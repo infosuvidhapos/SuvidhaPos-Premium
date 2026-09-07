@@ -48,3 +48,32 @@ BEGIN
      WHERE StoreType IN ('Gold & Diamond Jewellery','Silver Jewellery');
 END
 GO
+
+-- Base-unit inventory / three-level UOM (PACK -> INNER -> BASE).
+-- Quantity in ProductBatches and StockLedger remains ALWAYS in BaseUnit.
+IF COL_LENGTH('dbo.ProductUoms','InnerUnit') IS NULL ALTER TABLE dbo.ProductUoms ADD InnerUnit nvarchar(20) NULL;
+IF COL_LENGTH('dbo.ProductUoms','InnerConversionFactor') IS NULL ALTER TABLE dbo.ProductUoms ADD InnerConversionFactor decimal(18,6) NOT NULL CONSTRAINT DF_ProductUoms_InnerFactor DEFAULT 1;
+IF COL_LENGTH('dbo.ProductUoms','PackInnerFactor') IS NULL ALTER TABLE dbo.ProductUoms ADD PackInnerFactor decimal(18,6) NOT NULL CONSTRAINT DF_ProductUoms_PackInnerFactor DEFAULT 1;
+IF COL_LENGTH('dbo.ProductUoms','InnerPurchaseRate') IS NULL ALTER TABLE dbo.ProductUoms ADD InnerPurchaseRate decimal(18,4) NOT NULL CONSTRAINT DF_ProductUoms_InnerPurchase DEFAULT 0;
+IF COL_LENGTH('dbo.ProductUoms','InnerMrp') IS NULL ALTER TABLE dbo.ProductUoms ADD InnerMrp decimal(18,4) NOT NULL CONSTRAINT DF_ProductUoms_InnerMrp DEFAULT 0;
+IF COL_LENGTH('dbo.ProductUoms','InnerSalePrice') IS NULL ALTER TABLE dbo.ProductUoms ADD InnerSalePrice decimal(18,4) NOT NULL CONSTRAINT DF_ProductUoms_InnerSale DEFAULT 0;
+GO
+
+-- Every normal product has a UOM definition, even single-unit items (factor 1).
+INSERT dbo.ProductUoms(ProductId,BaseUnit,PackUnit,ConversionFactor,PackPurchaseRate,PackMrp,PackSalePrice,LooseSalePrice,AllowLoose)
+SELECT p.Id,UPPER(ISNULL(NULLIF(p.Unit,''),'PCS')),UPPER(ISNULL(NULLIF(p.Unit,''),'PCS')),1,p.PurchasePrice,p.Mrp,p.SalePrice,p.SalePrice,1
+FROM dbo.Products p
+WHERE NOT EXISTS(SELECT 1 FROM dbo.ProductUoms u WHERE u.ProductId=p.Id);
+GO
+
+IF COL_LENGTH('dbo.PurchaseLines','UnitPurchased') IS NULL ALTER TABLE dbo.PurchaseLines ADD UnitPurchased nvarchar(20) NULL;
+IF COL_LENGTH('dbo.PurchaseLines','PurchasedQty') IS NULL ALTER TABLE dbo.PurchaseLines ADD PurchasedQty decimal(18,3) NULL;
+IF COL_LENGTH('dbo.PurchaseLines','TotalBaseQty') IS NULL ALTER TABLE dbo.PurchaseLines ADD TotalBaseQty decimal(18,3) NULL;
+IF COL_LENGTH('dbo.PurchaseLines','RatePerPurchasedUnit') IS NULL ALTER TABLE dbo.PurchaseLines ADD RatePerPurchasedUnit decimal(18,4) NULL;
+GO
+
+IF COL_LENGTH('dbo.SaleLines','UnitSold') IS NULL ALTER TABLE dbo.SaleLines ADD UnitSold nvarchar(20) NULL;
+IF COL_LENGTH('dbo.SaleLines','SoldQuantity') IS NULL ALTER TABLE dbo.SaleLines ADD SoldQuantity decimal(18,3) NULL;
+IF COL_LENGTH('dbo.SaleLines','TotalBaseQtyDeducted') IS NULL ALTER TABLE dbo.SaleLines ADD TotalBaseQtyDeducted decimal(18,3) NULL;
+IF COL_LENGTH('dbo.SaleLines','RatePerSoldUnit') IS NULL ALTER TABLE dbo.SaleLines ADD RatePerSoldUnit decimal(18,4) NULL;
+GO

@@ -67,6 +67,21 @@ jobs:
           $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
           if(-not $jewel.Contains("suvidha:outlet-synced")){ throw 'Jewellery mode outlet sync listener missing' }
           if(-not $jewel.Contains("window.loadBilling=()=>invoice('retail')")){ throw 'Jewellery billing override missing' }
+      - name: Validate base-unit multi-unit inventory
+        shell: powershell
+        run: |
+          $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/specialized-schema.sql' -Raw -Encoding UTF8
+          foreach($token in @('InnerUnit','InnerConversionFactor','PackInnerFactor','UnitPurchased','TotalBaseQty','UnitSold','TotalBaseQtyDeducted')){ if(-not $schema.Contains($token)){ throw "Missing UOM schema token: $token" } }
+          $premium = Get-Content 'src/SuvidhaPOS-Premium/PremiumFeatureModules.cs' -Raw -Encoding UTF8
+          if(-not $premium.Contains('ResolvedPremiumSaleLine')){ throw 'Server-side sale UOM resolver missing' }
+          if(-not $premium.Contains('TotalBaseQtyDeducted')){ throw 'Sale base quantity audit missing' }
+          $counter = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/counter-billing.js' -Raw -Encoding UTF8
+          if(-not $counter.Contains('BaseQty:x.Qty*x.Factor')){ throw 'Counter billing does not submit base quantity' }
+          if(-not $counter.Contains("UnitSold:x.Uom")){ throw 'Counter billing sold unit audit missing' }
+          $special = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js' -Raw -Encoding UTF8
+          if(-not $special.Contains('Inner Unit (optional)')){ throw 'Three-level UOM item master missing' }
+          if(-not $special.Contains('UnitPurchased:x.Unit')){ throw 'Purchase UOM audit missing' }
+          if(-not $special.Contains('Batch No is mandatory for Pharmacy / Medical Store')){ throw 'Pharmacy batch validation missing' }
       - name: Download SQL Server 2019 Express prerequisite
         shell: powershell
         run: |

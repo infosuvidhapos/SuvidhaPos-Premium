@@ -113,15 +113,53 @@ public static class SpecializedModules
 
         app.MapGet("/api/products/{id:int}/uom", async (Db db, int id) =>
         {
-            var r = await db.QuerySingleAsync("SELECT TOP 1 ProductId,BaseUnit,PackUnit,ConversionFactor,PackPurchaseRate,PackMrp,PackSalePrice,LooseSalePrice,AllowLoose FROM ProductUoms WHERE ProductId=@id", P("@id", id));
-            if (r.Count == 0) return Results.Ok(new { ProductId=id, BaseUnit="PCS", PackUnit="BOX", ConversionFactor=1m, PackPurchaseRate=0m, PackMrp=0m, PackSalePrice=0m, LooseSalePrice=0m, AllowLoose=true });
+            var r = await db.QuerySingleAsync(@"SELECT TOP 1 ProductId,BaseUnit,InnerUnit,PackUnit,ConversionFactor,
+InnerConversionFactor,PackInnerFactor,PackPurchaseRate,PackMrp,PackSalePrice,
+InnerPurchaseRate,InnerMrp,InnerSalePrice,LooseSalePrice,AllowLoose
+FROM ProductUoms WHERE ProductId=@id", P("@id", id));
+            if (r.Count == 0)
+            {
+                var p = await db.QuerySingleAsync("SELECT TOP 1 Unit,PurchasePrice,Mrp,SalePrice FROM Products WHERE Id=@id",P("@id",id));
+                var unit=p.GetValueOrDefault("Unit")?.ToString()??"PCS";
+                var purchase=Convert.ToDecimal(p.GetValueOrDefault("PurchasePrice")??0m);
+                var mrp=Convert.ToDecimal(p.GetValueOrDefault("Mrp")??0m);
+                var sale=Convert.ToDecimal(p.GetValueOrDefault("SalePrice")??0m);
+                return Results.Ok(new { ProductId=id, BaseUnit=unit, InnerUnit=(string?)null, PackUnit=unit, ConversionFactor=1m, InnerConversionFactor=1m, PackInnerFactor=1m, PackPurchaseRate=purchase, PackMrp=mrp, PackSalePrice=sale, InnerPurchaseRate=0m, InnerMrp=0m, InnerSalePrice=0m, LooseSalePrice=sale, AllowLoose=true });
+            }
             return Results.Ok(r);
         });
         app.MapPut("/api/products/{id:int}/uom", async (Db db, int id, UomRequest x) =>
         {
-            if (string.IsNullOrWhiteSpace(x.BaseUnit) || string.IsNullOrWhiteSpace(x.PackUnit) || x.ConversionFactor <= 0) return Results.BadRequest(new { message="Base unit, pack unit and conversion factor are required" });
-            await db.ScalarAsync(@"MERGE ProductUoms AS t USING (SELECT @id ProductId) s ON t.ProductId=s.ProductId WHEN MATCHED THEN UPDATE SET BaseUnit=@b,PackUnit=@p,ConversionFactor=@f,PackPurchaseRate=@pp,PackMrp=@m,PackSalePrice=@sp,LooseSalePrice=@lp,AllowLoose=@lo,UpdatedAt=SYSDATETIME() WHEN NOT MATCHED THEN INSERT(ProductId,BaseUnit,PackUnit,ConversionFactor,PackPurchaseRate,PackMrp,PackSalePrice,LooseSalePrice,AllowLoose) VALUES(@id,@b,@p,@f,@pp,@m,@sp,@lp,@lo);", P("@id",id),P("@b",x.BaseUnit.Trim().ToUpperInvariant()),P("@p",x.PackUnit.Trim().ToUpperInvariant()),P("@f",x.ConversionFactor),P("@pp",x.PackPurchaseRate),P("@m",x.PackMrp),P("@sp",x.PackSalePrice),P("@lp",x.LooseSalePrice),P("@lo",x.AllowLoose));
-            return Results.Ok(new { saved=true });
+            if (string.IsNullOrWhiteSpace(x.BaseUnit) || string.IsNullOrWhiteSpace(x.PackUnit))
+                return Results.BadRequest(new { message="Base unit and pack unit are required" });
+
+            var baseUnit=x.BaseUnit.Trim().ToUpperInvariant();
+            var packUnit=x.PackUnit.Trim().ToUpperInvariant();
+            var innerUnit=string.IsNullOrWhiteSpace(x.InnerUnit)?null:x.InnerUnit.Trim().ToUpperInvariant();
+            var innerFactor=innerUnit is null?1m:Math.Max(1m,x.InnerConversionFactor);
+            var packInnerFactor=Math.Max(1m,x.PackInnerFactor);
+            var totalFactor=innerUnit is null
+                ? Math.Max(1m,x.ConversionFactor>0?x.ConversionFactor:packInnerFactor)
+                : innerFactor*packInnerFactor;
+            if(packUnit.Equals(baseUnit,StringComparison.OrdinalIgnoreCase) && innerUnit is null) totalFactor=1m;
+
+            await db.ScalarAsync(@"MERGE ProductUoms AS t
+USING (SELECT @id ProductId) s ON t.ProductId=s.ProductId
+WHEN MATCHED THEN UPDATE SET
+ BaseUnit=@b,InnerUnit=@iu,PackUnit=@p,ConversionFactor=@f,
+ InnerConversionFactor=@if,PackInnerFactor=@pf,
+ PackPurchaseRate=@pp,PackMrp=@m,PackSalePrice=@sp,
+ InnerPurchaseRate=@ip,InnerMrp=@im,InnerSalePrice=@is,
+ LooseSalePrice=@lp,AllowLoose=@lo,UpdatedAt=SYSDATETIME()
+WHEN NOT MATCHED THEN
+ INSERT(ProductId,BaseUnit,InnerUnit,PackUnit,ConversionFactor,InnerConversionFactor,PackInnerFactor,PackPurchaseRate,PackMrp,PackSalePrice,InnerPurchaseRate,InnerMrp,InnerSalePrice,LooseSalePrice,AllowLoose)
+ VALUES(@id,@b,@iu,@p,@f,@if,@pf,@pp,@m,@sp,@ip,@im,@is,@lp,@lo);",
+ P("@id",id),P("@b",baseUnit),P("@iu",innerUnit),P("@p",packUnit),P("@f",totalFactor),
+ P("@if",innerFactor),P("@pf",packInnerFactor),
+ P("@pp",x.PackPurchaseRate),P("@m",x.PackMrp),P("@sp",x.PackSalePrice),
+ P("@ip",x.InnerPurchaseRate),P("@im",x.InnerMrp),P("@is",x.InnerSalePrice),
+ P("@lp",x.LooseSalePrice),P("@lo",x.AllowLoose));
+            return Results.Ok(new { saved=true, BaseUnit=baseUnit, InnerUnit=innerUnit, PackUnit=packUnit, ConversionFactor=totalFactor, InnerConversionFactor=innerFactor, PackInnerFactor=packInnerFactor });
         });
 
         app.MapGet("/api/jewellery/metal-rates", async (Db db) => Results.Ok(await db.QueryAsync("SELECT Id,MetalType,Purity,RatePerGram,EffectiveAt FROM JewelleryMetalRates WHERE IsActive=1 ORDER BY MetalType,Purity")));
@@ -177,7 +215,7 @@ ORDER BY Id DESC",P("@f",f),P("@e",e),P("@q",term),P("@like","%"+term+"%")));
     static bool IsJewellery(string t)=>CanonicalStoreType(t).Equals("Jewellery Shop",StringComparison.OrdinalIgnoreCase);
     static SqlParameter P(string n,object? v)=>new(n,v??DBNull.Value);
     public record BackupMasterRequest(string? Server,string? Database,string? Folder,string? Schedule,int RetentionDays,bool LocalEnabled,bool Zip,bool AutoCleanup,string? ExternalFolder,bool ExternalEnabled,string? GoogleDriveConfig);
-    public record UomRequest(string BaseUnit,string PackUnit,decimal ConversionFactor,decimal PackPurchaseRate,decimal PackMrp,decimal PackSalePrice,decimal LooseSalePrice,bool AllowLoose);
+    public record UomRequest(string BaseUnit,string PackUnit,decimal ConversionFactor,decimal PackPurchaseRate,decimal PackMrp,decimal PackSalePrice,decimal LooseSalePrice,bool AllowLoose,string? InnerUnit=null,decimal InnerConversionFactor=1m,decimal PackInnerFactor=1m,decimal InnerPurchaseRate=0m,decimal InnerMrp=0m,decimal InnerSalePrice=0m);
     public record MetalRateRequest(string MetalType,string Purity,decimal RatePerGram,DateTime? EffectiveAt);
     public record JewelleryItemRequest(string TagNo,string? Barcode,string ItemName,string? Category,string MetalType,string Purity,decimal PurityPercent,string? Huid,decimal GrossWeight,decimal NetWeight,decimal StoneWeight,string? MakingChargeType,decimal MakingValue,string? Status,string? RackName);
     public record JewellerySaleRequest(string? CustomerName,int? CustomerId,string? CustomerPan,List<JewellerySaleLineRequest> Lines,decimal GstRate,decimal OldMetalCredit,decimal PaidAmount,string? PaymentMode,string? Notes);

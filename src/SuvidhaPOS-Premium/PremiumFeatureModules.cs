@@ -22,22 +22,46 @@ public static class PremiumFeatureModules
             var session = ctx.Items["User"];
             var cashier = session?.GetType().GetProperty("UserName")?.GetValue(session)?.ToString() ?? "Unknown";
 
+            // Resolve the sold UOM on the server. The client sends the human unit/qty,
+            // while stock is always consumed in BaseUnit.
+            var resolved = new List<ResolvedPremiumSaleLine>();
+            foreach (var l in x.Lines)
+            {
+                var soldUnit=(l.UnitSold??"").Trim();
+                var u=await db.QuerySingleAsync(@"SELECT TOP 1 BaseUnit,InnerUnit,PackUnit,ConversionFactor,InnerConversionFactor FROM ProductUoms WHERE ProductId=@p",P("@p",l.ProductId));
+                decimal factor=1m;
+                if(!string.IsNullOrWhiteSpace(soldUnit) && u.Count>0)
+                {
+                    var baseUnit=u.GetValueOrDefault("BaseUnit")?.ToString()??"PCS";
+                    var innerUnit=u.GetValueOrDefault("InnerUnit")?.ToString();
+                    var packUnit=u.GetValueOrDefault("PackUnit")?.ToString();
+                    if(soldUnit.Equals(packUnit,StringComparison.OrdinalIgnoreCase)) factor=Math.Max(1m,Convert.ToDecimal(u.GetValueOrDefault("ConversionFactor")??1m));
+                    else if(!string.IsNullOrWhiteSpace(innerUnit)&&soldUnit.Equals(innerUnit,StringComparison.OrdinalIgnoreCase)) factor=Math.Max(1m,Convert.ToDecimal(u.GetValueOrDefault("InnerConversionFactor")??1m));
+                    else if(soldUnit.Equals(baseUnit,StringComparison.OrdinalIgnoreCase)) factor=1m;
+                }
+                var soldQty=l.SoldQty>0?l.SoldQty:(l.BaseQty>0?l.BaseQty/factor:l.Qty/factor);
+                var baseQty=!string.IsNullOrWhiteSpace(soldUnit)?soldQty*factor:(l.BaseQty>0?l.BaseQty:l.Qty);
+                var soldRate=l.RatePerSoldUnit>0?l.RatePerSoldUnit:l.SalePrice*factor;
+                var baseRate=factor>0?soldRate/factor:l.SalePrice;
+                if(baseQty<=0) return Results.BadRequest(new { message="Quantity must be greater than zero" });
+                resolved.Add(new ResolvedPremiumSaleLine(l.ProductId,baseQty,baseRate,l.TaxRate,l.Discount,string.IsNullOrWhiteSpace(soldUnit)?null:soldUnit,soldQty,soldRate,factor));
+            }
+
             using var c = db.CreateConnection();
             await c.OpenAsync();
             using var tx = c.BeginTransaction();
             try
             {
-                foreach (var l in x.Lines)
+                foreach (var l in resolved)
                 {
-                    if (l.Qty <= 0) return Results.BadRequest(new { message = "Quantity must be greater than zero" });
                     var ck = new SqlCommand("SELECT ISNULL(SUM(Quantity),0) FROM ProductBatches WHERE ProductId=@p AND Quantity>0 AND ExpiryDate>=CAST(GETDATE() AS date)", c, tx);
                     ck.Parameters.Add(P("@p", l.ProductId));
-                    if (Convert.ToDecimal(await ck.ExecuteScalarAsync()) < l.Qty)
-                        return Results.BadRequest(new { message = "Insufficient saleable stock for product " + l.ProductId });
+                    if (Convert.ToDecimal(await ck.ExecuteScalarAsync()) < l.BaseQty)
+                        return Results.BadRequest(new { message = "Insufficient saleable base-unit stock for product " + l.ProductId });
                 }
 
-                decimal sub = x.Lines.Sum(a => a.Qty * a.SalePrice);
-                decimal tax = x.Lines.Sum(a => a.Qty * a.SalePrice * a.TaxRate / 100m);
+                decimal sub = resolved.Sum(a => a.BaseQty * a.BaseRate);
+                decimal tax = resolved.Sum(a => a.BaseQty * a.BaseRate * a.TaxRate / 100m);
                 decimal discount = discountType == "PERCENT" ? sub * Math.Min(100m, discountValue) / 100m : discountValue;
                 discount = Math.Min(discount, sub + tax);
                 decimal total = Math.Max(0, sub - discount + tax);
@@ -61,9 +85,9 @@ SELECT CAST(SCOPE_IDENTITY() AS int);", c, tx);
                 });
                 int sid = (int)await cmd.ExecuteScalarAsync();
 
-                foreach (var l in x.Lines)
+                foreach (var l in resolved)
                 {
-                    decimal rem = l.Qty;
+                    decimal rem = l.BaseQty;
                     while (rem > 0)
                     {
                         cmd = new SqlCommand("SELECT TOP 1 Id,Quantity,CostPrice FROM ProductBatches WITH(UPDLOCK,ROWLOCK) WHERE ProductId=@p AND Quantity>0 AND ExpiryDate>=CAST(GETDATE() AS date) ORDER BY ExpiryDate,Id", c, tx);
@@ -75,11 +99,19 @@ SELECT CAST(SCOPE_IDENTITY() AS int);", c, tx);
                         await r.CloseAsync();
                         decimal take = Math.Min(rem, avail);
                         cost += take * cp;
+                        decimal soldTake=l.Factor>0?take/l.Factor:take;
 
                         cmd = new SqlCommand(@"UPDATE ProductBatches SET Quantity=Quantity-@q WHERE Id=@b;
-INSERT SaleLines(SaleId,ProductId,BatchId,Quantity,SalePrice,CostPrice,TaxRate,Discount) VALUES(@s,@p,@b,@q,@sp,@cp,@tr,@di);
-INSERT StockLedger(ProductId,BatchId,MovementType,Quantity,ReferenceType,ReferenceId) VALUES(@p,@b,'SALE',-@q,'SALE',@s)", c, tx);
-                        cmd.Parameters.AddRange(new[] { P("@q",take),P("@b",bid),P("@s",sid),P("@p",l.ProductId),P("@sp",l.SalePrice),P("@cp",cp),P("@tr",l.TaxRate),P("@di",l.Discount) });
+INSERT SaleLines(SaleId,ProductId,BatchId,Quantity,SalePrice,CostPrice,TaxRate,Discount,UnitSold,SoldQuantity,TotalBaseQtyDeducted,RatePerSoldUnit)
+VALUES(@s,@p,@b,@q,@sp,@cp,@tr,@di,@us,@sq,@tb,@rsu);
+INSERT StockLedger(ProductId,BatchId,MovementType,Quantity,ReferenceType,ReferenceId,Notes)
+VALUES(@p,@b,'SALE',-@q,'SALE',@s,@note)", c, tx);
+                        cmd.Parameters.AddRange(new[] {
+                            P("@q",take),P("@b",bid),P("@s",sid),P("@p",l.ProductId),
+                            P("@sp",l.BaseRate),P("@cp",cp),P("@tr",l.TaxRate),P("@di",l.Discount),
+                            P("@us",l.UnitSold),P("@sq",soldTake),P("@tb",take),P("@rsu",l.SoldRate),
+                            P("@note",string.IsNullOrWhiteSpace(l.UnitSold)?"Base-unit sale":$"{soldTake:0.###} {l.UnitSold} = {take:0.###} base units")
+                        });
                         await cmd.ExecuteNonQueryAsync();
                         rem -= take;
                     }
@@ -253,7 +285,7 @@ ORDER BY p.Name"; break;
         });
     }
 
-    public record PremiumSaleLine(int ProductId, decimal Qty, decimal SalePrice, decimal TaxRate, decimal Discount);
+    public record PremiumSaleLine(int ProductId, decimal Qty, decimal SalePrice, decimal TaxRate, decimal Discount, string? UnitSold=null, decimal SoldQty=0m, decimal BaseQty=0m, decimal RatePerSoldUnit=0m);
     public record PremiumPaymentRequest(string Mode, string? Type, decimal Amount, string? ReferenceNo);
     public record PremiumSaleRequest(int? CustomerId,string? CustomerName,string? PaymentMode,decimal PaidAmount,string? DiscountType,decimal DiscountValue,string? Notes,List<PremiumSaleLine> Lines,List<PremiumPaymentRequest>? Payments);
     public record OpeningStockLine(int ProductId,string? BatchNo,decimal Quantity,decimal CostPrice,decimal SalePrice,decimal Mrp,DateTime? ExpiryDate);
