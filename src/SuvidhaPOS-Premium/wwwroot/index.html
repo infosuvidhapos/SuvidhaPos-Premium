@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SuvidhaPOS Premium</title>
-<link rel="stylesheet" href="/css/app.css?v=635authfix5">
-<link rel="stylesheet" href="/css/counter-billing.css?v=635authfix5">
-<link rel="stylesheet" href="/css/payment-keyboard.css?v=635authfix5">
-<link rel="stylesheet" href="/css/multi-mode-payment.css?v=635authfix5">
-<link rel="stylesheet" href="/css/legacy-report-suite.css?v=635authfix5">
-<link rel="stylesheet" href="/css/premium-fixes.css?v=635authfix5">
-<link rel="stylesheet" href="/css/login-premium.css?v=635authfix5">
-<link rel="stylesheet" href="/css/backup-master.css?v=635authfix5">
-<link rel="stylesheet" href="/css/specialized-pos.css?v=635authfix5">
+<link rel="stylesheet" href="/css/app.css?v=636authfix6">
+<link rel="stylesheet" href="/css/counter-billing.css?v=636authfix6">
+<link rel="stylesheet" href="/css/payment-keyboard.css?v=636authfix6">
+<link rel="stylesheet" href="/css/multi-mode-payment.css?v=636authfix6">
+<link rel="stylesheet" href="/css/legacy-report-suite.css?v=636authfix6">
+<link rel="stylesheet" href="/css/premium-fixes.css?v=636authfix6">
+<link rel="stylesheet" href="/css/login-premium.css?v=636authfix6">
+<link rel="stylesheet" href="/css/backup-master.css?v=636authfix6">
+<link rel="stylesheet" href="/css/specialized-pos.css?v=636authfix6">
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -28,7 +28,7 @@
         <div class="login-feature"><b>◷</b>Expiry Alert</div><div class="login-feature"><b>⌖</b>Rack Indexing</div><div class="login-feature"><b>✦</b>AI Item Entry</div><div class="login-feature"><b>▤</b>Multi Store</div><div class="login-feature"><b>⚡</b>Secure & Fast</div>
       </div>
       <div class="login-quote">“ Organize Today<br><strong>&nbsp;&nbsp;&nbsp;Grow Tomorrow</strong> ”</div>
-      <div class="login-footer">Version 6.3.5-authfix5 </div>
+      <div class="login-footer">Version 6.3.6-authfix6 </div>
     </div>
     <div class="login-panel">
       <div class="login-card">
@@ -36,7 +36,7 @@
         <div class="login-field"><label>User ID</label><input id="loginUser" class="login-input" autocomplete="username" placeholder="Enter your user ID"></div>
         <div class="login-field"><label>Password</label><div class="login-passbox"><input id="loginPass" class="login-input" type="password" autocomplete="current-password" placeholder="Enter your password"><button id="loginEye" class="login-eye" type="button">◉</button></div></div>
         <div class="login-row"><label class="login-check"><input id="rememberMe" type="checkbox" checked> Remember Me</label><button id="forgotPasswordBtn" class="login-link" type="button">Forgot Password?</button></div>
-        <button id="loginSubmitBtn" class="login-submit" type="button">→ &nbsp; Login &nbsp;›</button>
+        <button id="loginSubmitBtn" class="login-submit" type="button" onclick="if(window.suvidhaLoginNow){return window.suvidhaLoginNow(event);}document.getElementById('loginError').textContent='LOGIN MODULE NOT LOADED (AUTHFIX6)';return false;">→ &nbsp; Login &nbsp;›</button>
         <div class="login-or">OR</div>
         <button id="biometricBtn" class="login-secondary" type="button">◎ &nbsp; Login with Biometrics (Optional)</button>
         <div id="loginError" class="login-error"></div>
@@ -79,99 +79,10 @@
 <header><div class="mobilebrand"><button class="iconbtn" onclick="toggleSide()">☰</button></div><div><h1 id="title">Dashboard</h1><p>Premium billing &amp; inventory management</p></div><div class="headright"><span class="pill">📅 <span id="today"></span></span><span class="pill">🏪 <span id="outletPill">Main Outlet</span></span><button class="pill" id="userPill" onclick="openChangePassword(false)">Admin</button><button class="refresh" onclick="refreshPage()">↻</button></div></header>
 <section id="app"></section><footer><span>● SQL Server: <b id="dbstatus">Checking...</b></span><span id="clock"></span><span>SuvidhaPOS Premium • Local SQL</span></footer>
 </main></div><div id="toast"></div>
-<script src="/js/app.js?v=635authfix5"></script><script src="/js/desktop-bridge.js?v=635authfix5"></script><script src="/js/pos-fixes.js?v=635authfix5"></script><script src="/js/specialized-pos.js?v=635authfix5"></script><script src="/js/tax-master.js?v=635authfix5"></script><script src="/js/reports-suite.js?v=635authfix5"></script><script src="/js/ai-settings-fix.js?v=635authfix5"></script><script src="/js/counter-billing.js?v=635authfix5"></script><script src="/js/outlet-master-fix.js?v=635authfix5"></script><script src="/js/payment-keyboard.js?v=635authfix5"></script><script src="/js/multi-mode-payment.js?v=635authfix5"></script><script src="/js/print-settings.js?v=635authfix5"></script><script src="/js/backup-master.js?v=635authfix5"></script><script src="/js/legacy-report-suite.js?v=635authfix5"></script><script src="/js/legacy-report-boot.js?v=635authfix5"></script>
-<script>
-(function(){
-  const $=id=>document.getElementById(id);
-  const setError=m=>{const e=$('loginError');if(e)e.textContent=m?String(m):'';};
-  const native=(type,payload)=>{try{
-    if(type==='support'||type==='forgotPassword'){
-      const u='https://wa.me/918271718844';
-      try{window.open(u,'_blank','noopener')}catch(e){location.href=u}
-      return true;
-    }
-    if(type==='biometric'){setError('Biometric login requires Windows Hello/device enrollment.');return true;}
-    if(window.chrome&&window.chrome.webview){window.chrome.webview.postMessage(Object.assign({type:type},payload||{}));return true}
-  }catch(e){console.error(e)}return false};
+<script src="/js/app.js?v=636authfix6"></script><script src="/js/desktop-bridge.js?v=636authfix6"></script><script src="/js/pos-fixes.js?v=636authfix6"></script><script src="/js/specialized-pos.js?v=636authfix6"></script><script src="/js/tax-master.js?v=636authfix6"></script><script src="/js/reports-suite.js?v=636authfix6"></script><script src="/js/ai-settings-fix.js?v=636authfix6"></script><script src="/js/counter-billing.js?v=636authfix6"></script><script src="/js/outlet-master-fix.js?v=636authfix6"></script><script src="/js/payment-keyboard.js?v=636authfix6"></script><script src="/js/multi-mode-payment.js?v=636authfix6"></script><script src="/js/print-settings.js?v=636authfix6"></script><script src="/js/backup-master.js?v=636authfix6"></script><script src="/js/legacy-report-suite.js?v=636authfix6"></script><script src="/js/legacy-report-boot.js?v=636authfix6"></script>
+<script src="/js/login-authfix6.js?v=636authfix6"></script>
 
-  const doLogin=async()=>{
-    const user=($('loginUser')?.value||'').trim();
-    const pass=$('loginPass')?.value||'';
-    const remember=!!$('rememberMe')?.checked;
-    const btn=$('loginSubmitBtn');
-    setError('');
-    if(!user||!pass){setError('Enter User ID and Password');return}
-    if(btn){btn.disabled=true;btn.textContent='Signing in...'}
 
-    try{
-      const r=await fetch('/api/login',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','Accept':'application/json'},
-        credentials:'same-origin',
-        cache:'no-store',
-        body:JSON.stringify({UserName:user,Password:pass})
-      });
-      let d={};try{d=await r.json()}catch{}
-      if(!r.ok){
-        setError(r.status===401?'Invalid username or password':(d.message||d.detail||('Login failed ('+r.status+')')));
-        return;
-      }
-
-      const token=d.token||d.Token||null;
-      if(token){
-        window.suvidhaAuthToken=token;
-        try{sessionStorage.setItem('suvidha_auth_token',token)}catch{}
-      }
-
-      const raw=d.user||d.User||{};
-      const u={
-        Id:raw.Id??raw.id,
-        UserName:raw.UserName??raw.userName??user,
-        DisplayName:raw.DisplayName??raw.displayName??raw.UserName??raw.userName??user,
-        Role:raw.Role??raw.role??'User',
-        MustChangePassword:raw.MustChangePassword??raw.mustChangePassword??false
-      };
-      try{currentUser=u}catch{}
-      window.currentUser=u;
-
-      const verifyHeaders={'Accept':'application/json'};
-      if(token)verifyHeaders['Authorization']='Bearer '+token;
-      const verify=await fetch('/api/me',{headers:verifyHeaders,credentials:'same-origin',cache:'no-store'});
-      if(!verify.ok){
-        let detail='HTTP '+verify.status;
-        try{const x=await verify.json();detail=x.message||x.detail||detail}catch{}
-        throw new Error('Session verification failed: '+detail);
-      }
-
-      native(remember?'remember':'clearRemembered',remember?{enabled:true,userName:user,password:pass}:{});
-      const s=$('loginScreen');if(s)s.style.display='none';
-      const p=$('userPill');if(p)p.textContent=u.DisplayName+' · '+u.Role;
-
-      try{if(typeof window.loadDashboard==='function')await window.loadDashboard()}catch(e){console.error('Dashboard failed after login',e)}
-      try{if(u.MustChangePassword&&typeof window.openChangePassword==='function')window.openChangePassword(true)}catch(e){console.error('Password dialog failed',e)}
-    }catch(e){
-      console.error('Desktop login error',e);
-      setError(e?.message||String(e)||'Login failed');
-      const s=$('loginScreen');if(s)s.style.display='flex';
-    }finally{
-      if(btn){btn.disabled=false;btn.textContent='→   Login   ›'}
-    }
-  };
-
-  window.login=doLogin;
-  const support=()=>native('support');
-  $('loginEye')?.addEventListener('click',function(){const x=$('loginPass');if(!x)return;x.type=x.type==='password'?'text':'password';this.textContent=x.type==='password'?'◉':'◌'});
-  $('loginSubmitBtn')?.addEventListener('click',doLogin);
-  $('loginPass')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doLogin()}});
-  $('loginUser')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('loginPass')?.focus()}});
-  $('forgotPasswordBtn')?.addEventListener('click',support);
-  $('supportBtn')?.addEventListener('click',support);
-  $('biometricBtn')?.addEventListener('click',()=>native('biometric'));
-  $('changeDatabaseBtn')?.addEventListener('click',()=>{if(!native('database'))setError('Change Database is available from the Windows desktop host.')});
-  $('exitBtn')?.addEventListener('click',()=>{if(!native('exit')){try{window.close()}catch(e){}}});
-  window.addEventListener('load',()=>{$('loginUser')?.focus()});
-})();
-</script>
 
 <script>(async()=>{try{const r=await fetch('/public/specialization',{cache:'no-store'});if(r.ok){const x=await r.json();const e=document.getElementById('loginOutlet');if(e)e.textContent=(x.OutletName||'Main Outlet')+' · '+(x.StoreType||'Retail Shop')}}catch{}})();</script>
 </body></html>

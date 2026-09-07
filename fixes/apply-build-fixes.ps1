@@ -73,4 +73,4 @@ if(-not $text.Contains('SuvidhaPOS.Premium.ReportTaxModules.Map(app);')){$text=$
 Set-Content $program $text -Encoding UTF8
 Set-Content $project $proj -Encoding UTF8
 Set-Content $desktopPath $desktop -Encoding UTF8
-Write-Host 'Build fixes applied, including inline login patch and WebView2 cache bust.'
+Write-Host 'Build fixes applied. index.html remains untouched to preserve UTF-8.'

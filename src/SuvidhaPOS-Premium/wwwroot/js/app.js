@@ -1,4 +1,4 @@
-let currentUser=null;
+var currentUser=null;
 async function login(){
   const u=document.querySelector('#loginUser').value.trim(),p=document.querySelector('#loginPass').value;
   try{
