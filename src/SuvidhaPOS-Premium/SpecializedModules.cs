@@ -121,6 +121,20 @@ public static class SpecializedModules
             var id=await db.ScalarAsync(@"INSERT JewelleryItems(TagNo,Barcode,ItemName,Category,MetalType,Purity,PurityPercent,Huid,GrossWeight,NetWeight,StoneWeight,MakingChargeType,MakingValue,Status,RackName) VALUES(@tag,@bc,@name,@cat,@metal,@purity,@pp,@huid,@gross,@net,@stone,@mct,@mv,@status,@rack);SELECT CAST(SCOPE_IDENTITY() AS int)",P("@tag",x.TagNo),P("@bc",x.Barcode),P("@name",x.ItemName),P("@cat",x.Category),P("@metal",x.MetalType),P("@purity",x.Purity),P("@pp",x.PurityPercent),P("@huid",x.Huid),P("@gross",x.GrossWeight),P("@net",x.NetWeight),P("@stone",x.StoneWeight),P("@mct",x.MakingChargeType??"FLAT"),P("@mv",x.MakingValue),P("@status",x.Status??"IN_STOCK"),P("@rack",x.RackName));
             return Results.Ok(new {id});
         });
+        app.MapGet("/api/jewellery/sales", async (Db db, string? q, DateTime? from, DateTime? to) =>
+        {
+            var term=q?.Trim()??"";
+            var f=(from??new DateTime(2000,1,1)).Date;
+            var e=(to??DateTime.Today).Date.AddDays(1);
+            return Results.Ok(await db.QueryAsync(@"SELECT TOP 500 Id,InvoiceNo,BillDate,CustomerName,PaymentMode,GrossAmount,OldMetalCredit,NetPayable,PaidAmount,
+CAST(NetPayable-PaidAmount AS decimal(18,2)) Balance,
+CASE WHEN PaidAmount>=NetPayable THEN 'paid' ELSE 'unpaid' END [Status],
+'retail' [Type]
+FROM JewellerySales
+WHERE BillDate>=@f AND BillDate<@e AND (@q='' OR InvoiceNo LIKE @like OR CustomerName LIKE @like)
+ORDER BY Id DESC",P("@f",f),P("@e",e),P("@q",term),P("@like","%"+term+"%")));
+        });
+
         app.MapPost("/api/jewellery/sales", async (Db db, JewellerySaleRequest x) =>
         {
             if (x.Lines is null || x.Lines.Count==0) return Results.BadRequest(new {message="Add jewellery item"});
