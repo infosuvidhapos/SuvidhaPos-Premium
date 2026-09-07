@@ -98,7 +98,12 @@ jobs:
         shell: powershell
         run: |
           $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
-          foreach($token in @('"/api/ai/config"','"/api/ai/test"','https://api.openai.com/v1/files','new StringContent("user_data"),"purpose"','type="input_file",file_id=openAiFileId','OpenAiErrorMessage')){ if(-not $program.Contains($token)){ throw "AI backend validation missing: $token" } }
+          if(-not $program.Contains('app.MapGet("/api/ai/config"')){ throw 'AI config endpoint missing' }
+          if(-not $program.Contains('app.MapPost("/api/ai/test"')){ throw 'AI test endpoint missing' }
+          if(-not $program.Contains('https://api.openai.com/v1/files')){ throw 'OpenAI Files API upload missing' }
+          if(-not $program.Contains('upload.Add(new StringContent("user_data"),"purpose")')){ throw 'OpenAI file purpose=user_data missing' }
+          if(-not $program.Contains('contentPart=new{type="input_file",file_id=openAiFileId};')){ throw 'Responses API file_id input missing' }
+          if(-not $program.Contains('static string OpenAiErrorMessage')){ throw 'OpenAI error diagnostic helper missing' }
           $app = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           if(-not $app.Contains('Test AI Connection')){ throw 'AI connection test UI missing' }
           if(-not $app.Contains('NOT SQL SERVER')){ throw 'AI-specific error diagnostic missing' }
