@@ -155,7 +155,7 @@ app.MapPut("/api/outlet",async(Db db,OutletRequest x)=>{
  var id=Convert.ToInt32(row["Id"]); await db.ScalarAsync("UPDATE OutletMaster SET OutletName=@n,StoreType=@t,Address=@a,Phone=@p,Gstin=@g,RequireBatch=@b,RequireExpiry=@e,DefaultUnit=@u,UpdatedAt=SYSDATETIME() WHERE Id=@id",P("@n",x.OutletName),P("@t",x.StoreType),P("@a",x.Address),P("@p",x.Phone),P("@g",x.Gstin),P("@b",x.RequireBatch),P("@e",x.RequireExpiry),P("@u",x.DefaultUnit??"PCS"),P("@id",id)); return Results.Ok(new{saved=true,id});
 });
 app.MapGet("/api/outlet-types",()=>Results.Ok(new[]{
- "Retail Shop","Pharmacy / Medical Store","Agriculture Product Store","Seeds & Fertilizer Store","Pesticide / Crop Care Store","General Store","Grocery Store","Supermarket","Wholesale Store","Distributor","FMCG Store","Cosmetics & Beauty Store","Personal Care Store","Stationery Store","Hardware Store","Electrical Store","Electronics Store","Mobile & Accessories Store","Garments Store","Footwear Store","Hardware & Sanitary Store","Auto Parts Store","Pet / Veterinary Store","Dairy Store","Bakery","Restaurant / Cafe","Sweet Shop","Department Store","Other"
+ "Retail Shop","Pharmacy / Medical Store","Agriculture Product Store","Seeds & Fertilizer Store","Pesticide / Crop Care Store","General Store","Grocery Store","Supermarket","Wholesale Store","Distributor","FMCG Store","Cosmetics & Beauty Store","Personal Care Store","Stationery Store","Hardware Store","Electrical Store","Electronics Store","Mobile & Accessories Store","Garments Store","Footwear Store","Hardware & Sanitary Store","Auto Parts Store","Pet / Veterinary Store","Dairy Store","Bakery","Restaurant / Cafe","Sweet Shop","Department Store","Jewellery Shop","Other"
 }));
 app.MapGet("/api/products/location-search",async(Db db,string? q)=>Results.Ok(await db.QueryAsync(@"SELECT TOP 50 p.Id,p.Name,p.Barcode,p.Sku,p.Category,p.LocationCode,p.RackName,p.ShelfName,CAST(ISNULL((SELECT SUM(b.Quantity) FROM ProductBatches b WHERE b.ProductId=p.Id AND b.ExpiryDate>=CAST(GETDATE() AS date)),0) AS decimal(18,3)) Stock FROM Products p WHERE p.IsActive=1 AND (@q='' OR p.Name LIKE @l OR ISNULL(p.Barcode,'') LIKE @l OR ISNULL(p.Sku,'') LIKE @l OR ISNULL(p.LocationCode,'') LIKE @l) ORDER BY CASE WHEN p.Barcode=@q THEN 0 WHEN p.Sku=@q THEN 1 ELSE 2 END,p.Name",P("@q",q??""),P("@l","%"+(q??"")+"%"))));
 
@@ -207,6 +207,8 @@ app.MapPost("/api/ai/import/purchase/commit",async(Db db,HttpContext ctx,AiPurch
   await tx.CommitAsync(); return Results.Ok(new{id=purId,total,rows=prepared.Count});
  }catch(Exception ex){await tx.RollbackAsync();return Results.BadRequest(new{message=ex.Message});}
 });
+
+SuvidhaPOS.Premium.PremiumFeatureModules.Map(app);
 
 app.Run();
 

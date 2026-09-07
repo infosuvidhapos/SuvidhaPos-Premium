@@ -21,3 +21,21 @@ INSERT dbo.TaxMaster(TaxName,Rate,IsDefault,IsActive) VALUES('GST 0%',0,1,1),('G
 GO
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='UX_TaxMaster_DefaultRate') CREATE UNIQUE INDEX UX_TaxMaster_DefaultRate ON dbo.TaxMaster(Rate) WHERE IsDefault=1 AND IsActive=1;
 GO
+
+
+IF COL_LENGTH('dbo.Sales','CashierName') IS NULL ALTER TABLE dbo.Sales ADD CashierName nvarchar(80) NULL;
+IF COL_LENGTH('dbo.Sales','DiscountType') IS NULL ALTER TABLE dbo.Sales ADD DiscountType nvarchar(20) NOT NULL CONSTRAINT DF_Sales_DiscountType DEFAULT 'RUPEES';
+IF COL_LENGTH('dbo.Sales','DiscountValue') IS NULL ALTER TABLE dbo.Sales ADD DiscountValue decimal(18,4) NOT NULL CONSTRAINT DF_Sales_DiscountValue DEFAULT 0;
+GO
+IF OBJECT_ID('dbo.SalePayments') IS NULL CREATE TABLE dbo.SalePayments(
+ Id bigint IDENTITY PRIMARY KEY,
+ SaleId int NOT NULL REFERENCES dbo.Sales(Id),
+ PaymentMode nvarchar(30) NOT NULL,
+ PaymentType nvarchar(30) NULL,
+ Amount decimal(18,2) NOT NULL DEFAULT 0,
+ ReferenceNo nvarchar(100) NULL,
+ CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME()
+);
+GO
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_SalePayments_SaleId') CREATE INDEX IX_SalePayments_SaleId ON dbo.SalePayments(SaleId);
+GO
