@@ -16,7 +16,25 @@ app.UseDefaultFiles(); app.UseStaticFiles();
 var sessions = new ConcurrentDictionary<string, SessionUser>();
 app.Use(async (ctx,next) => {
     if (!ctx.Request.Path.StartsWithSegments("/api") || ctx.Request.Path.StartsWithSegments("/api/health") || ctx.Request.Path.StartsWithSegments("/api/login")) { await next(); return; }
-    if (!ctx.Request.Cookies.TryGetValue("suvidha_session", out var token) || !sessions.TryGetValue(token, out var user)) { ctx.Response.StatusCode=401; await ctx.Response.WriteAsJsonAsync(new {message="Login required"}); return; }
+
+    string? token = null;
+    if (ctx.Request.Cookies.TryGetValue("suvidha_session", out var cookieToken))
+        token = cookieToken;
+
+    if (string.IsNullOrWhiteSpace(token))
+    {
+        var auth = ctx.Request.Headers["Authorization"].ToString();
+        if (auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            token = auth.Substring(7).Trim();
+    }
+
+    if (string.IsNullOrWhiteSpace(token) || !sessions.TryGetValue(token, out var user))
+    {
+        ctx.Response.StatusCode=401;
+        await ctx.Response.WriteAsJsonAsync(new {message="Login required"});
+        return;
+    }
+
     ctx.Items["User"] = user;
     if (ctx.Request.Path.StartsWithSegments("/api/users") && user.Role != "Admin") { ctx.Response.StatusCode=403; await ctx.Response.WriteAsJsonAsync(new {message="Admin permission required"}); return; }
     if (ctx.Request.Path.StartsWithSegments("/api/sales") && ctx.Request.Path.Value?.EndsWith("/void") == true && user.Role == "Cashier") { ctx.Response.StatusCode=403; await ctx.Response.WriteAsJsonAsync(new {message="Manager permission required"}); return; }
@@ -26,10 +44,34 @@ app.Use(async (ctx,next) => {
 app.MapPost("/api/login", async(HttpContext ctx,Db db, LoginRequest x) => {
     var row=await db.QuerySingleAsync("SELECT TOP 1 Id,UserName,DisplayName,PasswordHash,Role,MustChangePassword FROM Users WHERE UserName=@u AND IsActive=1",P("@u",x.UserName?.Trim()));
     if(row.Count==0 || !VerifyPassword(x.Password??"", row["PasswordHash"]?.ToString()??"")) return Results.Unauthorized();
-    var token=Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)); var su=new SessionUser(Convert.ToInt32(row["Id"]),row["UserName"]?.ToString()??"",row["DisplayName"]?.ToString()??"",row["Role"]?.ToString()??"Cashier"); sessions[token]=su; ctx.Response.Cookies.Append("suvidha_session",token,new CookieOptions{HttpOnly=true,SameSite=SameSiteMode.Lax,IsEssential=true});
-    return Results.Ok(new {user=new {su.Id,su.UserName,su.DisplayName,su.Role,MustChangePassword=Convert.ToBoolean(row["MustChangePassword"]??false)}});
+
+    var token=Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+    var su=new SessionUser(Convert.ToInt32(row["Id"]),row["UserName"]?.ToString()??"",row["DisplayName"]?.ToString()??"",row["Role"]?.ToString()??"Cashier");
+    sessions[token]=su;
+
+    ctx.Response.Cookies.Append("suvidha_session",token,new CookieOptions{
+        HttpOnly=true,
+        SameSite=SameSiteMode.Lax,
+        IsEssential=true,
+        Path="/"
+    });
+
+    return Results.Ok(new {
+        token,
+        user=new {su.Id,su.UserName,su.DisplayName,su.Role,MustChangePassword=Convert.ToBoolean(row["MustChangePassword"]??false)}
+    });
 });
-app.MapPost("/api/logout",(HttpContext ctx)=>{if(ctx.Request.Cookies.TryGetValue("suvidha_session",out var token)) sessions.TryRemove(token,out _); ctx.Response.Cookies.Delete("suvidha_session"); return Results.Ok(new{loggedOut=true});});
+app.MapPost("/api/logout",(HttpContext ctx)=>{
+    string? token=null;
+    if(ctx.Request.Cookies.TryGetValue("suvidha_session",out var cookieToken)) token=cookieToken;
+    if(string.IsNullOrWhiteSpace(token)){
+        var auth=ctx.Request.Headers["Authorization"].ToString();
+        if(auth.StartsWith("Bearer ",StringComparison.OrdinalIgnoreCase)) token=auth.Substring(7).Trim();
+    }
+    if(!string.IsNullOrWhiteSpace(token)) sessions.TryRemove(token,out _);
+    ctx.Response.Cookies.Delete("suvidha_session",new CookieOptions{Path="/"});
+    return Results.Ok(new{loggedOut=true});
+});
 app.MapGet("/api/me",(HttpContext ctx)=>Results.Ok(ctx.Items["User"]));
 app.MapPost("/api/change-password",async(Db db,HttpContext ctx,PasswordChangeRequest x)=>{var u=(SessionUser)ctx.Items["User"]!; var row=await db.QuerySingleAsync("SELECT PasswordHash FROM Users WHERE Id=@id",P("@id",u.Id)); if(!VerifyPassword(x.CurrentPassword??"",row.GetValueOrDefault("PasswordHash")?.ToString()??"")) return Results.BadRequest(new{message="Current password is incorrect"}); if(string.IsNullOrWhiteSpace(x.NewPassword)||x.NewPassword.Length<6)return Results.BadRequest(new{message="Password must be at least 6 characters"}); await db.ScalarAsync("UPDATE Users SET PasswordHash=@p,MustChangePassword=0 WHERE Id=@id",P("@p",HashPassword(x.NewPassword)),P("@id",u.Id)); return Results.Ok(new{changed=true});});
 
