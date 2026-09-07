@@ -26,6 +26,18 @@ jobs:
         shell: powershell
         run: |
           $required=@('src/SuvidhaPOS-Premium/Program.cs','src/SuvidhaPOS-Premium/SpecializedModules.cs','src/SuvidhaPOS-Premium/PremiumFeatureModules.cs','src/SuvidhaPOS-Premium/wwwroot/js/premium-masters.js','src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js','src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-masters.css','src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj','src/SuvidhaPOS-Premium/Database/schema.sql','src/SuvidhaPOS-Premium/Database/specialized-schema.sql','src/SuvidhaPOS-Premium/Database/seed.sql','src/SuvidhaPOS-Premium/Database/print-schema.sql','src/SuvidhaPOS-Premium/wwwroot/index.html','src/SuvidhaPOS-Premium/wwwroot/js/app.js','src/SuvidhaPOS-Premium/wwwroot/js/login-authfix7.js','src/SuvidhaPOS-Premium/wwwroot/js/desktop-bridge.js','src/SuvidhaPOS-Premium/wwwroot/js/pos-fixes.js','src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js','src/SuvidhaPOS-Premium/wwwroot/js/backup-master.js','src/SuvidhaPOS-Premium/wwwroot/css/app.css','src/SuvidhaPOS-Premium/wwwroot/css/login-premium.css','src/SuvidhaPOS-Premium/wwwroot/css/backup-master.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-fixes.css','src/SuvidhaPOS-Premium/suvidha-pos.ico','src/SuvidhaPOS.Desktop/SuvidhaPOS.Desktop.csproj','src/SuvidhaPOS.Desktop/Program.cs','src/SuvidhaPOS.Desktop/MainForm.cs','src/SuvidhaPOS.Desktop/Database.config.json','installer/SuvidhaPOS.iss'); foreach($f in $required){if(-not(Test-Path $f)){throw "Missing $f"}}
+      - name: Validate sales trigger compatibility and report master
+        shell: powershell
+        run: |
+          $premium = Get-Content 'src/SuvidhaPOS-Premium/PremiumFeatureModules.cs' -Raw -Encoding UTF8
+          $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
+          if ($premium -match 'INSERT Sales[\\s\\S]{0,500}OUTPUT INSERTED') { throw 'Premium Sales insert is not trigger-safe' }
+          if ($program -match 'INSERT Sales[\\s\\S]{0,500}OUTPUT INSERTED') { throw 'Standard Sales insert is not trigger-safe' }
+          $reports = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/reports-suite.js' -Raw -Encoding UTF8
+          $required = @('Account Report','Daily Sale Report Bill Wise','Cashier Report','Date Wise Summary','Bill Modification Report','Utility Report','Item Wise Report','Profit & Loss Report','Date Wise Sale Summary Report','Bill/Customer Report','Category Wise Sale Report','Category Wise Monthly Sale Report','HSN Wise Sale Report','Purchase Register Report','Bill Detail Report','Qty Wise Report','Product Expiry Report','GSTR1')
+          foreach($name in $required){ if(-not $reports.Contains($name)){ throw "Missing report: $name" } }
+          $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
+          if($html.Contains('legacy-report-suite.js') -or $html.Contains('legacy-report-boot.js')){ throw 'Legacy report override is still loaded' }
       - name: Download SQL Server 2019 Express prerequisite
         shell: powershell
         run: |

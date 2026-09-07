@@ -52,7 +52,8 @@ public static class PremiumFeatureModules
 
                 var invoiceNo = "INV-" + DateTime.Now.ToString("yyyyMMddHHmmssfff");
                 var cmd = new SqlCommand(@"INSERT Sales(InvoiceNo,BillDate,CustomerId,CustomerName,PaymentMode,SubTotal,Discount,DiscountType,DiscountValue,Tax,GrandTotal,TotalCost,PaidAmount,Notes,CashierName)
-OUTPUT INSERTED.Id VALUES(@i,GETDATE(),@cid,@cn,@pm,@sub,@d,@dt,@dv,@t,@g,0,@paid,@notes,@cashier)", c, tx);
+VALUES(@i,GETDATE(),@cid,@cn,@pm,@sub,@d,@dt,@dv,@t,@g,0,@paid,@notes,@cashier);
+SELECT CAST(SCOPE_IDENTITY() AS int);", c, tx);
                 cmd.Parameters.AddRange(new[] {
                     P("@i",invoiceNo),P("@cid",x.CustomerId),P("@cn",x.CustomerName??"Walk-in Customer"),P("@pm",paymentMode),
                     P("@sub",sub),P("@d",discount),P("@dt",discountType),P("@dv",discountValue),P("@t",tax),P("@g",total),
