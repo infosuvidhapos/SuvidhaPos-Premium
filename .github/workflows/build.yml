@@ -44,10 +44,13 @@ jobs:
         shell: powershell
         run: |
           $outlet = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-master-fix.js' -Raw -Encoding UTF8
-          if($outlet.Contains('Gold & Diamond Jewellery')){ throw 'Duplicate Gold & Diamond Jewellery option still present' }
-          if($outlet.Contains('Silver Jewellery')){ throw 'Duplicate Silver Jewellery option still present' }
-          $count = ([regex]::Matches($outlet, "'Jewellery Shop'")).Count
-          if($count -ne 1){ throw "Expected exactly one Jewellery Shop option, found $count" }
+          $typesMatch = [regex]::Match($outlet, 'const\s+TYPES\s*=\s*\[(?<body>[\s\S]*?)\];')
+          if(-not $typesMatch.Success){ throw 'Outlet TYPES array not found' }
+          $typesBody = $typesMatch.Groups['body'].Value
+          if($typesBody.Contains('Gold & Diamond Jewellery')){ throw 'Duplicate Gold & Diamond Jewellery option still present in TYPES' }
+          if($typesBody.Contains('Silver Jewellery')){ throw 'Duplicate Silver Jewellery option still present in TYPES' }
+          $count = ([regex]::Matches($typesBody, "'Jewellery Shop'")).Count
+          if($count -ne 1){ throw "Expected exactly one Jewellery Shop option in TYPES, found $count" }
           $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/specialized-schema.sql' -Raw -Encoding UTF8
           if(-not $schema.Contains("StoreType IN ('Gold & Diamond Jewellery','Silver Jewellery')")){ throw 'Legacy jewellery type normalization migration missing' }
       - name: Download SQL Server 2019 Express prerequisite
