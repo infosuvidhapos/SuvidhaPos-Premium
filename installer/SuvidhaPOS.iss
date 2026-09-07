@@ -1,5 +1,5 @@
 #define MyAppName "SuvidhaPOS Premium"
-#define MyAppVersion "2.1.0"
+#define MyAppVersion "2.1.1"
 #define MyAppPublisher "SuvidhaPOS"
 #define MyAppExeName "SuvidhaPOS.Desktop.exe"
 [Setup]
@@ -18,6 +18,10 @@ SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
 PrivilegesRequired=admin
 WizardStyle=modern
+CloseApplications=yes
+RestartApplications=no
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\wwwroot"
 [Dirs]
 Name: "{app}"; Permissions: users-modify
 [Files]
