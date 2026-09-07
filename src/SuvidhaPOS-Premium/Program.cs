@@ -171,31 +171,127 @@ app.MapGet("/api/outlet-types",()=>Results.Ok(new[]{
 }));
 app.MapGet("/api/products/location-search",async(Db db,string? q)=>Results.Ok(await db.QueryAsync(@"SELECT TOP 50 p.Id,p.Name,p.Barcode,p.Sku,p.Category,p.LocationCode,p.RackName,p.ShelfName,CAST(ISNULL((SELECT SUM(b.Quantity) FROM ProductBatches b WHERE b.ProductId=p.Id AND b.ExpiryDate>=CAST(GETDATE() AS date)),0) AS decimal(18,3)) Stock FROM Products p WHERE p.IsActive=1 AND (@q='' OR p.Name LIKE @l OR ISNULL(p.Barcode,'') LIKE @l OR ISNULL(p.Sku,'') LIKE @l OR ISNULL(p.LocationCode,'') LIKE @l) ORDER BY CASE WHEN p.Barcode=@q THEN 0 WHEN p.Sku=@q THEN 1 ELSE 2 END,p.Name",P("@q",q??""),P("@l","%"+(q??"")+"%"))));
 
+app.MapGet("/api/ai/config",async(Db db)=>{
+ var envKey=Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+ var saved=(await db.QuerySingleAsync("SELECT [Value] FROM AppSettings WHERE [Key]='OpenAI.ApiKey'")).GetValueOrDefault("Value")?.ToString();
+ var key=!string.IsNullOrWhiteSpace(envKey)?envKey:saved;
+ var modelSetting=(await db.QuerySingleAsync("SELECT [Value] FROM AppSettings WHERE [Key]='OpenAI.Model'")).GetValueOrDefault("Value")?.ToString();
+ var model=Environment.GetEnvironmentVariable("OPENAI_MODEL")??modelSetting??"gpt-5.6-luna";
+ string? masked=null;
+ if(!string.IsNullOrWhiteSpace(key)) masked=key.Length<=8?"••••••••":key[..3]+"••••••"+key[^4..];
+ return Results.Ok(new{configured=!string.IsNullOrWhiteSpace(key),model,source=!string.IsNullOrWhiteSpace(envKey)?"Environment":"AppSettings",maskedKey=masked});
+});
+
+app.MapPost("/api/ai/test",async(Db db)=>{
+ var envKey=Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+ var saved=(await db.QuerySingleAsync("SELECT [Value] FROM AppSettings WHERE [Key]='OpenAI.ApiKey'")).GetValueOrDefault("Value")?.ToString();
+ var apiKey=!string.IsNullOrWhiteSpace(envKey)?envKey:saved;
+ var modelSetting=(await db.QuerySingleAsync("SELECT [Value] FROM AppSettings WHERE [Key]='OpenAI.Model'")).GetValueOrDefault("Value")?.ToString();
+ var model=Environment.GetEnvironmentVariable("OPENAI_MODEL")??modelSetting??"gpt-5.6-luna";
+ if(string.IsNullOrWhiteSpace(apiKey)) return Results.BadRequest(new{message="OpenAI API key is not configured"});
+ try{
+  using var http=new HttpClient{Timeout=TimeSpan.FromSeconds(45)};
+  http.DefaultRequestHeaders.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",apiKey);
+  var payload=new{model,input="Reply with exactly: OK"};
+  var resp=await http.PostAsJsonAsync("https://api.openai.com/v1/responses",payload);
+  var raw=await resp.Content.ReadAsStringAsync();
+  if(!resp.IsSuccessStatusCode) return Results.BadRequest(new{message=OpenAiErrorMessage(raw,(int)resp.StatusCode),status=(int)resp.StatusCode,model});
+  return Results.Ok(new{ok=true,model});
+ }catch(TaskCanceledException){return Results.BadRequest(new{message="OpenAI connection timed out. Check internet/firewall/proxy."});}
+ catch(HttpRequestException ex){return Results.BadRequest(new{message="Cannot reach OpenAI API: "+ex.Message});}
+});
+
 app.MapPost("/api/ai/import",async(HttpRequest req,Db db,HttpContext ctx)=>{
  if(!req.HasFormContentType) return Results.BadRequest(new{message="Use multipart/form-data"});
- var form=await req.ReadFormAsync(); var mode=(form["mode"].ToString()??"items").ToLowerInvariant(); var message=form["message"].ToString(); var file=form.Files.FirstOrDefault();
- var apiKey=Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? (await db.QuerySingleAsync("SELECT [Value] FROM AppSettings WHERE [Key]='OpenAI.ApiKey'")).GetValueOrDefault("Value")?.ToString();
- if(string.IsNullOrWhiteSpace(apiKey)) return Results.BadRequest(new{message="AI is not configured. Set OPENAI_API_KEY on this Windows machine or save an OpenAI key in Settings."});
- string? filename=file?.FileName; string mime=file?.ContentType??""; byte[]? bytes=null; string extracted="";
- if(file is not null){ if(file.Length>20*1024*1024) return Results.BadRequest(new{message="File is too large. Maximum 20 MB."}); using var ms=new MemoryStream(); await file.CopyToAsync(ms); bytes=ms.ToArray();
-   if(mime.Contains("spreadsheet")||mime.Contains("excel")||filename!.EndsWith(".xlsx",StringComparison.OrdinalIgnoreCase)) extracted=ExtractXlsx(bytes);
-   else if(mime.StartsWith("text/")||filename!.EndsWith(".csv",StringComparison.OrdinalIgnoreCase)||filename.EndsWith(".txt",StringComparison.OrdinalIgnoreCase)) extracted=Encoding.UTF8.GetString(bytes);
+ var form=await req.ReadFormAsync();
+ var mode=(form["mode"].ToString()??"items").ToLowerInvariant();
+ var message=form["message"].ToString();
+ var file=form.Files.FirstOrDefault();
+
+ var envKey=Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+ var savedKey=(await db.QuerySingleAsync("SELECT [Value] FROM AppSettings WHERE [Key]='OpenAI.ApiKey'")).GetValueOrDefault("Value")?.ToString();
+ var apiKey=!string.IsNullOrWhiteSpace(envKey)?envKey:savedKey;
+ if(string.IsNullOrWhiteSpace(apiKey)) return Results.BadRequest(new{message="OpenAI API key is not configured. Open Settings → AI Configuration and save a key."});
+
+ string? filename=file?.FileName;
+ string mime=file?.ContentType??"";
+ byte[]? bytes=null;
+ string extracted="";
+ if(file is not null){
+   if(file.Length<=0) return Results.BadRequest(new{message="Selected file is empty"});
+   if(file.Length>20*1024*1024) return Results.BadRequest(new{message="File is too large. Maximum 20 MB."});
+   using var ms=new MemoryStream(); await file.CopyToAsync(ms); bytes=ms.ToArray();
+   var ext=Path.GetExtension(filename??"").ToLowerInvariant();
+   if(mime.Contains("spreadsheet")||mime.Contains("excel")||ext==".xlsx") extracted=ExtractXlsx(bytes);
+   else if(mime.StartsWith("text/")||ext==".csv"||ext==".txt") extracted=Encoding.UTF8.GetString(bytes);
+   else if(string.IsNullOrWhiteSpace(mime)){
+      mime=ext switch{".pdf"=>"application/pdf",".png"=>"image/png",".jpg" or ".jpeg"=>"image/jpeg",".webp"=>"image/webp",_=>"application/octet-stream"};
+   }
  }
- var prompt = "You are an inventory data extraction assistant for a billing/POS system. Convert the supplied source into clean JSON only. Mode: " + mode + ". Store data may contain product master rows or a purchase invoice. Extract as many rows as confidently possible. Never invent barcode, batch, expiry, price, quantity or GST; use null/0 when missing. Preserve exact rack/location codes. For handwritten text, infer only obvious characters and include a confidence score. Return a JSON object with a rows array. Each row should contain name, barcode, sku, category, unit, hsn, gstRate, mrp, purchasePrice, salePrice, minStock, locationCode, rackName, shelfName, batchNo, manufactureDate, expiryDate, quantity, freeQuantity, confidence and notes. Dates must be YYYY-MM-DD. JSON only, no markdown.\nUser message: " + message + "\nExtracted spreadsheet/text content: " + extracted;
- using var http=new HttpClient(); http.DefaultRequestHeaders.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",apiKey);
- object contentPart;
- if(bytes is not null){
-   var b64=Convert.ToBase64String(bytes); var dataUrl=$"data:{mime};base64,{b64}";
-   contentPart = mime.StartsWith("image/") ? new {type="input_image",image_url=dataUrl,detail="high"} : new {type="input_file",filename=filename,file_data=b64};
- } else contentPart=null!;
- object[] content = contentPart is null ? new object[]{new {type="input_text",text=prompt}} : new object[]{new {type="input_text",text=prompt},contentPart};
- var modelSetting=(await db.QuerySingleAsync("SELECT [Value] FROM AppSettings WHERE [Key]='OpenAI.Model'")).GetValueOrDefault("Value")?.ToString(); var payload=new {model=Environment.GetEnvironmentVariable("OPENAI_MODEL")??modelSetting??"gpt-5.6-luna",input=new[]{new{role="user",content}}};
- var resp=await http.PostAsJsonAsync("https://api.openai.com/v1/responses",payload); var raw=await resp.Content.ReadAsStringAsync(); if(!resp.IsSuccessStatusCode) return Results.BadRequest(new{message="AI import failed",detail=raw});
- using var doc=JsonDocument.Parse(raw); var output=doc.RootElement.TryGetProperty("output_text",out var ot)?ot.GetString():ExtractResponseText(doc.RootElement); if(string.IsNullOrWhiteSpace(output)) return Results.BadRequest(new{message="AI returned no extracted rows"});
- var json=CleanJson(output); using var rowsDoc=JsonDocument.Parse(json); var rows=rowsDoc.RootElement.GetProperty("rows"); var list=JsonSerializer.Deserialize<List<AiImportRow>>(rows.GetRawText(),new JsonSerializerOptions{PropertyNameCaseInsensitive=true})??new();
- var u=(SessionUser)ctx.Items["User"]!; await db.ScalarAsync("INSERT AIImportLogs(ImportType,FileName,RowsFound,RowsAccepted,UserName,Notes) VALUES(@t,@f,@rf,@ra,@u,@n)",P("@t",mode),P("@f",filename),P("@rf",list.Count),P("@ra",list.Count),P("@u",u.UserName),P("@n","AI extraction preview; not auto-posted"));
- return Results.Ok(new{mode,fileName=filename,rows=list,warning="Review every row before posting. AI extraction is a draft and must not be treated as authoritative for medicines, prices, batch or expiry."});
+ if(file is null && string.IsNullOrWhiteSpace(message)) return Results.BadRequest(new{message="Choose a file or enter a message/notes first"});
+
+ var prompt = "You are an inventory data extraction assistant for a billing/POS system. Convert the supplied source into clean JSON only. Mode: " + mode + ". Store data may contain product master rows or a purchase invoice. Extract as many rows as confidently possible. Never invent barcode, batch, expiry, price, quantity or GST; use null/0 when missing. Preserve exact rack/location codes. For medicines preserve batch and expiry exactly when visible. Return a JSON object with a rows array. Each row should contain name, barcode, sku, category, unit, hsn, gstRate, mrp, purchasePrice, salePrice, minStock, locationCode, rackName, shelfName, batchNo, manufactureDate, expiryDate, quantity, freeQuantity, confidence and notes. Dates must be YYYY-MM-DD. JSON only, no markdown.\nUser message: " + message + "\nExtracted spreadsheet/text content: " + extracted;
+
+ using var http=new HttpClient{Timeout=TimeSpan.FromMinutes(3)};
+ http.DefaultRequestHeaders.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",apiKey);
+ string? openAiFileId=null;
+ try{
+   object? contentPart=null;
+   if(bytes is not null){
+     var ext=Path.GetExtension(filename??"").ToLowerInvariant();
+     if(mime.StartsWith("image/")){
+       var dataUrl=$"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+       contentPart=new{type="input_image",image_url=dataUrl,detail="high"};
+     }else if(ext==".pdf"||mime.Equals("application/pdf",StringComparison.OrdinalIgnoreCase)){
+       using var upload=new MultipartFormDataContent();
+       upload.Add(new StringContent("user_data"),"purpose");
+       var fc=new ByteArrayContent(bytes);
+       fc.Headers.ContentType=new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+       upload.Add(fc,"file",string.IsNullOrWhiteSpace(filename)?"import.pdf":filename);
+       var ur=await http.PostAsync("https://api.openai.com/v1/files",upload);
+       var uraw=await ur.Content.ReadAsStringAsync();
+       if(!ur.IsSuccessStatusCode) return Results.BadRequest(new{message="PDF upload to OpenAI failed: "+OpenAiErrorMessage(uraw,(int)ur.StatusCode),status=(int)ur.StatusCode});
+       using var ud=JsonDocument.Parse(uraw);
+       openAiFileId=ud.RootElement.TryGetProperty("id",out var fid)?fid.GetString():null;
+       if(string.IsNullOrWhiteSpace(openAiFileId)) return Results.BadRequest(new{message="OpenAI accepted the PDF but did not return a file id"});
+       contentPart=new{type="input_file",file_id=openAiFileId};
+     }else if(string.IsNullOrWhiteSpace(extracted)){
+       contentPart=new{type="input_file",filename=filename??"import.dat",file_data=Convert.ToBase64String(bytes)};
+     }
+   }
+
+   object[] content=contentPart is null
+     ? new object[]{new{type="input_text",text=prompt}}
+     : new object[]{new{type="input_text",text=prompt},contentPart};
+
+   var modelSetting=(await db.QuerySingleAsync("SELECT [Value] FROM AppSettings WHERE [Key]='OpenAI.Model'")).GetValueOrDefault("Value")?.ToString();
+   var model=Environment.GetEnvironmentVariable("OPENAI_MODEL")??modelSetting??"gpt-5.6-luna";
+   var payload=new{model,input=new[]{new{role="user",content}}};
+   var resp=await http.PostAsJsonAsync("https://api.openai.com/v1/responses",payload);
+   var raw=await resp.Content.ReadAsStringAsync();
+   if(!resp.IsSuccessStatusCode) return Results.BadRequest(new{message=OpenAiErrorMessage(raw,(int)resp.StatusCode),status=(int)resp.StatusCode,model});
+
+   using var doc=JsonDocument.Parse(raw);
+   var output=doc.RootElement.TryGetProperty("output_text",out var ot)?ot.GetString():ExtractResponseText(doc.RootElement);
+   if(string.IsNullOrWhiteSpace(output)) return Results.BadRequest(new{message="OpenAI returned no text. Try another PDF/image or use Test AI Connection."});
+   var json=CleanJson(output);
+   using var rowsDoc=JsonDocument.Parse(json);
+   if(!rowsDoc.RootElement.TryGetProperty("rows",out var rows)||rows.ValueKind!=JsonValueKind.Array) return Results.BadRequest(new{message="AI response did not contain a rows array"});
+   var list=JsonSerializer.Deserialize<List<AiImportRow>>(rows.GetRawText(),new JsonSerializerOptions{PropertyNameCaseInsensitive=true})??new();
+
+   var u=(SessionUser)ctx.Items["User"]!;
+   await db.ScalarAsync("INSERT AIImportLogs(ImportType,FileName,RowsFound,RowsAccepted,UserName,Notes) VALUES(@t,@f,@rf,@ra,@u,@n)",P("@t",mode),P("@f",filename),P("@rf",list.Count),P("@ra",list.Count),P("@u",u.UserName),P("@n","AI extraction preview; not auto-posted"));
+   return Results.Ok(new{mode,fileName=filename,rows=list,model,warning="Review every row before posting. AI extraction is a draft and must not be treated as authoritative for medicines, prices, batch or expiry."});
+ }catch(JsonException ex){return Results.BadRequest(new{message="AI returned invalid JSON: "+ex.Message});}
+ catch(TaskCanceledException){return Results.BadRequest(new{message="AI extraction timed out. Try a smaller PDF/image or check internet connection."});}
+ catch(HttpRequestException ex){return Results.BadRequest(new{message="Cannot reach OpenAI API: "+ex.Message});}
+ finally{
+   if(!string.IsNullOrWhiteSpace(openAiFileId)){
+     try{await http.DeleteAsync("https://api.openai.com/v1/files/"+Uri.EscapeDataString(openAiFileId));}catch{}
+   }
+ }
 });
+
 app.MapPost("/api/ai/import/items/commit",async(Db db,HttpContext ctx,AiCommitRequest x)=>{
  if(x.Rows.Count==0)return Results.BadRequest(new{message="No rows to import"}); int added=0,updated=0; foreach(var r in x.Rows){ if(string.IsNullOrWhiteSpace(r.Name))continue; var existing=await db.QuerySingleAsync("SELECT TOP 1 Id FROM Products WHERE (@b<>'' AND Barcode=@b) OR (@s<>'' AND Sku=@s)",P("@b",r.Barcode??""),P("@s",r.Sku??"")); if(existing.Count>0){await db.ScalarAsync("UPDATE Products SET Name=@n,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,LocationCode=@loc,RackName=@rack,ShelfName=@shelf WHERE Id=@id",P("@n",r.Name),P("@cat",r.Category),P("@u",r.Unit??"PCS"),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName),P("@id",existing["Id"]));updated++;}else{await db.ScalarAsync("INSERT Products(Name,Barcode,Sku,Category,Unit,Hsn,GstRate,Mrp,PurchasePrice,SalePrice,MinStock,LocationCode,RackName,ShelfName) VALUES(@n,@b,@s,@cat,@u,@h,@g,@m,@pp,@sp,@min,@loc,@rack,@shelf)",P("@n",r.Name),P("@b",r.Barcode),P("@s",r.Sku),P("@cat",r.Category),P("@u",r.Unit??"PCS"),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName));added++;}}
  return Results.Ok(new{added,updated});
@@ -227,6 +323,19 @@ app.Run();
 
 
 static async Task<Dictionary<string,object?>?> FindProduct(SqlConnection c,SqlTransaction tx,AiImportRow r){var cmd=new SqlCommand("SELECT TOP 1 Id FROM Products WHERE (@b<>'' AND Barcode=@b) OR (@s<>'' AND Sku=@s) OR (Name=@n)",c,tx);cmd.Parameters.AddRange(new[]{P("@b",r.Barcode??""),P("@s",r.Sku??""),P("@n",r.Name)});using var rd=await cmd.ExecuteReaderAsync();if(!await rd.ReadAsync())return null;return new Dictionary<string,object?>{{"Id",rd.GetValue(0)}};}
+static string OpenAiErrorMessage(string raw,int status)
+{
+ try{
+  using var d=JsonDocument.Parse(raw);
+  if(d.RootElement.TryGetProperty("error",out var e)){
+    var msg=e.TryGetProperty("message",out var m)?m.GetString():null;
+    var code=e.TryGetProperty("code",out var c)?c.ToString():null;
+    if(!string.IsNullOrWhiteSpace(msg)) return $"OpenAI API {status}: {msg}"+(string.IsNullOrWhiteSpace(code)?"":$" ({code})");
+  }
+  if(d.RootElement.TryGetProperty("message",out var top)) return $"OpenAI API {status}: {top.GetString()}";
+ }catch{}
+ return $"OpenAI API request failed with HTTP {status}";
+}
 static string CleanJson(string s){var a=s.IndexOf('{');var b=s.LastIndexOf('}');return a>=0&&b>a?s[a..(b+1)]:s;}
 static string ExtractResponseText(JsonElement root){var sb=new StringBuilder();if(root.TryGetProperty("output",out var output)&&output.ValueKind==JsonValueKind.Array){foreach(var item in output.EnumerateArray())if(item.TryGetProperty("content",out var c)&&c.ValueKind==JsonValueKind.Array)foreach(var part in c.EnumerateArray())if(part.TryGetProperty("text",out var t))sb.Append(t.GetString());}return sb.ToString();}
 static string ExtractXlsx(byte[] bytes){using var ms=new MemoryStream(bytes);using var zip=new ZipArchive(ms,ZipArchiveMode.Read);var shared=new List<string>();var ss=zip.GetEntry("xl/sharedStrings.xml");if(ss is not null){using var sr=new StreamReader(ss.Open());var x=XDocument.Load(sr);XNamespace ns="http://schemas.openxmlformats.org/spreadsheetml/2006/main";foreach(var si in x.Descendants(ns+"si"))shared.Add(string.Concat(si.Descendants(ns+"t").Select(t=>t.Value)));}var sh=zip.GetEntry("xl/worksheets/sheet1.xml");if(sh is null)return "";using var rd=new StreamReader(sh.Open());var doc=XDocument.Load(rd);XNamespace n="http://schemas.openxmlformats.org/spreadsheetml/2006/main";var sb=new StringBuilder();foreach(var row in doc.Descendants(n+"row")){var cells=new List<string>();foreach(var c in row.Elements(n+"c")){var v=c.Element(n+"v")?.Value??"";if((string?)c.Attribute("t")=="s"&&int.TryParse(v,out var i)&&i<shared.Count)v=shared[i];cells.Add(v);}sb.AppendLine(string.Join(" | ",cells));}return sb.ToString();}
