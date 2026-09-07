@@ -1,8 +1,10 @@
 $ErrorActionPreference='Stop'
 $program='src/SuvidhaPOS-Premium/Program.cs'
 $project='src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj'
+$indexPath='src/SuvidhaPOS-Premium/wwwroot/index.html'
 $text=Get-Content $program -Raw
 $proj=Get-Content $project -Raw
+$index=Get-Content $indexPath -Raw
 
 # Responses API requires a data URL for input_file file_data.
 $old='contentPart = mime.StartsWith("image/") ? new {type="input_image",image_url=dataUrl,detail="high"} : new {type="input_file",filename=filename,file_data=b64};'
@@ -54,10 +56,44 @@ app.MapGet("/api/ai/config",async(Db db)=>{
   if(-not $text.Contains($anchor)){throw 'AI import endpoint marker not found'}; $text=$text.Replace($anchor,$status+$anchor)
 }
 
-# Only fix the authentication cookie scope. Do not wrap the login endpoint with a fragile text replacement.
+# Authentication cookie must be available to every API route.
 $cookieOld='ctx.Response.Cookies.Append("suvidha_session",token,new CookieOptions{HttpOnly=true,SameSite=SameSiteMode.Lax,IsEssential=true});'
 $cookieNew='ctx.Response.Cookies.Append("suvidha_session",token,new CookieOptions{HttpOnly=true,SameSite=SameSiteMode.Lax,IsEssential=true,Path="/"});'
 if($text.Contains($cookieOld)){$text=$text.Replace($cookieOld,$cookieNew)}
+
+# Patch the actual inline login handler. The API can return camelCase and the
+# authenticated user can be either payload.user or the payload itself. Once
+# authentication succeeds, dashboard/UI errors must never be reported as a
+# credential failure.
+$inlineOld=@'
+      window.currentUser=d.user;
+      native(remember?'remember':'clearRemembered',remember?{enabled:true,userName:user,password:pass}:{});
+      const s=$('loginScreen');if(s)s.style.display='none';
+      const p=$('userPill');if(p&&d.user)p.textContent=(d.user.DisplayName||user)+' · '+(d.user.Role||'User');
+      if(d.user&&d.user.MustChangePassword&&typeof window.openChangePassword==='function')window.openChangePassword(true);
+      if(typeof window.loadDashboard==='function')await window.loadDashboard();
+    }catch(e){console.error('Login failed',e);showError(e.message||'Unable to login')}
+'@
+$inlineNew=@'
+      const u=d.user||d.User||d;
+      window.currentUser=u;
+      native(remember?'remember':'clearRemembered',remember?{enabled:true,userName:user,password:pass}:{});
+      const s=$('loginScreen');if(s)s.style.display='none';
+      const p=$('userPill');if(p&&u)p.textContent=(u.DisplayName||u.displayName||u.UserName||u.userName||user)+' · '+(u.Role||u.role||'User');
+      try{if(typeof window.loadDashboard==='function')await window.loadDashboard()}catch(e){console.error('Dashboard failed after successful login',e)}
+      try{if(u&&(u.MustChangePassword??u.mustChangePassword)&&typeof window.openChangePassword==='function')window.openChangePassword(true)}catch(e){console.error('Password dialog failed after successful login',e)}
+    }catch(e){console.error('Login failed',e);if(window.currentUser){const s=$('loginScreen');if(s)s.style.display='none';}else{showError(e.message||'Unable to login')}}
+'@
+if($index.Contains($inlineOld)){
+  $index=$index.Replace($inlineOld,$inlineNew)
+}else{
+  throw 'Inline login handler marker not found in index.html'
+}
+
+# Cache-bust the login hotfix on every rebuilt installer and expose a visible
+# build marker so we can confirm the installed UI is the new build.
+$index=$index.Replace('/js/legacy-report-boot.js','/js/legacy-report-boot.js?v=loginfix3')
+$index=$index.Replace('Version 6.3.2','Version 6.3.3-loginfix3')
 
 # Keep endpoint mappings deterministic.
 if(-not $text.Contains('SuvidhaPOS.Premium.SpecializedModules.Map(app);')){$text=$text.Replace('SpecializedModules.Map(app);','SuvidhaPOS.Premium.SpecializedModules.Map(app);');$text=$text.Replace('ReportTaxModules.Map(app);','SuvidhaPOS.Premium.ReportTaxModules.Map(app);')}
@@ -65,4 +101,5 @@ if(-not $text.Contains('SuvidhaPOS.Premium.ReportTaxModules.Map(app);')){$text=$
 
 Set-Content $program $text -Encoding UTF8
 Set-Content $project $proj -Encoding UTF8
-Write-Host 'Build fixes applied without touching index.html encoding.'
+Set-Content $indexPath $index -Encoding UTF8
+Write-Host 'Build fixes applied, including inline login handler patch.'
