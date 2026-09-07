@@ -35,7 +35,7 @@
     setPage('products');navTitle('Items & Inventory','Inventory is always maintained in the smallest Base Unit');
     try{
       const rows=await api('/api/products?size=500');S.items=rows;
-      app.innerHTML='<div class="content"><div class="toolbar"><input id="pq2" class="input" placeholder="Search item, barcode, SKU, location..." oninput="filterTable(\'uomRows\',this.value)"><button class="btn" onclick="openUomProduct()">＋ Add Item</button><button class="btn secondary" onclick="loadStock()">Stock View</button></div><div class="panel"><div class="panelhead"><div><h3>ITEM MASTER + MULTI UNIT</h3><p class="muted">Example: 1 BOX = 10 STRIP = 100 TABLET. Database stock remains TABLET.</p></div><span class="tag">BASE UNIT STOCK</span></div><div class="tablewrap"><table class="table"><thead><tr><th>ITEM</th><th>BASE</th><th>INNER</th><th>PACK</th><th>CONVERSION</th><th>STOCK</th><th>PACK MRP</th><th>LOOSE SALE</th><th>RACK</th><th></th></tr></thead><tbody id="uomRows">'+rows.map(x=>'<tr data-id="'+x.Id+'"><td><b>'+esc2(x.Name)+'</b><br><small class="muted">'+esc2(x.Barcode||x.Sku||'')+'</small></td><td>...</td><td>...</td><td>...</td><td>...</td><td>'+money2(x.Stock)+'</td><td>₹'+money2(x.Mrp)+'</td><td>₹'+money2(x.SalePrice)+'</td><td>'+esc2(x.LocationCode||x.RackName||'-')+'</td><td><button class="btn small" onclick="openUomProduct('+x.Id+')">Edit</button></td></tr>').join('')+'</tbody></table></div></div></div>';
+      app.innerHTML='<div class="content"><div class="toolbar"><input id="pq2" class="input" placeholder="Search item, barcode, SKU, location..." oninput="filterTable(\'uomRows\',this.value)"><button class="btn" onclick="openUomProduct()">＋ Add Item</button><button class="btn secondary" onclick="openProductBulkEdit()">✎ Bulk Edit</button><button class="btn secondary" onclick="loadStock()">Stock View</button></div><div class="panel"><div class="panelhead"><div><h3>ITEM MASTER + MULTI UNIT</h3><p class="muted">Example: 1 BOX = 10 STRIP = 100 TABLET. Database stock remains TABLET.</p></div><span class="tag">BASE UNIT STOCK</span></div><div class="tablewrap"><table class="table"><thead><tr><th>ITEM</th><th>BASE</th><th>INNER</th><th>PACK</th><th>CONVERSION</th><th>STOCK</th><th>PACK MRP</th><th>LOOSE SALE</th><th>RACK</th><th></th></tr></thead><tbody id="uomRows">'+rows.map(x=>'<tr data-id="'+x.Id+'"><td><b>'+esc2(x.Name)+'</b><br><small class="muted">'+esc2(x.Barcode||x.Sku||'')+'</small></td><td>...</td><td>...</td><td>...</td><td>...</td><td>'+money2(x.Stock)+'</td><td>₹'+money2(x.Mrp)+'</td><td>₹'+money2(x.SalePrice)+'</td><td>'+esc2(x.LocationCode||x.RackName||'-')+'</td><td><button class="btn small" onclick="openUomProduct('+x.Id+')">Edit</button></td></tr>').join('')+'</tbody></table></div></div></div>';
       for(const x of rows){
         const u=await loadUom(x.Id),tr=document.querySelector('#uomRows tr[data-id="'+x.Id+'"]');if(!tr)continue;
         const tf=totalFactor(u),inner=String(u.InnerUnit||'').trim();
@@ -100,6 +100,8 @@
 
   window.saveUomProduct=async function(id){
     try{
+      const identity=await api('/api/products/identity-check?name='+encodeURIComponent((unm.value||'').trim())+'&barcode='+encodeURIComponent((ubc.value||'').trim())+'&excludeId='+(id||0));
+      if(identity.duplicate){const c=identity.conflict||{};return alert('Duplicate '+(c.ConflictType==='NAME'?'Item Name':'Barcode')+': '+(c.Name||unm.value)+' already exists.')}
       const base=(ubase.value||'PCS').trim().toUpperCase(),inner=(uinner.value||'').trim().toUpperCase(),pack=(upack.value||base).trim().toUpperCase();
       const inf=inner?Math.max(1,+uinnerfactor.value||1):1,pf=Math.max(1,+upackfactor.value||1),tf=inner?inf*pf:pf;
       const bp=+ubp.value||0,bm=+ubm.value||0,bs=+ubs.value||0;
@@ -109,6 +111,21 @@
       const r=await api(id?'/api/products/'+id:'/api/products',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const pid=id||r.id;
       await api('/api/products/'+pid+'/uom',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({BaseUnit:base,InnerUnit:inner||null,PackUnit:pack,ConversionFactor:tf,InnerConversionFactor:inf,PackInnerFactor:pf,PackPurchaseRate:pp,PackMrp:pm,PackSalePrice:psale,InnerPurchaseRate:ip,InnerMrp:im,InnerSalePrice:isale,LooseSalePrice:bs,AllowLoose:uloose.checked})});
       S.uoms[pid]=null;await loadUom(pid,true);closeModal();toast('Item saved — stock unit: '+base);loadProducts()
+    }catch(e){alert(e.message)}
+  };
+
+  window.openProductBulkEdit=async function(){
+    const rows=await api('/api/products?size=1000');
+    S.bulkRows=rows.map(x=>({...x}));
+    modal('Bulk Edit Items — Duplicate Validation',`<div class="alert">Duplicate Item Name aur Duplicate Barcode allowed nahi hai. Save se pehle poora batch validate hoga.</div><div class="tablewrap" style="max-height:62vh"><table class="table"><thead><tr><th>ITEM NAME</th><th>BARCODE</th><th>SKU</th><th>CATEGORY</th><th>UNIT</th><th>GST%</th><th>MRP</th><th>PURCHASE</th><th>SALE</th><th>RACK</th></tr></thead><tbody>${S.bulkRows.map((x,i)=>`<tr><td><input class="input" value="${esc2(x.Name)}" onchange="bulkProductSet(${i},'Name',this.value)"></td><td><input class="input" value="${esc2(x.Barcode||'')}" onchange="bulkProductSet(${i},'Barcode',this.value)"></td><td><input class="input" value="${esc2(x.Sku||'')}" onchange="bulkProductSet(${i},'Sku',this.value)"></td><td><input class="input" value="${esc2(x.Category||'')}" onchange="bulkProductSet(${i},'Category',this.value)"></td><td><input class="input" value="${esc2(x.Unit||'PCS')}" onchange="bulkProductSet(${i},'Unit',this.value)"></td><td><input class="input" type="number" value="${x.GstRate||0}" onchange="bulkProductSet(${i},'GstRate',this.value)"></td><td><input class="input" type="number" value="${x.Mrp||0}" onchange="bulkProductSet(${i},'Mrp',this.value)"></td><td><input class="input" type="number" value="${x.PurchasePrice||0}" onchange="bulkProductSet(${i},'PurchasePrice',this.value)"></td><td><input class="input" type="number" value="${x.SalePrice||0}" onchange="bulkProductSet(${i},'SalePrice',this.value)"></td><td><input class="input" value="${esc2(x.RackName||x.LocationCode||'')}" onchange="bulkProductSet(${i},'RackName',this.value)"></td></tr>`).join('')}</tbody></table></div>`,`<button class="btn" onclick="saveProductBulkEdit()">Validate & Save All</button>`);
+    const mb=document.querySelector('#modal .modalbox');if(mb){mb.style.width='96vw';mb.style.maxWidth='1500px'}
+  };
+  window.bulkProductSet=function(i,k,v){if(!S.bulkRows?.[i])return;S.bulkRows[i][k]=['GstRate','Mrp','PurchasePrice','SalePrice','MinStock','MaxStock'].includes(k)?Number(v||0):v};
+  window.saveProductBulkEdit=async function(){
+    try{
+      const rows=(S.bulkRows||[]).map(x=>({Id:x.Id,Name:(x.Name||'').trim(),Barcode:(x.Barcode||'').trim()||null,Sku:(x.Sku||'').trim()||null,Category:x.Category||'General',Unit:x.Unit||'PCS',Hsn:x.Hsn||null,GstRate:+x.GstRate||0,Mrp:+x.Mrp||0,PurchasePrice:+x.PurchasePrice||0,SalePrice:+x.SalePrice||0,MinStock:+x.MinStock||0,MaxStock:+x.MaxStock||0,LocationCode:x.LocationCode||null,RackName:x.RackName||null,ShelfName:x.ShelfName||null}));
+      const r=await api('/api/products/bulk-edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Rows:rows})});
+      closeModal();toast('Bulk edit saved: '+r.updated+' items');loadProducts()
     }catch(e){alert(e.message)}
   };
 

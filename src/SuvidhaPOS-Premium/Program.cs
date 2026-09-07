@@ -93,8 +93,89 @@ app.MapGet("/api/dashboard/chart",async(Db db,int days=7)=>Results.Ok(await db.Q
 
 app.MapGet("/api/products",async(Db db,string? q,int page=1,int size=200)=>{q??="";page=Math.Max(1,page);return Results.Ok(await db.QueryAsync(@"SELECT p.Id,p.Name,p.Barcode,p.Sku,p.Category,p.Unit,p.Hsn,p.GstRate,p.Mrp,p.PurchasePrice,p.SalePrice,p.MinStock,p.MaxStock,p.LocationCode,p.RackName,p.ShelfName,p.TrackBatch,p.TrackExpiry,CAST(ISNULL((SELECT SUM(b.Quantity) FROM ProductBatches b WHERE b.ProductId=p.Id),0) AS decimal(18,3)) Stock FROM Products p WHERE p.IsActive=1 AND (@q='' OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like OR ISNULL(p.Sku,'') LIKE @like OR ISNULL(p.Category,'') LIKE @like) ORDER BY p.Name OFFSET @off ROWS FETCH NEXT @size ROWS ONLY",new SqlParameter("@q",q),new SqlParameter("@like","%"+q+"%"),new SqlParameter("@off",(page-1)*size),new SqlParameter("@size",size)));});
 app.MapGet("/api/products/{id:int}",async(Db db,int id)=>Results.Ok(await db.QuerySingleAsync("SELECT * FROM Products WHERE Id=@id",new SqlParameter("@id",id))));
-app.MapPost("/api/products",async(Db db,ProductRequest x)=>{if(string.IsNullOrWhiteSpace(x.Name))return Results.BadRequest(new{message="Product name is required"});try{var id=await db.ScalarAsync(@"INSERT Products(Name,Barcode,Sku,CategoryId,Category,Unit,Hsn,GstRate,Mrp,PurchasePrice,SalePrice,MinStock,MaxStock,LocationCode,RackName,ShelfName,TrackBatch,TrackExpiry) VALUES(@n,@b,@s,@cid,@cat,@u,@h,@g,@m,@pp,@sp,@min,@max,@loc,@rack,@shelf,@tb,@te);SELECT CAST(SCOPE_IDENTITY() AS int)",P("@n",x.Name),P("@b",x.Barcode),P("@s",x.Sku),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",x.Unit??"PCS"),P("@h",x.Hsn),P("@g",x.GstRate),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry));return Results.Ok(new{id});}catch(SqlException e)when(e.Number==2601||e.Number==2627){return Results.BadRequest(new{message="Barcode already exists"});}});
-app.MapPut("/api/products/{id:int}",async(Db db,int id,ProductRequest x)=>{await db.ScalarAsync(@"UPDATE Products SET Name=@n,Barcode=@b,Sku=@s,CategoryId=@cid,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,MaxStock=@max,LocationCode=@loc,RackName=@rack,ShelfName=@shelf,TrackBatch=@tb,TrackExpiry=@te WHERE Id=@id",P("@n",x.Name),P("@b",x.Barcode),P("@s",x.Sku),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",x.Unit??"PCS"),P("@h",x.Hsn),P("@g",x.GstRate),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry),P("@id",id));return Results.Ok(new{updated=true});});
+app.MapGet("/api/products/identity-check",async(Db db,string? name,string? barcode,int excludeId=0)=>{
+ var n=(name??"").Trim(); var b=(barcode??"").Trim();
+ var row=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
+ CASE WHEN @n<>'' AND UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) THEN 'NAME' ELSE 'BARCODE' END ConflictType
+ FROM Products WHERE IsActive=1 AND Id<>@id AND
+ ((@n<>'' AND UPPER(LTRIM(RTRIM(Name)))=UPPER(@n)) OR
+  (@b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b)))
+ ORDER BY Id",P("@n",n),P("@b",b),P("@id",excludeId));
+ return Results.Ok(new{duplicate=row.Count>0,conflict=row});
+});
+
+app.MapPost("/api/products",async(Db db,ProductRequest x)=>{
+ var name=(x.Name??"").Trim(); var barcode=string.IsNullOrWhiteSpace(x.Barcode)?null:x.Barcode.Trim();
+ if(string.IsNullOrWhiteSpace(name))return Results.BadRequest(new{message="Product name is required"});
+ var dup=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
+ CASE WHEN UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) THEN 'Item Name' ELSE 'Barcode' END ConflictType
+ FROM Products WHERE IsActive=1 AND
+ (UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) OR (@b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b)))",
+ P("@n",name),P("@b",barcode??""));
+ if(dup.Count>0)return Results.BadRequest(new{message=$"Duplicate {dup["ConflictType"]}: existing item '{dup["Name"]}' already uses this value.",duplicate=true,conflict=dup});
+ try{
+  var id=await db.ScalarAsync(@"INSERT Products(Name,Barcode,Sku,CategoryId,Category,Unit,Hsn,GstRate,Mrp,PurchasePrice,SalePrice,MinStock,MaxStock,LocationCode,RackName,ShelfName,TrackBatch,TrackExpiry)
+ VALUES(@n,@b,@s,@cid,@cat,@u,@h,@g,@m,@pp,@sp,@min,@max,@loc,@rack,@shelf,@tb,@te);
+ SELECT CAST(SCOPE_IDENTITY() AS int)",
+ P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",x.Unit??"PCS"),P("@h",x.Hsn),P("@g",x.GstRate),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry));
+  return Results.Ok(new{id});
+ }catch(SqlException e)when(e.Number==2601||e.Number==2627){return Results.BadRequest(new{message="Duplicate barcode is not allowed",duplicate=true});}
+});
+
+app.MapPut("/api/products/{id:int}",async(Db db,int id,ProductRequest x)=>{
+ var name=(x.Name??"").Trim(); var barcode=string.IsNullOrWhiteSpace(x.Barcode)?null:x.Barcode.Trim();
+ if(string.IsNullOrWhiteSpace(name))return Results.BadRequest(new{message="Product name is required"});
+ var dup=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
+ CASE WHEN UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) THEN 'Item Name' ELSE 'Barcode' END ConflictType
+ FROM Products WHERE IsActive=1 AND Id<>@id AND
+ (UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) OR (@b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b)))",
+ P("@n",name),P("@b",barcode??""),P("@id",id));
+ if(dup.Count>0)return Results.BadRequest(new{message=$"Duplicate {dup["ConflictType"]}: existing item '{dup["Name"]}' already uses this value.",duplicate=true,conflict=dup});
+ try{
+  await db.ScalarAsync(@"UPDATE Products SET Name=@n,Barcode=@b,Sku=@s,CategoryId=@cid,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,MaxStock=@max,LocationCode=@loc,RackName=@rack,ShelfName=@shelf,TrackBatch=@tb,TrackExpiry=@te WHERE Id=@id",
+  P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",x.Unit??"PCS"),P("@h",x.Hsn),P("@g",x.GstRate),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry),P("@id",id));
+  return Results.Ok(new{updated=true});
+ }catch(SqlException e)when(e.Number==2601||e.Number==2627){return Results.BadRequest(new{message="Duplicate barcode is not allowed",duplicate=true});}
+});
+
+app.MapPost("/api/products/bulk-edit",async(Db db,ProductBulkEditRequest x)=>{
+ if(x.Rows is null||x.Rows.Count==0)return Results.BadRequest(new{message="No item rows supplied"});
+ var conflicts=new List<object>();
+ var seenNames=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase);
+ var seenBarcodes=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase);
+ foreach(var r in x.Rows){
+   var n=(r.Name??"").Trim();var bc=(r.Barcode??"").Trim();
+   if(string.IsNullOrWhiteSpace(n)){conflicts.Add(new{r.Id,type="NAME",value=n,message="Item name is required"});continue;}
+   if(seenNames.TryGetValue(n,out var otherName))conflicts.Add(new{r.Id,type="NAME",value=n,message=$"Duplicate item name in bulk edit; also used by row {otherName}"});
+   else seenNames[n]=r.Id;
+   if(!string.IsNullOrWhiteSpace(bc)){
+     if(seenBarcodes.TryGetValue(bc,out var otherBarcode))conflicts.Add(new{r.Id,type="BARCODE",value=bc,message=$"Duplicate barcode in bulk edit; also used by row {otherBarcode}"});
+     else seenBarcodes[bc]=r.Id;
+   }
+ }
+ foreach(var r in x.Rows){
+   var n=(r.Name??"").Trim();var bc=(r.Barcode??"").Trim();
+   if(string.IsNullOrWhiteSpace(n))continue;
+   var dup=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
+    CASE WHEN UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) THEN 'NAME' ELSE 'BARCODE' END ConflictType
+    FROM Products WHERE IsActive=1 AND Id<>@id AND
+    (UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) OR (@b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b)))",
+    P("@n",n),P("@b",bc),P("@id",r.Id));
+   if(dup.Count>0)conflicts.Add(new{r.Id,type=dup["ConflictType"]?.ToString(),value=dup["ConflictType"]?.ToString()=="NAME"?n:bc,message=$"Conflicts with existing item '{dup["Name"]}' (ID {dup["Id"]})"});
+ }
+ if(conflicts.Count>0)return Results.BadRequest(new{message=$"Bulk edit blocked: {conflicts.Count} duplicate/invalid row(s). Fix highlighted item names/barcodes first.",duplicate=true,conflicts});
+ using var c=db.CreateConnection();await c.OpenAsync();using var tx=c.BeginTransaction();
+ try{
+   foreach(var r in x.Rows){
+     var cmd=new SqlCommand(@"UPDATE Products SET Name=@n,Barcode=@b,Sku=@s,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,MaxStock=@max,LocationCode=@loc,RackName=@rack,ShelfName=@shelf WHERE Id=@id AND IsActive=1",c,tx);
+     cmd.Parameters.AddRange(new[]{P("@n",r.Name.Trim()),P("@b",string.IsNullOrWhiteSpace(r.Barcode)?null:r.Barcode.Trim()),P("@s",string.IsNullOrWhiteSpace(r.Sku)?null:r.Sku.Trim()),P("@cat",r.Category),P("@u",r.Unit??"PCS"),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@max",r.MaxStock),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName),P("@id",r.Id)});
+     await cmd.ExecuteNonQueryAsync();
+   }
+   await tx.CommitAsync();return Results.Ok(new{updated=x.Rows.Count});
+ }catch(SqlException e)when(e.Number==2601||e.Number==2627){await tx.RollbackAsync();return Results.BadRequest(new{message="Bulk edit blocked because a duplicate barcode was detected.",duplicate=true});}
+ catch(Exception ex){await tx.RollbackAsync();return Results.BadRequest(new{message=ex.Message});}
+});
+
 app.MapDelete("/api/products/{id:int}",async(Db db,int id)=>{await db.ScalarAsync("UPDATE Products SET IsActive=0 WHERE Id=@id",P("@id",id));return Results.Ok(new{deleted=true});});
 app.MapGet("/api/categories",async(Db db)=>Results.Ok(await db.QueryAsync("SELECT Id,Name FROM Categories WHERE IsActive=1 ORDER BY Name")));
 app.MapPost("/api/categories",async(Db db,NameRequest x)=>Results.Ok(new{id=await db.ScalarAsync("INSERT Categories(Name) VALUES(@n);SELECT CAST(SCOPE_IDENTITY() AS int)",P("@n",x.Name))}));
@@ -293,10 +374,32 @@ app.MapPost("/api/ai/import",async(HttpRequest req,Db db,HttpContext ctx)=>{
 });
 
 app.MapPost("/api/ai/import/items/commit",async(Db db,HttpContext ctx,AiCommitRequest x)=>{
- if(x.Rows.Count==0)return Results.BadRequest(new{message="No rows to import"}); int added=0,updated=0; foreach(var r in x.Rows){ if(string.IsNullOrWhiteSpace(r.Name))continue; var existing=await db.QuerySingleAsync("SELECT TOP 1 Id FROM Products WHERE (@b<>'' AND Barcode=@b) OR (@s<>'' AND Sku=@s)",P("@b",r.Barcode??""),P("@s",r.Sku??"")); if(existing.Count>0){await db.ScalarAsync("UPDATE Products SET Name=@n,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,LocationCode=@loc,RackName=@rack,ShelfName=@shelf WHERE Id=@id",P("@n",r.Name),P("@cat",r.Category),P("@u",r.Unit??"PCS"),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName),P("@id",existing["Id"]));updated++;}else{await db.ScalarAsync("INSERT Products(Name,Barcode,Sku,Category,Unit,Hsn,GstRate,Mrp,PurchasePrice,SalePrice,MinStock,LocationCode,RackName,ShelfName) VALUES(@n,@b,@s,@cat,@u,@h,@g,@m,@pp,@sp,@min,@loc,@rack,@shelf)",P("@n",r.Name),P("@b",r.Barcode),P("@s",r.Sku),P("@cat",r.Category),P("@u",r.Unit??"PCS"),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName));added++;}}
- return Results.Ok(new{added,updated});
+ if(x.Rows.Count==0)return Results.BadRequest(new{message="No rows to import"});
+ int added=0,skipped=0;var conflicts=new List<object>();
+ var seenNames=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+ var seenBarcodes=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+ foreach(var r in x.Rows){
+   var name=(r.Name??"").Trim();var barcode=(r.Barcode??"").Trim();
+   if(string.IsNullOrWhiteSpace(name)){skipped++;conflicts.Add(new{type="NAME",value=name,message="Blank item name skipped"});continue;}
+   if(!seenNames.Add(name)){skipped++;conflicts.Add(new{type="NAME",value=name,message="Duplicate item name inside AI import skipped"});continue;}
+   if(!string.IsNullOrWhiteSpace(barcode)&&!seenBarcodes.Add(barcode)){skipped++;conflicts.Add(new{type="BARCODE",value=barcode,message=$"Duplicate barcode inside AI import skipped: {barcode}"});continue;}
+   var existing=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
+    CASE WHEN UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) THEN 'NAME' ELSE 'BARCODE' END ConflictType
+    FROM Products WHERE IsActive=1 AND
+    (UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) OR (@b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b)))",
+    P("@n",name),P("@b",barcode));
+   if(existing.Count>0){
+     skipped++;conflicts.Add(new{type=existing["ConflictType"]?.ToString(),value=existing["ConflictType"]?.ToString()=="NAME"?name:barcode,message=$"Skipped duplicate: '{name}' conflicts with existing item '{existing["Name"]}'",existingId=existing["Id"]});continue;
+   }
+   try{
+    await db.ScalarAsync(@"INSERT Products(Name,Barcode,Sku,Category,Unit,Hsn,GstRate,Mrp,PurchasePrice,SalePrice,MinStock,LocationCode,RackName,ShelfName)
+     VALUES(@n,@b,@s,@cat,@u,@h,@g,@m,@pp,@sp,@min,@loc,@rack,@shelf)",
+     P("@n",name),P("@b",string.IsNullOrWhiteSpace(barcode)?null:barcode),P("@s",string.IsNullOrWhiteSpace(r.Sku)?null:r.Sku.Trim()),P("@cat",r.Category),P("@u",r.Unit??"PCS"),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName));
+    added++;
+   }catch(SqlException e)when(e.Number==2601||e.Number==2627){skipped++;conflicts.Add(new{type="BARCODE",value=barcode,message=$"Duplicate barcode skipped: {barcode}"});}
+ }
+ return Results.Ok(new{added,updated=0,skipped,conflicts,message=$"Imported {added}; skipped {skipped} duplicate/invalid row(s)."});
 });
-
 
 app.MapPost("/api/ai/import/purchase/commit",async(Db db,HttpContext ctx,AiPurchaseCommitRequest x)=>{
  if(x.Rows.Count==0)return Results.BadRequest(new{message="No purchase rows to import"});
@@ -322,7 +425,7 @@ app.Run();
 
 
 
-static async Task<Dictionary<string,object?>?> FindProduct(SqlConnection c,SqlTransaction tx,AiImportRow r){var cmd=new SqlCommand("SELECT TOP 1 Id FROM Products WHERE (@b<>'' AND Barcode=@b) OR (@s<>'' AND Sku=@s) OR (Name=@n)",c,tx);cmd.Parameters.AddRange(new[]{P("@b",r.Barcode??""),P("@s",r.Sku??""),P("@n",r.Name)});using var rd=await cmd.ExecuteReaderAsync();if(!await rd.ReadAsync())return null;return new Dictionary<string,object?>{{"Id",rd.GetValue(0)}};}
+static async Task<Dictionary<string,object?>?> FindProduct(SqlConnection c,SqlTransaction tx,AiImportRow r){var cmd=new SqlCommand(@"SELECT TOP 1 Id FROM Products WHERE IsActive=1 AND ((@b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b)) OR (@s<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Sku,''))))=UPPER(@s)) OR UPPER(LTRIM(RTRIM(Name)))=UPPER(@n)) ORDER BY CASE WHEN @b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b) THEN 0 WHEN @s<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Sku,''))))=UPPER(@s) THEN 1 ELSE 2 END,Id",c,tx);cmd.Parameters.AddRange(new[]{P("@b",(r.Barcode??"").Trim()),P("@s",(r.Sku??"").Trim()),P("@n",(r.Name??"").Trim())});using var rd=await cmd.ExecuteReaderAsync();if(!await rd.ReadAsync())return null;return new Dictionary<string,object?>{{"Id",rd.GetValue(0)}};}
 static string OpenAiErrorMessage(string raw,int status)
 {
  try{
@@ -369,6 +472,8 @@ record DayClosingRequest(decimal OpeningCash,decimal CashSales,decimal CashIn,de
 record CreateUserRequest(string UserName,string? DisplayName,string Password,string? Role);
 record SettingRequest(string? Value);
 record ProductRequest(string Name,string? Barcode,string? Sku,int? CategoryId,string? Category,string? Unit,string? Hsn,decimal GstRate,decimal Mrp,decimal PurchasePrice,decimal SalePrice,decimal MinStock,decimal MaxStock,string? LocationCode=null,string? RackName=null,string? ShelfName=null,bool TrackBatch=true,bool TrackExpiry=true);
+record ProductBulkEditRow(int Id,string Name,string? Barcode,string? Sku,string? Category,string? Unit,string? Hsn,decimal GstRate,decimal Mrp,decimal PurchasePrice,decimal SalePrice,decimal MinStock,decimal MaxStock,string? LocationCode,string? RackName,string? ShelfName);
+record ProductBulkEditRequest(List<ProductBulkEditRow> Rows);
 record OutletRequest(string OutletName,string StoreType,string? Address,string? Phone,string? Gstin,bool RequireBatch,bool RequireExpiry,string? DefaultUnit);
 record AiImportRow(string? Name,string? Barcode,string? Sku,string? Category,string? Unit,string? Hsn,decimal GstRate,decimal Mrp,decimal PurchasePrice,decimal SalePrice,decimal MinStock,string? LocationCode,string? RackName,string? ShelfName,string? BatchNo,string? ManufactureDate,string? ExpiryDate,decimal Quantity,decimal FreeQuantity,decimal Confidence,string? Notes);
 record AiCommitRequest(List<AiImportRow> Rows);

@@ -104,6 +104,16 @@ jobs:
           if(-not $app.Contains('NOT SQL SERVER')){ throw 'AI-specific error diagnostic missing' }
           $fix = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/ai-settings-fix.js' -Raw -Encoding UTF8
           if(-not $fix.Contains('/api/ai/config')){ throw 'AI settings config status integration missing' }
+      - name: Validate duplicate item and barcode guards
+        shell: powershell
+        run: |
+          $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
+          foreach($token in @('/api/products/identity-check','/api/products/bulk-edit','Duplicate Item Name','Duplicate barcode','Duplicate item name inside AI import skipped','FindProduct')){ if(-not $program.Contains($token)){ throw "Duplicate guard missing: $token" } }
+          $app = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
+          if(-not $app.Contains('validateProductIdentity')){ throw 'Single item duplicate validation UI missing' }
+          if(-not $app.Contains('openProductBulkEdit')){ throw 'Bulk edit UI missing' }
+          $special = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js' -Raw -Encoding UTF8
+          if(-not $special.Contains('Validate & Save All')){ throw 'Specialized bulk duplicate validation UI missing' }
       - name: Download SQL Server 2019 Express prerequisite
         shell: powershell
         run: |
