@@ -40,6 +40,16 @@ jobs:
           if($optionCount -ne 19){ throw "Expected 19 premium report options, found $optionCount" }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           if($html.Contains('legacy-report-suite.js') -or $html.Contains('legacy-report-boot.js')){ throw 'Legacy report override is still loaded' }
+      - name: Validate jewellery outlet type normalization
+        shell: powershell
+        run: |
+          $outlet = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-master-fix.js' -Raw -Encoding UTF8
+          if($outlet.Contains('Gold & Diamond Jewellery')){ throw 'Duplicate Gold & Diamond Jewellery option still present' }
+          if($outlet.Contains('Silver Jewellery')){ throw 'Duplicate Silver Jewellery option still present' }
+          $count = ([regex]::Matches($outlet, "'Jewellery Shop'")).Count
+          if($count -ne 1){ throw "Expected exactly one Jewellery Shop option, found $count" }
+          $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/specialized-schema.sql' -Raw -Encoding UTF8
+          if(-not $schema.Contains("StoreType IN ('Gold & Diamond Jewellery','Silver Jewellery')")){ throw 'Legacy jewellery type normalization migration missing' }
       - name: Download SQL Server 2019 Express prerequisite
         shell: powershell
         run: |

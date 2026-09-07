@@ -39,3 +39,12 @@ IF OBJECT_ID('dbo.SalePayments') IS NULL CREATE TABLE dbo.SalePayments(
 GO
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_SalePayments_SaleId') CREATE INDEX IX_SalePayments_SaleId ON dbo.SalePayments(SaleId);
 GO
+
+-- Normalize legacy jewellery store types to the single supported Outlet Master option.
+IF OBJECT_ID('dbo.OutletMaster') IS NOT NULL
+BEGIN
+    UPDATE dbo.OutletMaster
+       SET StoreType='Jewellery Shop', UpdatedAt=SYSDATETIME()
+     WHERE StoreType IN ('Gold & Diamond Jewellery','Silver Jewellery');
+END
+GO

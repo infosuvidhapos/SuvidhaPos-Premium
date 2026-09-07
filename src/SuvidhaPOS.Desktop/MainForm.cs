@@ -37,7 +37,7 @@ public sealed class MainForm : Form
         {
             await StartBackendAsync();
             await InitializeWebViewAsync();
-            web.CoreWebView2!.Navigate(BaseUrl + "?build=644outletsync");
+            web.CoreWebView2!.Navigate(BaseUrl + "?build=645jewellerytype");
         }
         catch (Exception ex)
         {

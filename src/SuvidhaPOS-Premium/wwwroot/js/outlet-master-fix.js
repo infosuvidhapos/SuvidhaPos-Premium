@@ -1,6 +1,6 @@
 (function(){
   const TYPES=[
-    'Retail Shop','Pharmacy / Medical Store','Agriculture Product Store','Seeds & Fertilizer Store','Pesticide / Crop Care Store','General Store','Grocery Store','Supermarket','Wholesale Store','Distributor','FMCG Store','Cosmetics & Beauty Store','Personal Care Store','Stationery Store','Hardware Store','Electrical Store','Electronics Store','Mobile & Accessories Store','Garments Store','Footwear Store','Hardware & Sanitary Store','Auto Parts Store','Pet / Veterinary Store','Dairy Store','Bakery','Restaurant / Cafe','Sweet Shop','Department Store','Jewellery Shop','Gold & Diamond Jewellery','Silver Jewellery','Other'
+    'Retail Shop','Pharmacy / Medical Store','Agriculture Product Store','Seeds & Fertilizer Store','Pesticide / Crop Care Store','General Store','Grocery Store','Supermarket','Wholesale Store','Distributor','FMCG Store','Cosmetics & Beauty Store','Personal Care Store','Stationery Store','Hardware Store','Electrical Store','Electronics Store','Mobile & Accessories Store','Garments Store','Footwear Store','Hardware & Sanitary Store','Auto Parts Store','Pet / Veterinary Store','Dairy Store','Bakery','Restaurant / Cafe','Sweet Shop','Department Store','Jewellery Shop','Other'
   ];
   const e=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
   const saveLoginOutlet=(o)=>{try{localStorage.setItem('suvidha_outlet_display',JSON.stringify({OutletName:o?.OutletName||'Main Outlet',StoreType:o?.StoreType||'Retail Shop'}));}catch{}};

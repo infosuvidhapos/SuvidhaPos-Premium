@@ -1,5 +1,5 @@
 #define MyAppName "SuvidhaPOS Premium"
-#define MyAppVersion "2.2.4"
+#define MyAppVersion "2.2.5"
 #define MyAppPublisher "SuvidhaPOS"
 #define MyAppExeName "SuvidhaPOS.Desktop.exe"
 [Setup]
