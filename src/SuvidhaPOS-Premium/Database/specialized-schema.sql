@@ -89,3 +89,10 @@ UPDATE p SET
 FROM dbo.Products p JOIN dbo.ProductUoms u ON u.ProductId=p.Id
 WHERE u.ConversionFactor>0;
 GO
+
+-- Bill Management Master audit metadata.
+IF COL_LENGTH('dbo.Sales','ModifiedAt') IS NULL ALTER TABLE dbo.Sales ADD ModifiedAt datetime2 NULL;
+IF COL_LENGTH('dbo.Sales','ModifiedBy') IS NULL ALTER TABLE dbo.Sales ADD ModifiedBy nvarchar(80) NULL;
+IF COL_LENGTH('dbo.Sales','ModificationCount') IS NULL ALTER TABLE dbo.Sales ADD ModificationCount int NOT NULL CONSTRAINT DF_Sales_ModificationCount DEFAULT 0;
+IF COL_LENGTH('dbo.Sales','LastModificationType') IS NULL ALTER TABLE dbo.Sales ADD LastModificationType nvarchar(30) NULL;
+GO

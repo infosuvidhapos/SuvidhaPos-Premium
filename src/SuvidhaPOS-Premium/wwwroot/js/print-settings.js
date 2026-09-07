@@ -98,6 +98,7 @@ ${styleCss(template,thermal)}
  function buildHtml(d,mode=state.mode,template=state.template,width=state.width,autoPrint=false){
    const h=d.h||{},lines=d.l||[],c=d.company||{},o=d.outlet||{};
    const isPharma=/pharmacy|medical/i.test(o.StoreType||'')||template==='T06'||template==='A06';
+   const cancelledMark=String(h.Status||'Completed').toLowerCase()!=='completed'?'<div style="border:3px double #900;color:#900;font-weight:900;text-align:center;padding:6px;margin:6px 0">CANCELLED BILL</div>':'';
    const showCode=['T04','A02','A07'].includes(template);
    const detailed=['T06','T08','A02','A06','A07'].includes(template);
    const rows=lines.map((x,i)=>{const z=lineInfo(x);return `<tr>
@@ -106,7 +107,7 @@ ${styleCss(template,thermal)}
    const taxRows={};lines.forEach(x=>{const r=Number(x.TaxRate||0),z=lineInfo(x);taxRows[r]=(taxRows[r]||0)+z.amount});
    const taxSummary=Object.entries(taxRows).map(([r,v])=>`GST ${r}% on ₹${money(v)}`).join(' &nbsp; | &nbsp; ');
    return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(h.InvoiceNo||'Bill Preview')}</title><style>${commonCss(mode,template,width)}</style></head><body><div class="bill ${template}">
-    <div class="head center"><h1>${esc(c.CompanyName||o.OutletName||'SUVIDHA POS')}</h1><p>${esc(c.Address||'')}</p><p>${esc(c.Phone||'')} ${c.Gstin?' · GSTIN: '+esc(c.Gstin):''}</p><p class="strong">TAX INVOICE</p></div>
+    ${cancelledMark}<div class="head center"><h1>${esc(c.CompanyName||o.OutletName||'SUVIDHA POS')}</h1><p>${esc(c.Address||'')}</p><p>${esc(c.Phone||'')} ${c.Gstin?' · GSTIN: '+esc(c.Gstin):''}</p><p class="strong">TAX INVOICE</p></div>
     <div class="meta"><div>Invoice: <b>${esc(h.InvoiceNo||'')}</b></div><div>Date: ${new Date(h.BillDate||Date.now()).toLocaleString('en-IN')}</div><div>Customer: ${esc(h.CustomerName||'Walk-in Customer')}</div><div>Payment: ${esc(h.PaymentMode||'Cash')}</div><div>Outlet: ${esc(o.OutletName||'Main Outlet')}</div><div>${esc(o.StoreType||'Retail Shop')}</div></div>
     <table class="items"><thead><tr><th>Item</th><th>Qty</th><th class="amt">Rate</th><th class="amt">Amount</th></tr></thead><tbody>${rows}</tbody></table>
     ${detailed?'<div class="taxsum">'+taxSummary+'</div>':''}

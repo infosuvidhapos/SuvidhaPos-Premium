@@ -119,6 +119,15 @@ jobs:
           if(-not $app.Contains('openProductBulkEdit')){ throw 'Bulk edit UI missing' }
           $special = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js' -Raw -Encoding UTF8
           if(-not $special.Contains('Validate & Save All')){ throw 'Specialized bulk duplicate validation UI missing' }
+      - name: Validate Bill Management Master stock safety
+        shell: powershell
+        run: |
+          $bill = Get-Content 'src/SuvidhaPOS-Premium/BillManagementModules.cs' -Raw -Encoding UTF8
+          foreach($token in @('/api/bill-master','/api/sales/{id:int}/bill','/api/sales/{id:int}/payment-mode','BILL_EDIT_RESTORE','BILL_MODIFY_RESTORE','UPDATE ProductBatches SET Quantity=Quantity+@q','UPDATE ProductBatches SET Quantity=Quantity-@q','DELETE FROM SaleLines WHERE SaleId=@id','BILL_PAYMENT_CHANGED')){ if(-not $bill.Contains($token)){ throw "Bill Master backend missing: $token" } }
+          $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/bill-master.js' -Raw -Encoding UTF8
+          foreach($token in @('Reprint Bill','Edit Bill','Modify Bill','Cancel Bill','Payment Mode Change','stock restored and recalculated transactionally')){ if(-not $ui.Contains($token)){ throw "Bill Master UI missing: $token" } }
+          $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/specialized-schema.sql' -Raw -Encoding UTF8
+          if(-not $schema.Contains('LastModificationType')){ throw 'Bill modification audit schema missing' }
       - name: Download SQL Server 2019 Express prerequisite
         shell: powershell
         run: |
