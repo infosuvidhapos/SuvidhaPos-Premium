@@ -11,6 +11,8 @@
   function cbChoice(){if(!selectedUom)return null;const unit=document.querySelector('#cbUom')?.value;return selectedUom.options.find(x=>x.unit===unit)||selectedUom.options[0]}
   function applyCbChoice(choice){if(!choice||!selectedUom)return;const p=selectedUom.product;document.querySelector('#cbRate').value=Number(choice.rate||0).toFixed(2);document.querySelector('#cbMrp').value=Number(choice.mrp||0).toFixed(2);const av=Math.max(0,(Number(p.Stock||0)-cbBaseUsed(p.Id))/choice.factor);document.querySelector('#cbAvl').textContent=Number(av.toFixed(3));document.querySelector('#cbAvl').parentElement.title='Base stock: '+cbStockText(p.Stock,selectedUom.uom)}
   window.cbUomChanged=function(){applyCbChoice(cbChoice())};
+  window.cbCycleUom=function(){if(!selectedUom)return toast('Select item first');const sel=document.querySelector('#cbUom');if(!sel||sel.options.length<2)return;sel.selectedIndex=(sel.selectedIndex+1)%sel.options.length;cbUomChanged();sel.focus()};
+
 
   function discountInfo(){
     const type=document.querySelector('#cbDiscountType')?.value||'RUPEES';
@@ -35,7 +37,7 @@
     state.products=await api('/api/products?size=500');state.cart=[];selectedProduct=-1;selectedRow=-1;suggestIndex=0;paymentMode='Cash';paymentSubtype='Cash';multiPayments=[];
     app.innerHTML=`<div class="counter-billing">
       <div class="cb-head"><div>🧾 New Invoice (Sale)</div><div class="cb-billno">Bill No : <b id="cbBillNo">New</b></div><div class="cb-type">Counter Sale · Keyboard Ready</div></div>
-      <div class="cb-shortcuts"><span>F1 Discount</span><span>F3 Customer</span><span>F4 Reset</span><span>F6 Cash</span><span>F7 Credit/UPI</span><span>F8 BTC</span><span>F9 Multi Mode</span><span>F10 Save/Print</span><span>Esc Back</span></div>
+      <div class="cb-shortcuts"><span>F1 Discount</span><span>F2 Unit</span><span>F3 Customer</span><span>F4 Reset</span><span>F6 Cash</span><span>F7 Credit/UPI</span><span>F8 BTC</span><span>F9 Multi Mode</span><span>F10 Save/Print</span><span>Esc Back</span></div>
       <div class="cb-inputbar">
         <label class="cb-field">Barcode / Item Name<input id="cbSearch" autocomplete="off" placeholder="Scan barcode or type item"></label>
         <label class="cb-field">Item Name<input id="cbItemName" readonly placeholder="Select item"></label>
@@ -65,12 +67,13 @@
     ensureHidden();
     const search=document.querySelector('#cbSearch'),qty=document.querySelector('#cbQty'),rate=document.querySelector('#cbRate');
     document.querySelector('#cbUom').addEventListener('change',cbUomChanged);
+    document.querySelector('#cbUom').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.querySelector('#cbQty').focus();document.querySelector('#cbQty').select()}});
     search.addEventListener('input',cbSearch);
     search.addEventListener('keydown',async e=>{
       const list=getSuggestions();
       if(e.key==='ArrowDown'){e.preventDefault();suggestIndex=Math.min(Math.max(0,list.length-1),suggestIndex+1);renderSuggestions(list);return}
       if(e.key==='ArrowUp'){e.preventDefault();suggestIndex=Math.max(0,suggestIndex-1);renderSuggestions(list);return}
-      if(e.key==='Enter'){e.preventDefault();const exact=list.find(x=>(x.Barcode||'').toLowerCase()===search.value.trim().toLowerCase());const p=exact||list[suggestIndex]||list[0];if(p){await cbPick(p.Id);cbAddSelected();}return}
+      if(e.key==='Enter'){e.preventDefault();const exact=list.find(x=>(x.Barcode||'').toLowerCase()===search.value.trim().toLowerCase());const p=exact||list[suggestIndex]||list[0];if(p){await cbPick(p.Id);if(exact)cbAddSelected();else document.querySelector('#cbUom')?.focus();}return}
       if(e.key==='Escape'){cbHideSuggest()}
     });
     qty.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();rate.focus();rate.select()}});
@@ -145,7 +148,7 @@
   window.cbReset=function(){state.cart=[];selectedProduct=-1;selectedRow=-1;selectedUom=null;paymentMode='Cash';paymentSubtype='Cash';multiPayments=[];ensureHidden();document.querySelector('#cbDiscountType').value='RUPEES';document.querySelector('#cbDiscountValue').value='0';cbRender();document.querySelector('#cbSearch')?.focus()};
   window.cbComplete=async function(){if(!state.cart.length)return toast('Add item first');const d=discountInfo(),t=totals();if(paymentMode==='Multi Mode'&&Math.abs(multiPayments.reduce((a,x)=>a+x.Amount,0)-t.total)>.01)return cbOpenMulti();if(paymentMode==='Credit/UPI'&&!multiPayments.length)multiPayments=[{Mode:'Credit/UPI',Type:paymentSubtype||'UPI',Amount:t.total,ReferenceNo:null}];if(paymentMode==='Cash')multiPayments=[{Mode:'Cash',Type:'Cash',Amount:t.total,ReferenceNo:null}];if(paymentMode==='BTC')multiPayments=[{Mode:'BTC',Type:'BTC',Amount:t.total,ReferenceNo:null}];try{const customer=document.querySelector('#cbCustomer').value||'Walk-in Customer';const paid=multiPayments.filter(x=>x.Type!=='Credit').reduce((a,x)=>a+x.Amount,0);const data=await api('/api/premium/sales',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CustomerId:null,CustomerName:customer,PaymentMode:paymentMode,PaidAmount:paid,DiscountType:d.type,DiscountValue:d.value,Notes:document.querySelector('#cbRemarks').value||null,Payments:multiPayments,Lines:state.cart.map(x=>({ProductId:x.Id,Qty:x.Qty*x.Factor,SalePrice:x.Rate/x.Factor,TaxRate:x.Gst,Discount:0,UnitSold:x.Uom,SoldQty:x.Qty,BaseQty:x.Qty*x.Factor,RatePerSoldUnit:x.Rate}))})});toast('Bill completed: '+data.invoiceNo);if(typeof printLastBill==='function')printLastBill(data.id);setTimeout(renderCounterBilling,650)}catch(e){alert(e.message)}};
 
-  function cbKeys(e){if(state.page!=='billing'||!document.querySelector('.counter-billing'))return;const tag=(document.activeElement?.tagName||'').toLowerCase();if(e.key==='F1'){e.preventDefault();cbDiscount();return}if(e.key==='F3'){e.preventDefault();document.querySelector('#cbMobile')?.focus();return}if(e.key==='F4'){e.preventDefault();cbReset();return}if(e.key==='F6'){e.preventDefault();cbPaySelect('Cash');return}if(e.key==='F7'){e.preventDefault();cbOpenCreditUpi();return}if(e.key==='F8'){e.preventDefault();cbPaySelect('BTC');return}if(e.key==='F9'){e.preventDefault();cbOpenMulti();return}if(e.key==='F10'){e.preventDefault();cbComplete();return}if(e.key==='Escape'){e.preventDefault();loadDashboard();return}if(tag==='input'||tag==='select'||tag==='textarea')return;if(e.key==='Delete'){e.preventDefault();cbRemoveSelected();return}if((e.key==='+'||e.key==='=')&&selectedRow>=0&&state.cart[selectedRow]){e.preventDefault();const c=state.cart[selectedRow];if(cbBaseUsed(c.Id,selectedRow)+(c.Qty+1)*c.Factor<=c.Stock)c.Qty++;else toast('Stock limit reached');cbRender();return}if(e.key==='-'&&selectedRow>=0&&state.cart[selectedRow]){e.preventDefault();state.cart[selectedRow].Qty=Math.max(.001,state.cart[selectedRow].Qty-1);cbRender()}}
+  function cbKeys(e){if(state.page!=='billing'||!document.querySelector('.counter-billing'))return;const tag=(document.activeElement?.tagName||'').toLowerCase();if(e.key==='F1'){e.preventDefault();cbDiscount();return}if(e.key==='F2'){e.preventDefault();cbCycleUom();return}if(e.key==='F3'){e.preventDefault();document.querySelector('#cbMobile')?.focus();return}if(e.key==='F4'){e.preventDefault();cbReset();return}if(e.key==='F6'){e.preventDefault();cbPaySelect('Cash');return}if(e.key==='F7'){e.preventDefault();cbOpenCreditUpi();return}if(e.key==='F8'){e.preventDefault();cbPaySelect('BTC');return}if(e.key==='F9'){e.preventDefault();cbOpenMulti();return}if(e.key==='F10'){e.preventDefault();cbComplete();return}if(e.key==='Escape'){e.preventDefault();loadDashboard();return}if(tag==='input'||tag==='select'||tag==='textarea')return;if(e.key==='Delete'){e.preventDefault();cbRemoveSelected();return}if((e.key==='+'||e.key==='=')&&selectedRow>=0&&state.cart[selectedRow]){e.preventDefault();const c=state.cart[selectedRow];if(cbBaseUsed(c.Id,selectedRow)+(c.Qty+1)*c.Factor<=c.Stock)c.Qty++;else toast('Stock limit reached');cbRender();return}if(e.key==='-'&&selectedRow>=0&&state.cart[selectedRow]){e.preventDefault();state.cart[selectedRow].Qty=Math.max(.001,state.cart[selectedRow].Qty-1);cbRender()}}
   function cbHideSuggest(){const b=document.querySelector('#cbSuggest');if(b)b.style.display='none'}
 
   window.loadCounterBillingUom=renderCounterBilling;

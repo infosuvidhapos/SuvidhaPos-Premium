@@ -77,3 +77,15 @@ IF COL_LENGTH('dbo.SaleLines','SoldQuantity') IS NULL ALTER TABLE dbo.SaleLines 
 IF COL_LENGTH('dbo.SaleLines','TotalBaseQtyDeducted') IS NULL ALTER TABLE dbo.SaleLines ADD TotalBaseQtyDeducted decimal(18,3) NULL;
 IF COL_LENGTH('dbo.SaleLines','RatePerSoldUnit') IS NULL ALTER TABLE dbo.SaleLines ADD RatePerSoldUnit decimal(18,4) NULL;
 GO
+
+-- Normalize legacy Products rates from old UI, which stored pack rates in Products.
+-- Guards compare against ProductUoms pack rates, so this is idempotent after new base-rate saves.
+-- Normalize legacy Products rates from old pack-level storage.
+UPDATE p SET
+ PurchasePrice=CASE WHEN u.ConversionFactor>1 AND ABS(p.PurchasePrice-u.PackPurchaseRate)<0.0001 THEN u.PackPurchaseRate/u.ConversionFactor ELSE p.PurchasePrice END,
+ Mrp=CASE WHEN u.ConversionFactor>1 AND ABS(p.Mrp-u.PackMrp)<0.0001 THEN u.PackMrp/u.ConversionFactor ELSE p.Mrp END,
+ SalePrice=CASE WHEN u.LooseSalePrice>0 THEN u.LooseSalePrice WHEN u.ConversionFactor>1 AND ABS(p.SalePrice-u.PackSalePrice)<0.0001 THEN u.PackSalePrice/u.ConversionFactor ELSE p.SalePrice END,
+ Unit=u.BaseUnit
+FROM dbo.Products p JOIN dbo.ProductUoms u ON u.ProductId=p.Id
+WHERE u.ConversionFactor>0;
+GO

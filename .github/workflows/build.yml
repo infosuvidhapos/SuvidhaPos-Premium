@@ -74,6 +74,7 @@ jobs:
           foreach($token in @('InnerUnit','InnerConversionFactor','PackInnerFactor','UnitPurchased','TotalBaseQty','UnitSold','TotalBaseQtyDeducted')){ if(-not $schema.Contains($token)){ throw "Missing UOM schema token: $token" } }
           $premium = Get-Content 'src/SuvidhaPOS-Premium/PremiumFeatureModules.cs' -Raw -Encoding UTF8
           if(-not $premium.Contains('ResolvedPremiumSaleLine')){ throw 'Server-side sale UOM resolver missing' }
+          if(-not $premium.Contains('public record ResolvedPremiumSaleLine')){ throw 'ResolvedPremiumSaleLine record declaration missing' }
           if(-not $premium.Contains('TotalBaseQtyDeducted')){ throw 'Sale base quantity audit missing' }
           $counter = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/counter-billing.js' -Raw -Encoding UTF8
           if(-not $counter.Contains('BaseQty:x.Qty*x.Factor')){ throw 'Counter billing does not submit base quantity' }

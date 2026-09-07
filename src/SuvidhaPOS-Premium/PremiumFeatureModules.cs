@@ -286,6 +286,7 @@ ORDER BY p.Name"; break;
     }
 
     public record PremiumSaleLine(int ProductId, decimal Qty, decimal SalePrice, decimal TaxRate, decimal Discount, string? UnitSold=null, decimal SoldQty=0m, decimal BaseQty=0m, decimal RatePerSoldUnit=0m);
+    public record ResolvedPremiumSaleLine(int ProductId,decimal BaseQty,decimal BaseRate,decimal TaxRate,decimal Discount,string? UnitSold,decimal SoldQty,decimal SoldRate,decimal Factor);
     public record PremiumPaymentRequest(string Mode, string? Type, decimal Amount, string? ReferenceNo);
     public record PremiumSaleRequest(int? CustomerId,string? CustomerName,string? PaymentMode,decimal PaidAmount,string? DiscountType,decimal DiscountValue,string? Notes,List<PremiumSaleLine> Lines,List<PremiumPaymentRequest>? Payments);
     public record OpeningStockLine(int ProductId,string? BatchNo,decimal Quantity,decimal CostPrice,decimal SalePrice,decimal Mrp,DateTime? ExpiryDate);
