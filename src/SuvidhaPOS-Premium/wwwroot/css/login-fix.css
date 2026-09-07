@@ -1,0 +1,4 @@
+/* Final login lock: use the browser-safe reference JPG; only transparent controls are layered above it. */
+.login-screen{background:#06111f url('/img/login-reference.jpg') center center/100% 100% no-repeat!important}
+.ref-remember{opacity:0!important;appearance:none!important;-webkit-appearance:none!important}
+.ref-user,.ref-pass{z-index:5}.ref-login,.ref-biometric,.ref-database,.ref-support,.ref-exit,.ref-forgot,.ref-pass-toggle,.ref-theme{z-index:6}

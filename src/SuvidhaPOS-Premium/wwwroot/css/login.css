@@ -1,0 +1,18 @@
+/* LOGIN SCREEN — locked to the supplied reference artwork. */
+.login-screen{position:fixed;inset:0;z-index:99999;overflow:hidden;min-width:0;min-height:0;background:#06111f url('/img/login-reference.jpg') center center/100% 100% no-repeat!important}
+.login-reference-layer{position:absolute;inset:0;background:transparent;pointer-events:none}
+.login-screen input,.login-screen button{position:absolute;box-sizing:border-box;z-index:2}
+.ref-user,.ref-pass{left:53.65%;width:25.7%;height:5.9%;border:0;outline:0;background:transparent;color:#eef6ff;font:500 clamp(13px,1.05vw,17px)/1 "Segoe UI",Arial,sans-serif;padding:0 8px;caret-color:#21a8ff;text-shadow:0 1px 2px #000}
+.ref-user{top:31.8%}.ref-pass{top:44.25%}.ref-user:focus,.ref-pass:focus{background:rgba(12,39,63,.12);border-radius:8px}
+.ref-pass-toggle{left:76.4%;top:44.1%;width:4.2%;height:6.5%;background:transparent;border:0;cursor:pointer}
+.ref-remember{left:49.55%;top:51.45%;width:2%;height:3%;margin:0;cursor:pointer;opacity:0;appearance:none;-webkit-appearance:none}
+.ref-forgot{left:70.65%;top:51.65%;width:10.2%;height:3.4%;background:transparent;border:0;cursor:pointer;color:transparent}
+.ref-login{left:49.55%;top:56.65%;width:30.65%;height:6.7%;background:transparent;border:0;cursor:pointer;border-radius:10px}
+.ref-error{position:absolute;z-index:3;left:50%;top:63.65%;transform:translateX(-50%);width:30%;min-height:18px;text-align:center;color:#ff7180!important;font:700 12px "Segoe UI",Arial,sans-serif;pointer-events:none}
+.ref-theme{left:77.35%;top:17.15%;width:4%;height:5.4%;border:0;background:transparent;border-radius:50%;cursor:pointer}
+.ref-biometric{left:49.55%;top:69.1%;width:30.65%;height:6.4%;background:transparent;border:0;cursor:pointer;border-radius:10px}
+.ref-database{left:48.8%;top:77%;width:10.3%;height:10%;background:transparent;border:0;cursor:pointer}
+.ref-support{left:61%;top:77%;width:10.3%;height:10%;background:transparent;border:0;cursor:pointer}
+.ref-exit{left:73.7%;top:77%;width:8%;height:10%;background:transparent;border:0;cursor:pointer}
+.login-screen button:focus-visible,.login-screen input:focus-visible{outline:2px solid rgba(34,158,255,.75);outline-offset:2px}
+.login-light .login-screen{filter:brightness(1.06)}

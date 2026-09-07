@@ -1,0 +1,59 @@
+IF DB_ID(N'SuvidhaPOS') IS NULL EXEC('CREATE DATABASE [SuvidhaPOS]');
+GO
+USE [SuvidhaPOS];
+GO
+IF OBJECT_ID('dbo.Settings') IS NULL CREATE TABLE dbo.Settings(Id int IDENTITY PRIMARY KEY, CompanyName nvarchar(200) NOT NULL DEFAULT 'SuvidhaPOS', Address nvarchar(500) NULL, Phone nvarchar(50) NULL, Gstin nvarchar(30) NULL, InvoicePrefix nvarchar(20) NOT NULL DEFAULT 'INV', UpdatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
+IF OBJECT_ID('dbo.Categories') IS NULL CREATE TABLE dbo.Categories(Id int IDENTITY PRIMARY KEY,Name nvarchar(120) NOT NULL UNIQUE,IsActive bit NOT NULL DEFAULT 1);
+IF OBJECT_ID('dbo.Customers') IS NULL CREATE TABLE dbo.Customers(Id int IDENTITY PRIMARY KEY,Name nvarchar(200) NOT NULL,Phone nvarchar(30) NULL,Address nvarchar(500) NULL,GstIn nvarchar(30) NULL,OpeningBalance decimal(18,2) NOT NULL DEFAULT 0,IsActive bit NOT NULL DEFAULT 1,CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
+IF OBJECT_ID('dbo.Suppliers') IS NULL CREATE TABLE dbo.Suppliers(Id int IDENTITY PRIMARY KEY,Name nvarchar(200) NOT NULL,Phone nvarchar(30) NULL,Address nvarchar(500) NULL,GstIn nvarchar(30) NULL,OpeningBalance decimal(18,2) NOT NULL DEFAULT 0,IsActive bit NOT NULL DEFAULT 1,CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
+IF OBJECT_ID('dbo.Products') IS NULL CREATE TABLE dbo.Products(Id int IDENTITY PRIMARY KEY,Name nvarchar(200) NOT NULL,Barcode nvarchar(80) NULL,Sku nvarchar(80) NULL,CategoryId int NULL REFERENCES dbo.Categories(Id),Category nvarchar(100) NULL,Unit nvarchar(30) NOT NULL DEFAULT 'PCS',Hsn nvarchar(30) NULL,GstRate decimal(8,2) NOT NULL DEFAULT 0,Mrp decimal(18,2) NOT NULL DEFAULT 0,PurchasePrice decimal(18,2) NOT NULL DEFAULT 0,SalePrice decimal(18,2) NOT NULL DEFAULT 0,MinStock decimal(18,3) NOT NULL DEFAULT 0,MaxStock decimal(18,3) NOT NULL DEFAULT 0,IsActive bit NOT NULL DEFAULT 1,CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_Products_Barcode') CREATE UNIQUE INDEX IX_Products_Barcode ON dbo.Products(Barcode) WHERE Barcode IS NOT NULL AND Barcode<>'';
+IF OBJECT_ID('dbo.ProductBatches') IS NULL CREATE TABLE dbo.ProductBatches(Id int IDENTITY PRIMARY KEY,ProductId int NOT NULL REFERENCES dbo.Products(Id),BatchNo nvarchar(100) NOT NULL,Quantity decimal(18,3) NOT NULL DEFAULT 0,CostPrice decimal(18,2) NOT NULL DEFAULT 0,SellingPrice decimal(18,2) NOT NULL DEFAULT 0,Mrp decimal(18,2) NOT NULL DEFAULT 0,ManufactureDate date NULL,ExpiryDate date NOT NULL,CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_ProductBatches_ProductExpiry') CREATE INDEX IX_ProductBatches_ProductExpiry ON dbo.ProductBatches(ProductId,ExpiryDate,Quantity);
+IF OBJECT_ID('dbo.Purchases') IS NULL CREATE TABLE dbo.Purchases(Id int IDENTITY PRIMARY KEY,InvoiceNo nvarchar(80) NOT NULL,SupplierId int NULL REFERENCES dbo.Suppliers(Id),SupplierName nvarchar(200) NOT NULL,PurchaseDate datetime2 NOT NULL,SubTotal decimal(18,2) NOT NULL DEFAULT 0,Discount decimal(18,2) NOT NULL DEFAULT 0,Tax decimal(18,2) NOT NULL DEFAULT 0,GrandTotal decimal(18,2) NOT NULL,PaymentMode nvarchar(30) NOT NULL DEFAULT 'Credit',PaidAmount decimal(18,2) NOT NULL DEFAULT 0,Notes nvarchar(500) NULL);
+IF OBJECT_ID('dbo.PurchaseLines') IS NULL CREATE TABLE dbo.PurchaseLines(Id int IDENTITY PRIMARY KEY,PurchaseId int NOT NULL REFERENCES dbo.Purchases(Id),ProductId int NOT NULL REFERENCES dbo.Products(Id),BatchId int NOT NULL REFERENCES dbo.ProductBatches(Id),Quantity decimal(18,3) NOT NULL,FreeQuantity decimal(18,3) NOT NULL DEFAULT 0,CostPrice decimal(18,2) NOT NULL,Mrp decimal(18,2) NOT NULL,SalePrice decimal(18,2) NOT NULL,TaxRate decimal(8,2) NOT NULL DEFAULT 0,TaxAmount decimal(18,2) NOT NULL DEFAULT 0);
+IF OBJECT_ID('dbo.Sales') IS NULL CREATE TABLE dbo.Sales(Id int IDENTITY PRIMARY KEY,InvoiceNo nvarchar(80) NOT NULL,BillDate datetime2 NOT NULL,CustomerId int NULL REFERENCES dbo.Customers(Id),CustomerName nvarchar(200) NOT NULL,PaymentMode nvarchar(30) NOT NULL,SubTotal decimal(18,2) NOT NULL DEFAULT 0,Discount decimal(18,2) NOT NULL DEFAULT 0,Tax decimal(18,2) NOT NULL DEFAULT 0,GrandTotal decimal(18,2) NOT NULL,TotalCost decimal(18,2) NOT NULL DEFAULT 0,PaidAmount decimal(18,2) NOT NULL DEFAULT 0,Notes nvarchar(500) NULL,Status nvarchar(20) NOT NULL DEFAULT 'Completed');
+IF OBJECT_ID('dbo.SaleLines') IS NULL CREATE TABLE dbo.SaleLines(Id int IDENTITY PRIMARY KEY,SaleId int NOT NULL REFERENCES dbo.Sales(Id),ProductId int NOT NULL REFERENCES dbo.Products(Id),BatchId int NOT NULL REFERENCES dbo.ProductBatches(Id),Quantity decimal(18,3) NOT NULL,SalePrice decimal(18,2) NOT NULL,CostPrice decimal(18,2) NOT NULL,TaxRate decimal(8,2) NOT NULL DEFAULT 0,Discount decimal(18,2) NOT NULL DEFAULT 0);
+IF OBJECT_ID('dbo.StockLedger') IS NULL CREATE TABLE dbo.StockLedger(Id bigint IDENTITY PRIMARY KEY,ProductId int NOT NULL REFERENCES dbo.Products(Id),BatchId int NULL REFERENCES dbo.ProductBatches(Id),MovementType nvarchar(30) NOT NULL,Quantity decimal(18,3) NOT NULL,ReferenceType nvarchar(30) NULL,ReferenceId int NULL,Notes nvarchar(300) NULL,CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_StockLedger_ProductCreated') CREATE INDEX IX_StockLedger_ProductCreated ON dbo.StockLedger(ProductId,CreatedAt);
+IF OBJECT_ID('dbo.SalesReturns') IS NULL CREATE TABLE dbo.SalesReturns(Id int IDENTITY PRIMARY KEY,ReturnNo nvarchar(80) NOT NULL,SaleId int NULL REFERENCES dbo.Sales(Id),ReturnDate datetime2 NOT NULL,CustomerName nvarchar(200) NULL,GrandTotal decimal(18,2) NOT NULL,Reason nvarchar(300) NULL);
+IF OBJECT_ID('dbo.SalesReturnLines') IS NULL CREATE TABLE dbo.SalesReturnLines(Id int IDENTITY PRIMARY KEY,ReturnId int NOT NULL REFERENCES dbo.SalesReturns(Id),ProductId int NOT NULL REFERENCES dbo.Products(Id),BatchId int NOT NULL REFERENCES dbo.ProductBatches(Id),Quantity decimal(18,3) NOT NULL,Rate decimal(18,2) NOT NULL);
+IF OBJECT_ID('dbo.PurchaseReturns') IS NULL CREATE TABLE dbo.PurchaseReturns(Id int IDENTITY PRIMARY KEY,ReturnNo nvarchar(80) NOT NULL,PurchaseId int NULL REFERENCES dbo.Purchases(Id),ReturnDate datetime2 NOT NULL,SupplierName nvarchar(200) NULL,GrandTotal decimal(18,2) NOT NULL,Reason nvarchar(300) NULL);
+IF OBJECT_ID('dbo.PurchaseReturnLines') IS NULL CREATE TABLE dbo.PurchaseReturnLines(Id int IDENTITY PRIMARY KEY,ReturnId int NOT NULL REFERENCES dbo.PurchaseReturns(Id),ProductId int NOT NULL REFERENCES dbo.Products(Id),BatchId int NOT NULL REFERENCES dbo.ProductBatches(Id),Quantity decimal(18,3) NOT NULL,Rate decimal(18,2) NOT NULL);
+IF OBJECT_ID('dbo.Expenses') IS NULL CREATE TABLE dbo.Expenses(Id int IDENTITY PRIMARY KEY,ExpenseDate datetime2 NOT NULL,Category nvarchar(100) NOT NULL,Amount decimal(18,2) NOT NULL,PaymentMode nvarchar(30) NOT NULL,Notes nvarchar(500) NULL);
+IF OBJECT_ID('dbo.Users') IS NULL CREATE TABLE dbo.Users(Id int IDENTITY PRIMARY KEY,UserName nvarchar(80) NOT NULL UNIQUE,DisplayName nvarchar(150) NOT NULL,PasswordHash nvarchar(300) NOT NULL,Role nvarchar(30) NOT NULL DEFAULT 'Cashier',IsActive bit NOT NULL DEFAULT 1,CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
+IF OBJECT_ID('dbo.AuditLogs') IS NULL CREATE TABLE dbo.AuditLogs(Id bigint IDENTITY PRIMARY KEY,UserName nvarchar(80) NULL,Action nvarchar(100) NOT NULL,Entity nvarchar(100) NULL,EntityId int NULL,Details nvarchar(1000) NULL,CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
+IF NOT EXISTS(SELECT 1 FROM dbo.Categories) INSERT dbo.Categories(Name) VALUES('General'),('Grocery'),('Medicine'),('Beverages'),('Personal Care');
+IF NOT EXISTS(SELECT 1 FROM dbo.Settings) INSERT dbo.Settings(CompanyName) VALUES('SuvidhaPOS Premium');
+GO
+
+IF COL_LENGTH('dbo.Users','MustChangePassword') IS NULL ALTER TABLE dbo.Users ADD MustChangePassword bit NOT NULL CONSTRAINT DF_Users_MustChangePassword DEFAULT 0;
+IF COL_LENGTH('dbo.Sales','CancelledAt') IS NULL ALTER TABLE dbo.Sales ADD CancelledAt datetime2 NULL;
+IF COL_LENGTH('dbo.Sales','CancelledBy') IS NULL ALTER TABLE dbo.Sales ADD CancelledBy nvarchar(80) NULL;
+IF COL_LENGTH('dbo.Sales','RoundOff') IS NULL ALTER TABLE dbo.Sales ADD RoundOff decimal(18,2) NOT NULL CONSTRAINT DF_Sales_RoundOff DEFAULT 0;
+IF COL_LENGTH('dbo.Purchases','RoundOff') IS NULL ALTER TABLE dbo.Purchases ADD RoundOff decimal(18,2) NOT NULL CONSTRAINT DF_Purchases_RoundOff DEFAULT 0;
+IF OBJECT_ID('dbo.CustomerPayments') IS NULL CREATE TABLE dbo.CustomerPayments(Id int IDENTITY PRIMARY KEY,CustomerId int NOT NULL REFERENCES dbo.Customers(Id),PaymentDate datetime2 NOT NULL DEFAULT SYSDATETIME(),Amount decimal(18,2) NOT NULL,PaymentMode nvarchar(30) NOT NULL,ReferenceNo nvarchar(100) NULL,Notes nvarchar(500) NULL);
+IF OBJECT_ID('dbo.SupplierPayments') IS NULL CREATE TABLE dbo.SupplierPayments(Id int IDENTITY PRIMARY KEY,SupplierId int NOT NULL REFERENCES dbo.Suppliers(Id),PaymentDate datetime2 NOT NULL DEFAULT SYSDATETIME(),Amount decimal(18,2) NOT NULL,PaymentMode nvarchar(30) NOT NULL,ReferenceNo nvarchar(100) NULL,Notes nvarchar(500) NULL);
+IF OBJECT_ID('dbo.DayClosings') IS NULL CREATE TABLE dbo.DayClosings(Id int IDENTITY PRIMARY KEY,BusinessDate date NOT NULL UNIQUE,OpeningCash decimal(18,2) NOT NULL DEFAULT 0,CashSales decimal(18,2) NOT NULL DEFAULT 0,CashIn decimal(18,2) NOT NULL DEFAULT 0,CashOut decimal(18,2) NOT NULL DEFAULT 0,ClosingCash decimal(18,2) NOT NULL DEFAULT 0,ClosedBy nvarchar(80) NULL,ClosedAt datetime2 NULL,Notes nvarchar(500) NULL);
+IF OBJECT_ID('dbo.AppSettings') IS NULL CREATE TABLE dbo.AppSettings([Key] nvarchar(100) PRIMARY KEY,[Value] nvarchar(1000) NULL);
+IF NOT EXISTS(SELECT 1 FROM dbo.Users) INSERT dbo.Users(UserName,DisplayName,PasswordHash,Role,MustChangePassword) VALUES('admin','Administrator','PBKDF2$120000$kUAz5qw3w7g7JkxBMs1e7w==$HHayZpXwLGN8Q1eQfH9AqPS91FotlaQFyC+E6lCAeuk=','Admin',1);
+IF NOT EXISTS(SELECT 1 FROM dbo.AppSettings WHERE [Key]='Currency') INSERT dbo.AppSettings([Key],[Value]) VALUES('Currency','₹');
+IF NOT EXISTS(SELECT 1 FROM dbo.AppSettings WHERE [Key]='ExpiryWarningDays') INSERT dbo.AppSettings([Key],[Value]) VALUES('ExpiryWarningDays','30');
+
+-- Premium location tagging / outlet master / AI import metadata
+IF COL_LENGTH('dbo.Products','LocationCode') IS NULL ALTER TABLE dbo.Products ADD LocationCode nvarchar(50) NULL;
+IF COL_LENGTH('dbo.Products','RackName') IS NULL ALTER TABLE dbo.Products ADD RackName nvarchar(80) NULL;
+IF COL_LENGTH('dbo.Products','ShelfName') IS NULL ALTER TABLE dbo.Products ADD ShelfName nvarchar(80) NULL;
+IF COL_LENGTH('dbo.Products','TrackBatch') IS NULL ALTER TABLE dbo.Products ADD TrackBatch bit NOT NULL CONSTRAINT DF_Products_TrackBatch DEFAULT 1;
+IF COL_LENGTH('dbo.Products','TrackExpiry') IS NULL ALTER TABLE dbo.Products ADD TrackExpiry bit NOT NULL CONSTRAINT DF_Products_TrackExpiry DEFAULT 1;
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_Products_LocationCode') CREATE INDEX IX_Products_LocationCode ON dbo.Products(LocationCode);
+IF OBJECT_ID('dbo.OutletMaster') IS NULL CREATE TABLE dbo.OutletMaster(
+ Id int IDENTITY PRIMARY KEY, OutletName nvarchar(200) NOT NULL DEFAULT 'Main Outlet', StoreType nvarchar(100) NOT NULL DEFAULT 'Retail Shop',
+ Address nvarchar(500) NULL, Phone nvarchar(50) NULL, Gstin nvarchar(30) NULL,
+ RequireBatch bit NOT NULL DEFAULT 0, RequireExpiry bit NOT NULL DEFAULT 0,
+ DefaultUnit nvarchar(30) NOT NULL DEFAULT 'PCS', UpdatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
+IF NOT EXISTS(SELECT 1 FROM dbo.OutletMaster) INSERT dbo.OutletMaster(OutletName,StoreType) VALUES('Main Outlet','Retail Shop');
+IF OBJECT_ID('dbo.AIImportLogs') IS NULL CREATE TABLE dbo.AIImportLogs(
+ Id bigint IDENTITY PRIMARY KEY, ImportType nvarchar(30) NOT NULL, FileName nvarchar(260) NULL,
+ RowsFound int NOT NULL DEFAULT 0, RowsAccepted int NOT NULL DEFAULT 0, CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME(), UserName nvarchar(80) NULL, Notes nvarchar(1000) NULL);
+GO

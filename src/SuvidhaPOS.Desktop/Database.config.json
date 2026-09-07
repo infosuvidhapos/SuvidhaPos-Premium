@@ -1,0 +1,7 @@
+{
+  "Server": ".\\SQLEXPRESS",
+  "Database": "SuvidhaPOS",
+  "UseSqlAuthentication": false,
+  "UserName": "",
+  "EncryptedPassword": ""
+}

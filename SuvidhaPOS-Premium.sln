@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuvidhaPOS.Premium", "src\SuvidhaPOS-Premium\SuvidhaPOS.Premium.csproj", "{7E3B8A21-7C2D-4D8D-9F0B-8E5B7A6D0F11}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuvidhaPOS.Desktop", "src\SuvidhaPOS.Desktop\SuvidhaPOS.Desktop.csproj", "{B8D2A8D5-0D4E-4D90-9B0E-5F7D6A3C21E8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7E3B8A21-7C2D-4D8D-9F0B-8E5B7A6D0F11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E3B8A21-7C2D-4D8D-9F0B-8E5B7A6D0F11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E3B8A21-7C2D-4D8D-9F0B-8E5B7A6D0F11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E3B8A21-7C2D-4D8D-9F0B-8E5B7A6D0F11}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B8D2A8D5-0D4E-4D90-9B0E-5F7D6A3C21E8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B8D2A8D5-0D4E-4D90-9B0E-5F7D6A3C21E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B8D2A8D5-0D4E-4D90-9B0E-5F7D6A3C21E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B8D2A8D5-0D4E-4D90-9B0E-5F7D6A3C21E8}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

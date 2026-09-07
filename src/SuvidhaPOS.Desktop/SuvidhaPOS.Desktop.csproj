@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>..\SuvidhaPOS-Premium\suvidha-pos.ico</ApplicationIcon>
+    <AssemblyName>SuvidhaPOS.Desktop</AssemblyName>
+    <RootNamespace>SuvidhaPOS.Desktop</RootNamespace>
+    <!-- WebView2 ships a WPF helper assembly built against WindowsBase 5 while the net8 Windows reference pack exposes WindowsBase 4. This is a known reference-assembly mismatch; the WinForms control itself is used and the resolved net8 reference is correct. -->
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.11" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\SuvidhaPOS-Premium\suvidha-pos.ico" Link="suvidha-pos.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Database.config.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

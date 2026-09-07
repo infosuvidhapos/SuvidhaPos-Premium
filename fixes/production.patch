@@ -1,0 +1,11 @@
+--- a/src/SuvidhaPOS-Premium/Program.cs
++++ b/src/SuvidhaPOS-Premium/Program.cs
+@@ -132,6 +132,6 @@
+  object contentPart;
+  if(bytes is not null){
+    var b64=Convert.ToBase64String(bytes); var dataUrl=$"data:{mime};base64,{b64}";
+-   contentPart = mime.StartsWith("image/") ? new {type="input_image",image_url=dataUrl,detail="high"} : new {type="input_file",filename=filename,file_data=b64};
++   contentPart = mime.StartsWith("image/") ? new {type="input_image",image_url=dataUrl,detail="high"} : new {type="input_file",filename=filename,file_data=dataUrl,detail="high"};
+  } else contentPart=null!;
+  object[] content = contentPart is null ? new object[]{new {type="input_text",text=prompt}} : new object[]{new {type="input_text",text=prompt},contentPart};
+  var modelSetting=(await db.QuerySingleAsync("SELECT [Value] FROM AppSettings WHERE [Key]='OpenAI.Model'")).GetValueOrDefault("Value")?.ToString(); var payload=new {model=Environment.GetEnvironmentVariable("OPENAI_MODEL")??modelSetting??"gpt-5.6-luna",input=new[]{new{role="user",content}}};

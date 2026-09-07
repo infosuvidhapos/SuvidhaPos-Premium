@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SuvidhaPOS Premium</title>
+<link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/counter-billing.css">
+<link rel="stylesheet" href="/css/payment-keyboard.css">
+<link rel="stylesheet" href="/css/multi-mode-payment.css">
+<link rel="stylesheet" href="/css/legacy-report-suite.css">
+<link rel="stylesheet" href="/css/premium-fixes.css">
+<link rel="stylesheet" href="/css/login-premium.css">
+<link rel="stylesheet" href="/css/backup-master.css">
+<link rel="stylesheet" href="/css/specialized-pos.css">
+</head>
+<body>
+<div id="loginScreen" class="login-screen">
+  <div class="login-wrap">
+    <div class="login-brand">
+      <div class="login-outlet" aria-label="Current outlet">🏪 <span id="loginOutlet">Main Outlet · Retail Shop</span></div>
+      <img class="login-logo" src="/img/suvidha-pos-logo.svg?v=original" alt="Suvidha POS">
+      <div class="login-kicker">Premium Billing & Inventory System</div>
+      <h1 class="login-title">Smart Billing<span>Stronger Business</span></h1>
+      <div class="login-sub">Inventory&nbsp; | &nbsp;Purchase&nbsp; | &nbsp;Sales&nbsp; | &nbsp;Reports&nbsp; | &nbsp;Anywhere</div>
+      <div class="login-features">
+        <div class="login-feature"><b>🛒</b>POS Billing</div><div class="login-feature"><b>▣</b>Inventory</div><div class="login-feature"><b>🚚</b>Purchase</div><div class="login-feature"><b>↩</b>Sales Return</div><div class="login-feature"><b>▥</b>Reports</div>
+        <div class="login-feature"><b>◷</b>Expiry Alert</div><div class="login-feature"><b>⌖</b>Rack Indexing</div><div class="login-feature"><b>✦</b>AI Item Entry</div><div class="login-feature"><b>▤</b>Multi Store</div><div class="login-feature"><b>⚡</b>Secure & Fast</div>
+      </div>
+      <div class="login-quote">“ Organize Today<br><strong>&nbsp;&nbsp;&nbsp;Grow Tomorrow</strong> ”</div>
+      <div class="login-footer">Version 6.3.2 &nbsp;|&nbsp; © 2026 SuvidhaPOS. All rights reserved.</div>
+    </div>
+    <div class="login-panel">
+      <div class="login-card">
+        <h2>Welcome Back!</h2><p>Login to your SuvidhaPOS account</p>
+        <div class="login-field"><label>User ID</label><input id="loginUser" class="login-input" autocomplete="username" placeholder="Enter your user ID"></div>
+        <div class="login-field"><label>Password</label><div class="login-passbox"><input id="loginPass" class="login-input" type="password" autocomplete="current-password" placeholder="Enter your password"><button id="loginEye" class="login-eye" type="button">◉</button></div></div>
+        <div class="login-row"><label class="login-check"><input id="rememberMe" type="checkbox" checked> Remember Me</label><button id="forgotPasswordBtn" class="login-link" type="button">Forgot Password?</button></div>
+        <button id="loginSubmitBtn" class="login-submit" type="button">→ &nbsp; Login &nbsp;›</button>
+        <div class="login-or">OR</div>
+        <button id="biometricBtn" class="login-secondary" type="button">◎ &nbsp; Login with Biometrics (Optional)</button>
+        <div id="loginError" class="login-error"></div>
+        <div class="login-tools"><button id="changeDatabaseBtn" class="login-tool" type="button"><b>🗄</b>Change Database</button><button id="supportBtn" class="login-tool support" type="button" aria-label="Contact Support on WhatsApp"><b class="wa-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 3.2A12.7 12.7 0 0 0 5 22.2L3.4 28.6l6.5-1.7A12.8 12.8 0 1 0 16 3.2Zm0 22.2c-2.1 0-4.1-.6-5.8-1.8l-.4-.3-3.8 1 1-3.7-.3-.4A9.9 9.9 0 1 1 16 25.4Zm5.5-7.3c-.3-.2-1.8-.9-2.1-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-1.6-.8-2.7-1.5-3.8-3.3-.3-.5.3-.5.8-1.7.1-.2 0-.4 0-.6s-.7-1.7-.9-2.3c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.1 1.1-1.1 2.7 0 1.6 1.2 3.2 1.4 3.4.2.2 2.4 3.7 5.8 5.1 2.2.9 3.1 1 4.2.8.7-.1 1.8-.7 2.1-1.3.3-.6.3-1.2.2-1.3-.1-.2-.3-.3-.6-.4Z"/></svg></b>Contact Support</button><button id="exitBtn" class="login-tool exit" type="button"><b>⏻</b>Exit</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="shell">
+<aside id="sidebar">
+  <div class="brand"><div class="brandmark">SP</div><div><b>SUVIDHA POS</b><small>PREMIUM</small></div></div>
+  <div class="section">WORKSPACE</div>
+  <nav>
+    <button class="nav active" data-page="dashboard">⌂<span>Dashboard</span></button>
+    <button class="nav" data-page="billing">▣<span>New Billing</span></button>
+    <button class="nav" data-page="products">▤<span>Items &amp; Inventory</span></button>
+    <button class="nav" data-page="aiimport">✦<span>AI Import</span></button>
+    <button class="nav" data-page="purchase">🛒<span>Purchases</span></button>
+    <button class="nav" data-page="sales">▤<span>Sales History</span></button>
+    <div class="section">MANAGE</div>
+    <button class="nav" data-page="customers">♙<span>Customers</span></button>
+    <button class="nav" data-page="suppliers">♧<span>Suppliers</span></button>
+    <button class="nav" data-page="expiry">◷<span>Expiry Center</span></button>
+    <button class="nav" data-page="returns">↩<span>Returns</span></button>
+    <button class="nav" data-page="expenses">₹<span>Expenses</span></button>
+    <button class="nav" data-page="taxmaster">%<span>Tax Master</span></button>
+    <div class="section">ANALYTICS</div>
+    <button class="nav" data-page="reports">▥<span>Reports</span></button>
+  </nav>
+  <div class="sidebottom">
+    <button class="plain" onclick="loadSettings()">⚙ Settings</button>
+    <button class="plain" onclick="loadDayClosing()">▣ Day Closing</button>
+    <button class="plain" onclick="loadUsers()">👤 Users</button>
+    <button class="plain" onclick="loadPrintSettings()">🖨 Print Settings</button>
+    <button class="plain logoutBtn" onclick="logout()">↪ Logout</button>
+    <button class="plain" onclick="loadBackupMaster()">💾 Database Backup</button>
+  </div>
+</aside>
+<main>
+<header><div class="mobilebrand"><button class="iconbtn" onclick="toggleSide()">☰</button></div><div><h1 id="title">Dashboard</h1><p>Premium billing &amp; inventory management</p></div><div class="headright"><span class="pill">📅 <span id="today"></span></span><span class="pill">🏪 <span id="outletPill">Main Outlet</span></span><button class="pill" id="userPill" onclick="openChangePassword(false)">Admin</button><button class="refresh" onclick="refreshPage()">↻</button></div></header>
+<section id="app"></section><footer><span>● SQL Server: <b id="dbstatus">Checking...</b></span><span id="clock"></span><span>SuvidhaPOS Premium • Local SQL</span></footer>
+</main></div><div id="toast"></div>
+<script src="/js/app.js"></script><script src="/js/desktop-bridge.js"></script><script src="/js/pos-fixes.js"></script><script src="/js/specialized-pos.js"></script><script src="/js/tax-master.js"></script><script src="/js/reports-suite.js"></script><script src="/js/ai-settings-fix.js"></script><script src="/js/counter-billing.js"></script><script src="/js/outlet-master-fix.js"></script><script src="/js/payment-keyboard.js"></script><script src="/js/multi-mode-payment.js"></script><script src="/js/print-settings.js"></script><script src="/js/backup-master.js"></script><script src="/js/legacy-report-suite.js"></script><script src="/js/legacy-report-boot.js"></script>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const showError=m=>{const e=$('loginError');if(e)e.textContent=String(m||'Unable to login');};
+  const native=(type,payload)=>{try{
+    if(type==='support'||type==='forgotPassword'){
+      const u='https://wa.me/918271718844';
+      try{window.open(u,'_blank','noopener')}catch(e){location.href=u}
+      return true;
+    }
+    if(type==='biometric'){
+      showError('Biometric login is optional and requires Windows Hello/device enrollment.');
+      return true;
+    }
+    if(window.chrome&&window.chrome.webview){window.chrome.webview.postMessage(Object.assign({type:type},payload||{}));return true}
+  }catch(e){console.error(e)}return false};
+  const support=()=>native('support');
+  const doLogin=async()=>{
+    const user=($('loginUser')?.value||'').trim(),pass=$('loginPass')?.value||'',remember=!!$('rememberMe')?.checked;
+    showError('');
+    if(!user||!pass){showError('Enter User ID and Password');return}
+    const btn=$('loginSubmitBtn');if(btn){btn.disabled=true;btn.textContent='Signing in...'}
+    try{
+      const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({UserName:user,Password:pass})});
+      let d={};try{d=await r.json()}catch(e){}
+      if(!r.ok)throw new Error(d.message||d.detail||(r.status===401?'Invalid username or password':'Login failed'));
+      window.currentUser=d.user;
+      native(remember?'remember':'clearRemembered',remember?{enabled:true,userName:user,password:pass}:{});
+      const s=$('loginScreen');if(s)s.style.display='none';
+      const p=$('userPill');if(p&&d.user)p.textContent=(d.user.DisplayName||user)+' · '+(d.user.Role||'User');
+      if(d.user&&d.user.MustChangePassword&&typeof window.openChangePassword==='function')window.openChangePassword(true);
+      if(typeof window.loadDashboard==='function')await window.loadDashboard();
+    }catch(e){console.error('Login failed',e);showError(e.message||'Unable to login')}
+    finally{if(btn){btn.disabled=false;btn.textContent='→   Login   ›'}}
+  };
+  window.login=doLogin;
+  window.desktopMessage=window.desktopMessage||((type)=>{if(type==='support'||type==='forgotPassword')support();else if(type==='exit')window.close();else if(type==='database')showError('Change Database requires the desktop host.')});
+  $('loginEye')?.addEventListener('click',function(){const x=$('loginPass');if(!x)return;x.type=x.type==='password'?'text':'password';this.textContent=x.type==='password'?'◉':'◌'});
+  $('loginSubmitBtn')?.addEventListener('click',doLogin);
+  $('loginPass')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doLogin()}});
+  $('loginUser')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('loginPass')?.focus()}});
+  $('forgotPasswordBtn')?.addEventListener('click',support);
+  $('supportBtn')?.addEventListener('click',support);
+  $('biometricBtn')?.addEventListener('click',()=>native('biometric'));
+  $('changeDatabaseBtn')?.addEventListener('click',()=>{if(!native('database'))showError('Change Database is available from the Windows desktop host.')});
+  $('exitBtn')?.addEventListener('click',()=>{if(!native('exit')){try{window.close()}catch(e){}}});
+  window.addEventListener('load',()=>{$('loginUser')?.focus()});
+})();
+</script>
+<script>(async()=>{try{const r=await fetch('/public/specialization',{cache:'no-store'});if(r.ok){const x=await r.json();const e=document.getElementById('loginOutlet');if(e)e.textContent=(x.OutletName||'Main Outlet')+' · '+(x.StoreType||'Retail Shop')}}catch{}})();</script>
+</body></html>
