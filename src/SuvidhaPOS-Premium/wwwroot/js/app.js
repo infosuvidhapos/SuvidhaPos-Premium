@@ -1,13 +1,43 @@
 let currentUser=null;
-async function login(){const u=document.querySelector('#loginUser').value.trim(),p=document.querySelector('#loginPass').value;try{const x=await api('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({UserName:u,Password:p})});currentUser=x.user;document.querySelector('#loginScreen').style.display='none';document.querySelector('#userPill').textContent=currentUser.DisplayName+' · '+currentUser.Role; if(currentUser.MustChangePassword) openChangePassword(true); loadDashboard();}catch(e){document.querySelector('#loginError').textContent='Invalid username or password';}}
-async function logout(){await api('/api/logout',{method:'POST'});location.reload()}
+async function login(){
+  const u=document.querySelector('#loginUser').value.trim(),p=document.querySelector('#loginPass').value;
+  try{
+    const x=await api('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({UserName:u,Password:p})});
+    const token=x.token||x.Token||null;
+    if(token){window.suvidhaAuthToken=token;try{sessionStorage.setItem('suvidha_auth_token',token)}catch{}}
+    const raw=x.user||x.User||{};
+    currentUser={
+      Id:raw.Id??raw.id,
+      UserName:raw.UserName??raw.userName??u,
+      DisplayName:raw.DisplayName??raw.displayName??raw.UserName??raw.userName??u,
+      Role:raw.Role??raw.role??'User',
+      MustChangePassword:raw.MustChangePassword??raw.mustChangePassword??false
+    };
+    window.currentUser=currentUser;
+    document.querySelector('#loginScreen').style.display='none';
+    document.querySelector('#userPill').textContent=currentUser.DisplayName+' · '+currentUser.Role;
+    if(currentUser.MustChangePassword) openChangePassword(true);
+    await loadDashboard();
+  }catch(e){document.querySelector('#loginError').textContent=e.message||'Login failed';}
+}
+async function logout(){try{await api('/api/logout',{method:'POST'})}finally{window.suvidhaAuthToken=null;try{sessionStorage.removeItem('suvidha_auth_token')}catch{}location.reload()}}
 function openChangePassword(force=false){modal('Change Password',`<div class="formgrid"><label>Current Password<input id="cp" class="input" type="password"></label><label>New Password<input id="np" class="input" type="password"></label><label>Confirm Password<input id="ncp" class="input" type="password"></label></div>${force?'<div class="alert">For security, change the default password before continuing.</div>':''}`,`<button class="btn" onclick="changePassword()">Update Password</button>`);}
 async function changePassword(){if(np.value!==ncp.value)return toast('Passwords do not match');try{await api('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CurrentPassword:cp.value,NewPassword:np.value})});closeModal();toast('Password changed');}catch(e){alert(e.message)}}
 const app=document.querySelector('#app'), title=document.querySelector('#title');
 const state={page:'dashboard',products:[],cart:[],customers:[],suppliers:[]};
 document.querySelector('#today').textContent=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
 setInterval(()=>document.querySelector('#clock').textContent=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),1000);
-async function api(url,opt={}){const r=await fetch(url,opt);let d={};try{d=await r.json()}catch{}if(r.status===401){document.querySelector('#loginScreen').style.display='flex';throw new Error('Login required')}if(!r.ok)throw new Error(d.message||d.detail||'Request failed');return d}
+async function api(url,opt={}){
+  let token=window.suvidhaAuthToken||null;
+  if(!token){try{token=sessionStorage.getItem('suvidha_auth_token')}catch{}}
+  const headers=new Headers(opt.headers||{});
+  if(token) headers.set('Authorization','Bearer '+token);
+  const r=await fetch(url,{...opt,headers,credentials:'same-origin',cache:opt.cache||'no-store'});
+  let d={};try{d=await r.json()}catch{}
+  if(r.status===401){document.querySelector('#loginScreen').style.display='flex';throw new Error('Login required')}
+  if(!r.ok)throw new Error(d.message||d.detail||'Request failed');
+  return d
+}
 const money=x=>Number(x||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmt=v=>v?new Date(v).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'-';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
