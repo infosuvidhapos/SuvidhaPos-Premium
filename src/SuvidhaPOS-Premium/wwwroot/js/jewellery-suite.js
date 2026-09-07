@@ -218,14 +218,31 @@
   window.jewelSuiteInvoice=invoice;
   window.jewelComingSoon=function(name){notify(name+' is available only in Jewellery Shop workspace; detailed transaction workflow can be added next.')};
 
-  async function enable(){
-    let s;try{s=await fetch('/public/specialization',{cache:'no-store'}).then(r=>r.ok?r.json():null)}catch{}
-    if(!s?.IsJewellery){document.body.classList.remove('jewel-suite-mode');return}
-    JS.enabled=true;document.body.classList.add('jewel-suite-mode');document.body.dataset.storeType='jewellery-shop';shell();
+  const canonicalStoreType=v=>/^(Gold & Diamond Jewellery|Silver Jewellery)$/i.test(String(v||'').trim())?'Jewellery Shop':String(v||'').trim();
+  const isJewelleryProfile=s=>!!s&&(s.IsJewellery===true||canonicalStoreType(s.StoreType)==='Jewellery Shop');
+  async function enable(profile){
+    let s=profile;
+    if(!s){
+      try{s=await fetch('/public/specialization?_='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}}).then(r=>r.ok?r.json():null)}catch{}
+    }
+    if(!isJewelleryProfile(s)){
+      document.body.classList.remove('jewel-suite-mode');
+      window.__jewelSuiteEnabled=false;
+      return false;
+    }
+    if(JS.enabled&&document.body.classList.contains('jewel-suite-mode'))return true;
+    JS.enabled=true;window.__jewelSuiteEnabled=true;
+    document.body.classList.add('jewel-suite-mode');
+    document.body.dataset.storeType='jewellery-shop';
+    shell();
     window.loadDashboard=dashboard;
     window.loadBilling=()=>invoice('retail');
-    const current=document.querySelector('#loginScreen')?.style.display;
-    if(current==='none'||document.body.getAttribute('data-authenticated')==='true')dashboard();
+    window.loadPurchase=()=>invoice('purchase');
+    const current=document.querySelector('#loginScreen');
+    if(!current||getComputedStyle(current).display==='none'||document.body.getAttribute('data-authenticated')==='true')dashboard();
+    return true;
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(enable,0));else setTimeout(enable,0);
+  window.applyJewelleryOutletMode=enable;
+  window.addEventListener('suvidha:outlet-synced',e=>{if(isJewelleryProfile(e.detail))enable(e.detail)});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>enable(window.suvidhaOutlet),0));else setTimeout(()=>enable(window.suvidhaOutlet),0);
 })();

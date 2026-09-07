@@ -3,26 +3,15 @@
     'Retail Shop','Pharmacy / Medical Store','Agriculture Product Store','Seeds & Fertilizer Store','Pesticide / Crop Care Store','General Store','Grocery Store','Supermarket','Wholesale Store','Distributor','FMCG Store','Cosmetics & Beauty Store','Personal Care Store','Stationery Store','Hardware Store','Electrical Store','Electronics Store','Mobile & Accessories Store','Garments Store','Footwear Store','Hardware & Sanitary Store','Auto Parts Store','Pet / Veterinary Store','Dairy Store','Bakery','Restaurant / Cafe','Sweet Shop','Department Store','Jewellery Shop','Other'
   ];
   const e=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
-  const saveLoginOutlet=(o)=>{try{localStorage.setItem('suvidha_outlet_display',JSON.stringify({OutletName:o?.OutletName||'Main Outlet',StoreType:o?.StoreType||'Retail Shop'}));}catch{}};
-  const restoreLoginOutlet=()=>{try{const raw=localStorage.getItem('suvidha_outlet_display');if(!raw)return;const x=JSON.parse(raw),el=document.getElementById('loginOutlet');if(el)el.textContent=(x.OutletName||'Main Outlet')+' · '+(x.StoreType||'Retail Shop');}catch{}};
+  const canonicalType=v=>/^(Gold & Diamond Jewellery|Silver Jewellery)$/i.test(String(v||'').trim())?'Jewellery Shop':(String(v||'').trim()||'Retail Shop');
+  const saveLoginOutlet=(o)=>{try{localStorage.setItem('suvidha_outlet_display',JSON.stringify({OutletName:o?.OutletName||'Main Outlet',StoreType:canonicalType(o?.StoreType||'Retail Shop')}));}catch{}};
+  const restoreLoginOutlet=()=>{try{const raw=localStorage.getItem('suvidha_outlet_display');if(!raw)return;const x=JSON.parse(raw),el=document.getElementById('loginOutlet');if(el)el.textContent=(x.OutletName||'Main Outlet')+' · '+canonicalType(x.StoreType||'Retail Shop');}catch{}};
   restoreLoginOutlet();
-  // The login page is not authenticated yet. Redirect only the read-only specialization lookup
-  // to the public endpoint; all other /api requests keep their normal authentication behavior.
-  const nativeFetch=window.fetch.bind(window);
-  window.fetch=function(input,init){
-    try{
-      const url=typeof input==='string'?input:(input&&input.url)||'';
-      if(url==='/api/specialization' || url.startsWith('/api/specialization?')) input=url.replace('/api/specialization','/public/specialization');
-    }catch{}
-    return nativeFetch(input,init);
-  };
-  const syncPublicOutlet=async()=>{try{const r=await nativeFetch('/public/specialization',{cache:'no-store'});if(r.ok){const x=await r.json();saveLoginOutlet(x);const el=document.getElementById('loginOutlet');if(el)el.textContent=(x.OutletName||'Main Outlet')+' · '+(x.StoreType||'Retail Shop');}}catch{}};
-  syncPublicOutlet();
   window.loadSettings=async function(){
     setPage('settings');title.textContent='Settings';
     try{
       const [x,o]=await Promise.all([api('/api/settings'),api('/api/outlet')]);
-      const type=o.StoreType||'Retail Shop';
+      const type=canonicalType(o.StoreType||'Retail Shop');
       saveLoginOutlet(o);
       document.querySelector('#outletPill').textContent=o.OutletName||'Main Outlet';
       document.body.dataset.storeType=type.replace(/[^a-z0-9]+/gi,'-').toLowerCase();
@@ -63,6 +52,22 @@
     else{box.innerHTML='<div class="outlet-mode-standard"><b>▣ STANDARD / UOM BILLING MODE</b><span>Normal billing flow is active. Packaging/UOM conversion can be used where configured.</span></div>'}
   };
   window.saveOutlet=async function(){
-    const o={OutletName:oname.value.trim()||'Main Outlet',StoreType:otype.value,Address:oaddr.value||null,Phone:ophone.value||null,Gstin:ogst.value||null,RequireBatch:oreqbatch.checked,RequireExpiry:oreqexp.checked,DefaultUnit:'PCS'};
-    try{await api('/api/outlet',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});saveLoginOutlet(o);const loginEl=document.getElementById('loginOutlet');if(loginEl)loginEl.textContent=o.OutletName+' · '+o.StoreType;document.querySelector('#outletPill').textContent=o.OutletName;document.body.dataset.storeType=o.StoreType.replace(/[^a-z0-9]+/gi,'-').toLowerCase();toast(o.StoreType==='Jewellery Shop'?'Jewellery Billing Mode enabled':'Outlet Master saved');await loadSettings();}catch(err){alert(err.message)}};
+    const o={
+      OutletName:oname.value.trim()||'Main Outlet',
+      StoreType:canonicalType(otype.value),
+      Address:oaddr.value||null,Phone:ophone.value||null,Gstin:ogst.value||null,
+      RequireBatch:oreqbatch.checked,RequireExpiry:oreqexp.checked,DefaultUnit:'PCS'
+    };
+    try{
+      await api('/api/outlet',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
+      saveLoginOutlet(o);
+      const loginEl=document.getElementById('loginOutlet');if(loginEl)loginEl.textContent=o.OutletName+' · '+o.StoreType;
+      const pill=document.querySelector('#outletPill');if(pill)pill.textContent=o.OutletName;
+      document.body.dataset.storeType=o.StoreType.replace(/[^a-z0-9]+/gi,'-').toLowerCase();
+      if(window.refreshLoginOutlet)await window.refreshLoginOutlet(true);
+      window.dispatchEvent(new CustomEvent('suvidha:outlet-saved',{detail:o}));
+      toast(o.StoreType==='Jewellery Shop'?'Jewellery Shop mode enabled — reloading workspace':'Outlet Master saved — reloading workspace');
+      setTimeout(()=>location.replace('/?outlet='+Date.now()),450);
+    }catch(err){alert(err.message)}
+  };
 })();

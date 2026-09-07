@@ -17,9 +17,9 @@ public static class SpecializedModules
             ctx.Response.Headers.Expires = "0";
             var o = await db.QuerySingleAsync("SELECT TOP 1 OutletName,StoreType,UpdatedAt FROM OutletMaster ORDER BY Id");
             var name = o.GetValueOrDefault("OutletName")?.ToString();
-            var type = o.GetValueOrDefault("StoreType")?.ToString();
+            var type = CanonicalStoreType(o.GetValueOrDefault("StoreType")?.ToString());
             if (string.IsNullOrWhiteSpace(name)) name = "Main Outlet";
-            if (string.IsNullOrWhiteSpace(type)) type = "Retail Shop";
+            
             return Results.Ok(new {
                 OutletName = name,
                 StoreType = type,
@@ -32,7 +32,7 @@ public static class SpecializedModules
         app.MapGet("/api/specialization", async (Db db) =>
         {
             var o = await db.QuerySingleAsync("SELECT TOP 1 OutletName,StoreType FROM OutletMaster ORDER BY Id");
-            var type = o.GetValueOrDefault("StoreType")?.ToString() ?? "Retail Shop";
+            var type = CanonicalStoreType(o.GetValueOrDefault("StoreType")?.ToString());
             return Results.Ok(new { OutletName = o.GetValueOrDefault("OutletName")?.ToString() ?? "Main Outlet", StoreType = type, IsJewellery = IsJewellery(type), IsUom = !IsJewellery(type) });
         });
 
@@ -168,7 +168,13 @@ ORDER BY Id DESC",P("@f",f),P("@e",e),P("@q",term),P("@like","%"+term+"%")));
         });
         app.MapPost("/api/jewellery/old-metal/calculate", (OldMetalRequest x) => { var melt=Math.Max(0,x.GrossWeight-x.StoneWeight-x.WaxDeduction); var pure=melt*(x.AssayedPurityPercent/100m)*(1-x.MeltingLossPercent/100m); return Results.Ok(new{meltWeight=melt,netPureWeight=pure,credit=pure*x.PurchaseRatePerGram}); });
     }
-    static bool IsJewellery(string t)=>t.Contains("jewellery",StringComparison.OrdinalIgnoreCase)||t.Contains("jewelry",StringComparison.OrdinalIgnoreCase)||t.Contains("gold",StringComparison.OrdinalIgnoreCase)||t.Contains("silver",StringComparison.OrdinalIgnoreCase);
+    static string CanonicalStoreType(string? t)
+    {
+        var v=(t??"").Trim();
+        if(v.Equals("Gold & Diamond Jewellery",StringComparison.OrdinalIgnoreCase)||v.Equals("Silver Jewellery",StringComparison.OrdinalIgnoreCase)) return "Jewellery Shop";
+        return string.IsNullOrWhiteSpace(v) ? "Retail Shop" : v;
+    }
+    static bool IsJewellery(string t)=>CanonicalStoreType(t).Equals("Jewellery Shop",StringComparison.OrdinalIgnoreCase);
     static SqlParameter P(string n,object? v)=>new(n,v??DBNull.Value);
     public record BackupMasterRequest(string? Server,string? Database,string? Folder,string? Schedule,int RetentionDays,bool LocalEnabled,bool Zip,bool AutoCleanup,string? ExternalFolder,bool ExternalEnabled,string? GoogleDriveConfig);
     public record UomRequest(string BaseUnit,string PackUnit,decimal ConversionFactor,decimal PackPurchaseRate,decimal PackMrp,decimal PackSalePrice,decimal LooseSalePrice,bool AllowLoose);

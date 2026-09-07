@@ -53,6 +53,20 @@ jobs:
           if($count -ne 1){ throw "Expected exactly one Jewellery Shop option in TYPES, found $count" }
           $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/specialized-schema.sql' -Raw -Encoding UTF8
           if(-not $schema.Contains("StoreType IN ('Gold & Diamond Jewellery','Silver Jewellery')")){ throw 'Legacy jewellery type normalization migration missing' }
+      - name: Validate report dropdown and outlet mode switching
+        shell: powershell
+        run: |
+          $reports = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/reports-suite.js' -Raw -Encoding UTF8
+          if(-not $reports.Contains('data-no-tax-enhance="1"')){ throw 'Report dropdown is not protected from tax enhancer' }
+          $tax = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/tax-master.js' -Raw -Encoding UTF8
+          if(-not $tax.Contains("el.id==='reportType'")){ throw 'Tax Master reportType exclusion missing' }
+          $outlet = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-master-fix.js' -Raw -Encoding UTF8
+          if(-not $outlet.Contains("location.replace('/?outlet='")){ throw 'Outlet save does not force workspace reload' }
+          $sync = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-login-sync.js' -Raw -Encoding UTF8
+          if(-not $sync.Contains("suvidha:outlet-saved")){ throw 'Login outlet live sync event missing' }
+          $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
+          if(-not $jewel.Contains("suvidha:outlet-synced")){ throw 'Jewellery mode outlet sync listener missing' }
+          if(-not $jewel.Contains("window.loadBilling=()=>invoice('retail')")){ throw 'Jewellery billing override missing' }
       - name: Download SQL Server 2019 Express prerequisite
         shell: powershell
         run: |
