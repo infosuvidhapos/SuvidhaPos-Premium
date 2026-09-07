@@ -18,7 +18,8 @@
  ['bill-detail','Bill Detail Report'],
  ['qty-wise-report','Qty Wise Report'],
  ['product-expiry','Product Expiry Report'],
- ['gstr1','GSTR1']
+ ['gstr1','GSTR1'],
+ ['current-stock-report','Current Stock Report']
  ];
  let currentRows=[],currentDef=null;
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -32,7 +33,7 @@
  window.loadReports=async function(){setPage('reports');title.textContent='Report Master';document.querySelector('header p').textContent='From/To date reports with Excel and PDF export';const today=iso(new Date()),from=iso(new Date(Date.now()-29*86400000));app.innerHTML=`<div class="content">
  <div class="panel report-toolbar"><div class="formgrid"><label>Report<select id="reportType" class="select">${defs.map(x=>`<option value="${x[0]}">${esc(x[1])}</option>`).join('')}</select></label><label>From Date<input id="reportFrom" class="input" type="date" value="${from}"></label><label>To Date<input id="reportTo" class="input" type="date" value="${today}"></label><label>Search<input id="reportQ" class="input" placeholder="Bill, item, customer, supplier, user..."></label></div><div class="toolbar"><button class="btn" onclick="runReport()">Generate Report</button><button class="btn secondary" onclick="exportReportExcel()">⬇ Export Excel</button><button class="btn secondary" onclick="exportReportPdf()">⬇ Export PDF</button></div></div>
  <div id="reportMeta" class="muted" style="margin:8px 0"></div><div class="panel"><div class="tablewrap"><table class="table" id="reportTable"><thead></thead><tbody><tr><td class="empty">Select report and generate</td></tr></tbody></table></div></div></div>`;
- document.querySelector('#reportType').addEventListener('change',runReport);document.querySelector('#reportMeta').textContent='18 report masters loaded';await runReport()};
+ document.querySelector('#reportType').addEventListener('change',runReport);document.querySelector('#reportMeta').textContent='19 report masters loaded';await runReport()};
 
  window.runReport=async function(){const type=document.querySelector('#reportType')?.value;if(!type)return;currentDef=defs.find(x=>x[0]===type)||defs[0];const from=document.querySelector('#reportFrom').value,to=document.querySelector('#reportTo').value,q=encodeURIComponent(document.querySelector('#reportQ').value||'');try{currentRows=await api(`/api/premium-reports/${type}?from=${from}&to=${to}&q=${q}`);render()}catch(e){document.querySelector('#reportTable').innerHTML=`<tbody><tr><td class="alert">${esc(e.message)}</td></tr></tbody>`}};
 

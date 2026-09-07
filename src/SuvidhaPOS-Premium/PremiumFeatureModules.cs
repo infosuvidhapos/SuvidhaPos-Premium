@@ -221,6 +221,32 @@ FROM ProductBatches b JOIN Products p ON p.Id=b.ProductId WHERE b.Quantity>0 AND
                 case "gstr1":
                     sql=@"SELECT s.BillDate,s.InvoiceNo,s.CustomerName,ISNULL(c.GstIn,'') CustomerGSTIN,ISNULL(p.Hsn,'') HSN,sl.TaxRate GSTPercent,CAST(sl.Quantity*sl.SalePrice-sl.Discount AS decimal(18,2)) TaxableValue,CAST((sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/2/100 AS decimal(18,2)) CGST,CAST((sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/2/100 AS decimal(18,2)) SGST,CAST((sl.Quantity*sl.SalePrice-sl.Discount)*(1+sl.TaxRate/100) AS decimal(18,2)) InvoiceLineValue
 FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId JOIN Products p ON p.Id=sl.ProductId LEFT JOIN Customers c ON c.Id=s.CustomerId WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e AND (@q='' OR s.InvoiceNo LIKE @like OR s.CustomerName LIKE @like OR ISNULL(c.GstIn,'') LIKE @like) ORDER BY s.BillDate DESC,s.InvoiceNo"; break;
+                case "current-stock-report":
+                    sql=@"SELECT
+p.Id ProductId,
+p.Name ItemName,
+ISNULL(p.Barcode,'') Barcode,
+ISNULL(p.Sku,'') SKU,
+ISNULL(NULLIF(p.Category,''),'Uncategorised') Category,
+p.Unit,
+ISNULL(p.Hsn,'') HSN,
+p.GstRate GSTPercent,
+CAST(ISNULL(SUM(CASE WHEN l.CreatedAt<@e THEN l.Quantity ELSE 0 END),0) AS decimal(18,3)) CurrentStock,
+p.PurchasePrice,
+p.SalePrice,
+p.Mrp MRP,
+CAST(ISNULL(SUM(CASE WHEN l.CreatedAt<@e THEN l.Quantity ELSE 0 END),0)*p.PurchasePrice AS decimal(18,2)) StockCostValue,
+CAST(ISNULL(SUM(CASE WHEN l.CreatedAt<@e THEN l.Quantity ELSE 0 END),0)*p.SalePrice AS decimal(18,2)) StockSaleValue,
+ISNULL(p.LocationCode,'') LocationCode,
+ISNULL(p.RackName,'') RackName,
+ISNULL(p.ShelfName,'') ShelfName,
+CONVERT(date,DATEADD(day,-1,@e)) AsOnDate
+FROM Products p
+LEFT JOIN StockLedger l ON l.ProductId=p.Id
+WHERE p.IsActive=1 AND (@q='' OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like OR ISNULL(p.Sku,'') LIKE @like OR ISNULL(p.Category,'') LIKE @like)
+GROUP BY p.Id,p.Name,p.Barcode,p.Sku,p.Category,p.Unit,p.Hsn,p.GstRate,p.PurchasePrice,p.SalePrice,p.Mrp,p.LocationCode,p.RackName,p.ShelfName
+HAVING ISNULL(SUM(CASE WHEN l.CreatedAt<@e THEN l.Quantity ELSE 0 END),0)<>0
+ORDER BY p.Name"; break;
                 default: return Results.BadRequest(new { message = "Unknown premium report type" });
             }
             return Results.Ok(await db.QueryAsync(sql,P("@f",f),P("@e",e),P("@q",term),P("@like",like)));

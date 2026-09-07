@@ -34,8 +34,10 @@ jobs:
           if ($premium -match 'INSERT Sales[\\s\\S]{0,500}OUTPUT INSERTED') { throw 'Premium Sales insert is not trigger-safe' }
           if ($program -match 'INSERT Sales[\\s\\S]{0,500}OUTPUT INSERTED') { throw 'Standard Sales insert is not trigger-safe' }
           $reports = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/reports-suite.js' -Raw -Encoding UTF8
-          $required = @('Account Report','Daily Sale Report Bill Wise','Cashier Report','Date Wise Summary','Bill Modification Report','Utility Report','Item Wise Report','Profit & Loss Report','Date Wise Sale Summary Report','Bill/Customer Report','Category Wise Sale Report','Category Wise Monthly Sale Report','HSN Wise Sale Report','Purchase Register Report','Bill Detail Report','Qty Wise Report','Product Expiry Report','GSTR1')
+          $required = @('Account Report','Daily Sale Report Bill Wise','Cashier Report','Date Wise Summary','Bill Modification Report','Utility Report','Item Wise Report','Profit & Loss Report','Date Wise Sale Summary Report','Bill/Customer Report','Category Wise Sale Report','Category Wise Monthly Sale Report','HSN Wise Sale Report','Purchase Register Report','Bill Detail Report','Qty Wise Report','Product Expiry Report','GSTR1','Current Stock Report')
           foreach($name in $required){ if(-not $reports.Contains($name)){ throw "Missing report: $name" } }
+          $optionCount = ([regex]::Matches($reports, "\['[^']+','[^']+'\]")).Count
+          if($optionCount -ne 19){ throw "Expected 19 premium report options, found $optionCount" }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           if($html.Contains('legacy-report-suite.js') -or $html.Contains('legacy-report-boot.js')){ throw 'Legacy report override is still loaded' }
       - name: Download SQL Server 2019 Express prerequisite
