@@ -113,7 +113,7 @@ jobs:
         shell: powershell
         run: |
           $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
-          foreach($token in @('/api/products/identity-check','/api/products/bulk-edit','Duplicate Item Name','Duplicate barcode','Duplicate item name inside AI import skipped','FindProduct')){ if(-not $program.Contains($token)){ throw "Duplicate guard missing: $token" } }
+          foreach($token in @('/api/products/identity-check','/api/products/bulk-edit',"THEN 'Item Name' ELSE 'Barcode' END ConflictType",'Duplicate barcode is not allowed','Duplicate item name inside AI import skipped','FindProduct')){ if(-not $program.Contains($token)){ throw "Duplicate guard missing: $token" } }
           $app = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           if(-not $app.Contains('validateProductIdentity')){ throw 'Single item duplicate validation UI missing' }
           if(-not $app.Contains('openProductBulkEdit')){ throw 'Bulk edit UI missing' }
