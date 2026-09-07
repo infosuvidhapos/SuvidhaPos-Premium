@@ -98,7 +98,7 @@ jobs:
         shell: powershell
         run: |
           $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
-          foreach($token in @('"/api/ai/config"','"/api/ai/test"','https://api.openai.com/v1/files','purpose"),"user_data"','type="input_file",file_id=openAiFileId','OpenAiErrorMessage')){ if(-not $program.Contains($token)){ throw "AI backend validation missing: $token" } }
+          foreach($token in @('"/api/ai/config"','"/api/ai/test"','https://api.openai.com/v1/files','new StringContent("user_data"),"purpose"','type="input_file",file_id=openAiFileId','OpenAiErrorMessage')){ if(-not $program.Contains($token)){ throw "AI backend validation missing: $token" } }
           $app = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           if(-not $app.Contains('Test AI Connection')){ throw 'AI connection test UI missing' }
           if(-not $app.Contains('NOT SQL SERVER')){ throw 'AI-specific error diagnostic missing' }
