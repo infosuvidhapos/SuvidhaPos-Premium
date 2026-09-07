@@ -2,9 +2,11 @@ $ErrorActionPreference='Stop'
 $program='src/SuvidhaPOS-Premium/Program.cs'
 $project='src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj'
 $indexPath='src/SuvidhaPOS-Premium/wwwroot/index.html'
+$desktopPath='src/SuvidhaPOS.Desktop/MainForm.cs'
 $text=Get-Content $program -Raw
 $proj=Get-Content $project -Raw
 $index=Get-Content $indexPath -Raw
+$desktop=Get-Content $desktopPath -Raw
 
 # Responses API requires a data URL for input_file file_data.
 $old='contentPart = mime.StartsWith("image/") ? new {type="input_image",image_url=dataUrl,detail="high"} : new {type="input_file",filename=filename,file_data=b64};'
@@ -90,10 +92,14 @@ if($index.Contains($inlineOld)){
   throw 'Inline login handler marker not found in index.html'
 }
 
-# Cache-bust the login hotfix on every rebuilt installer and expose a visible
-# build marker so we can confirm the installed UI is the new build.
-$index=$index.Replace('/js/legacy-report-boot.js','/js/legacy-report-boot.js?v=loginfix3')
-$index=$index.Replace('Version 6.3.2','Version 6.3.3-loginfix3')
+# Cache-bust both the login hotfix JS and the root WebView2 navigation. The
+# WebView2 profile is persistent across installer upgrades, so navigating to
+# the exact same localhost URL can otherwise display stale cached HTML.
+$index=$index.Replace('/js/legacy-report-boot.js','/js/legacy-report-boot.js?v=loginfix4')
+$index=$index.Replace('Version 6.3.2','Version 6.3.4-loginfix4')
+$navOld='web.CoreWebView2!.Navigate(BaseUrl);'
+$navNew='web.CoreWebView2!.Navigate(BaseUrl + "?build=loginfix4");'
+if($desktop.Contains($navOld)){$desktop=$desktop.Replace($navOld,$navNew)}else{throw 'Desktop navigation marker not found'}
 
 # Keep endpoint mappings deterministic.
 if(-not $text.Contains('SuvidhaPOS.Premium.SpecializedModules.Map(app);')){$text=$text.Replace('SpecializedModules.Map(app);','SuvidhaPOS.Premium.SpecializedModules.Map(app);');$text=$text.Replace('ReportTaxModules.Map(app);','SuvidhaPOS.Premium.ReportTaxModules.Map(app);')}
@@ -102,4 +108,5 @@ if(-not $text.Contains('SuvidhaPOS.Premium.ReportTaxModules.Map(app);')){$text=$
 Set-Content $program $text -Encoding UTF8
 Set-Content $project $proj -Encoding UTF8
 Set-Content $indexPath $index -Encoding UTF8
-Write-Host 'Build fixes applied, including inline login handler patch.'
+Set-Content $desktopPath $desktop -Encoding UTF8
+Write-Host 'Build fixes applied, including inline login patch and WebView2 cache bust.'
