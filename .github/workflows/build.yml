@@ -1,0 +1,100 @@
+name: SuvidhaPOS Premium Windows Build
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-test-publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply deterministic build fixes
+        shell: powershell
+        run: .\fixes\apply-build-fixes.ps1
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore SuvidhaPOS-Premium.sln
+      - name: Build
+        run: dotnet build SuvidhaPOS-Premium.sln --configuration Release --no-restore
+      - name: Validate source layout
+        shell: powershell
+        run: |
+          $required=@('src/SuvidhaPOS-Premium/Program.cs','src/SuvidhaPOS-Premium/SpecializedModules.cs','src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj','src/SuvidhaPOS-Premium/Database/schema.sql','src/SuvidhaPOS-Premium/Database/specialized-schema.sql','src/SuvidhaPOS-Premium/Database/seed.sql','src/SuvidhaPOS-Premium/Database/print-schema.sql','src/SuvidhaPOS-Premium/wwwroot/index.html','src/SuvidhaPOS-Premium/wwwroot/js/app.js','src/SuvidhaPOS-Premium/wwwroot/js/desktop-bridge.js','src/SuvidhaPOS-Premium/wwwroot/js/pos-fixes.js','src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js','src/SuvidhaPOS-Premium/wwwroot/js/backup-master.js','src/SuvidhaPOS-Premium/wwwroot/css/app.css','src/SuvidhaPOS-Premium/wwwroot/css/login-premium.css','src/SuvidhaPOS-Premium/wwwroot/css/backup-master.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-fixes.css','src/SuvidhaPOS-Premium/suvidha-pos.ico','src/SuvidhaPOS.Desktop/SuvidhaPOS.Desktop.csproj','src/SuvidhaPOS.Desktop/Program.cs','src/SuvidhaPOS.Desktop/MainForm.cs','src/SuvidhaPOS.Desktop/Database.config.json','installer/SuvidhaPOS.iss'); foreach($f in $required){if(-not(Test-Path $f)){throw "Missing $f"}}
+      - name: Download SQL Server 2019 Express prerequisite
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path installer/Prerequisites | Out-Null
+          Invoke-WebRequest -Uri 'https://download.microsoft.com/download/7/f/8/7f8a9c43-8c8a-4f7c-9f92-83c18d96b681/SQL2019-SSEI-Expr.exe' -OutFile installer/Prerequisites/SQL2019-SSEI-Expr.exe
+          Invoke-WebRequest -Uri 'https://download.microsoft.com/download/7/c/1/7c14e92e-bdcb-4f89-b7cf-93543e7112d1/SQLEXPR_x64_ENU.exe' -OutFile installer/Prerequisites/SQL2019-SQLEXPR_x64_ENU.exe
+      - name: Download WebView2 prerequisite
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path installer/Prerequisites | Out-Null
+          Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?linkid=2124703' -OutFile installer/Prerequisites/MicrosoftEdgeWebview2Setup.exe
+      - name: Publish backend
+        run: dotnet publish src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj --configuration Release --runtime win-x64 --self-contained true --output publish/win-x64
+      - name: Publish desktop
+        run: dotnet publish src/SuvidhaPOS.Desktop/SuvidhaPOS.Desktop.csproj --configuration Release --runtime win-x64 --self-contained true --output publish/desktop/win-x64
+      - name: Assemble desktop application
+        shell: powershell
+        run: |
+          Copy-Item 'publish/win-x64/*' 'publish/desktop/win-x64' -Recurse -Force
+          foreach($f in @('publish/desktop/win-x64/SuvidhaPOS.Desktop.exe','publish/desktop/win-x64/SuvidhaPOS.Premium.exe','publish/desktop/win-x64/Database/specialized-schema.sql','publish/desktop/win-x64/Database/print-schema.sql')){if(-not(Test-Path $f)){throw "Missing publish file $f"}}
+      - name: Create and verify SQL Server 2019 compatible backup
+        shell: powershell
+        run: |
+          $sql2019='installer/Prerequisites/SQL2019-SQLEXPR_x64_ENU.exe'
+          $arguments='/Q /ACTION=Install /IACCEPTSQLSERVERLICENSETERMS /FEATURES=SQLENGINE /INSTANCENAME=SQLEXPRESS2019 /SQLSVCACCOUNT="NT AUTHORITY\SYSTEM" /SQLSYSADMINACCOUNTS="BUILTIN\ADMINISTRATORS" /TCPENABLED=1 /NPENABLED=1 /SQLSVCSTARTUPTYPE=Automatic /UPDATEENABLED=0'
+          $p=Start-Process -FilePath $sql2019 -ArgumentList $arguments -Wait -PassThru
+          if($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010){throw "SQL Server 2019 Express installation failed with exit code $($p.ExitCode)"}
+          Start-Service 'MSSQL$SQLEXPRESS2019' -ErrorAction SilentlyContinue
+          choco install sqlserver-cmdlineutils --version=15.0.4298.100 --yes --no-progress
+          $sqlcmd=Get-ChildItem 'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\*\Tools\Binn\sqlcmd.exe','C:\Program Files (x86)\Microsoft SQL Server\Client SDK\ODBC\*\Tools\Binn\sqlcmd.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if($null -eq $sqlcmd){throw 'sqlcmd missing'}
+          $server='.\SQLEXPRESS2019'
+          & $sqlcmd.FullName -I -S $server -E -b -Q "SELECT @@VERSION; SELECT SERVERPROPERTY('ProductVersion') AS ProductVersion, SERVERPROPERTY('ProductLevel') AS ProductLevel, SERVERPROPERTY('Edition') AS Edition;"
+          if($LASTEXITCODE -ne 0){throw 'SQL Server 2019 connection failed'}
+          New-Item -ItemType Directory -Force -Path database-artifact | Out-Null
+          foreach($script in @('schema.sql','specialized-schema.sql','print-schema.sql','seed.sql')){
+            & $sqlcmd.FullName -I -S $server -E -b -i "src/SuvidhaPOS-Premium/Database/$script"
+            if($LASTEXITCODE -ne 0){throw "$script failed on SQL Server 2019"}
+          }
+          $bak=(Resolve-Path 'database-artifact').Path+'\SuvidhaPos.bak'
+          & $sqlcmd.FullName -I -S $server -E -b -Q "ALTER DATABASE [SuvidhaPOS] SET COMPATIBILITY_LEVEL = 150; BACKUP DATABASE [SuvidhaPOS] TO DISK=N'$bak' WITH INIT,COPY_ONLY,CHECKSUM; RESTORE VERIFYONLY FROM DISK=N'$bak' WITH CHECKSUM;"
+          if($LASTEXITCODE -ne 0){throw 'SQL Server 2019 backup verification failed'}
+          & $sqlcmd.FullName -I -S $server -E -b -Q "RESTORE HEADERONLY FROM DISK=N'$bak';"
+          if($LASTEXITCODE -ne 0){throw 'Backup header validation failed'}
+          Copy-Item $bak 'publish/desktop/win-x64/Database/SuvidhaPos.bak' -Force
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup --yes --no-progress
+      - name: Build installer
+        shell: powershell
+        run: '& ''C:\Program Files (x86)\Inno Setup 6\ISCC.exe'' installer/SuvidhaPOS.iss'
+      - name: Validate installer
+        shell: powershell
+        run: |
+          $installer=Get-ChildItem 'installer/installer-output/*.exe' | Select-Object -First 1
+          if($null -eq $installer){throw 'Installer not generated'}
+          Get-FileHash $installer.FullName -Algorithm SHA256
+      - name: Upload Windows publish artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuvidhaPOS-Premium-Windows-x64
+          path: publish/desktop/win-x64
+      - name: Upload database backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuvidhaPos-Database-Backup
+          path: database-artifact/SuvidhaPos.bak
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuvidhaPOS-Premium-Windows-Installer
+          path: installer/installer-output/*.exe
