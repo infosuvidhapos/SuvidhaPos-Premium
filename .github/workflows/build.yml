@@ -83,6 +83,17 @@ jobs:
           if(-not $special.Contains('Inner Unit (optional)')){ throw 'Three-level UOM item master missing' }
           if(-not $special.Contains('UnitPurchased:x.Unit')){ throw 'Purchase UOM audit missing' }
           if(-not $special.Contains('Batch No is mandatory for Pharmacy / Medical Store')){ throw 'Pharmacy batch validation missing' }
+      - name: Validate 20-style Print Master
+        shell: powershell
+        run: |
+          $print = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/print-settings.js' -Raw -Encoding UTF8
+          foreach($id in @('T01','T02','T03','T04','T05','T06','T07','T08','T09','T10','A01','A02','A03','A04','A05','A06','A07','A08','A09','A10')){ if(-not $print.Contains("'$id'")){ throw "Missing print template $id" } }
+          if(-not $print.Contains('LIVE PREVIEW')){ throw 'Print preview missing' }
+          if(-not $print.Contains('window.printInvoice')){ throw 'Invoice print override missing' }
+          $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/print-schema.sql' -Raw -Encoding UTF8
+          if(-not $schema.Contains('PrintTemplate')){ throw 'Sales PrintTemplate persistence missing' }
+          $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
+          if(-not $program.Contains('app.MapGet("/api/app-settings/{key}"')){ throw 'AppSettings GET-by-key endpoint missing' }
       - name: Download SQL Server 2019 Express prerequisite
         shell: powershell
         run: |
