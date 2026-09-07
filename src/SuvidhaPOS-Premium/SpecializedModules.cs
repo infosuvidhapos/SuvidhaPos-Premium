@@ -10,11 +10,23 @@ public static class SpecializedModules
     {
         // Read-only outlet specialization is intentionally available before login so the login screen
         // can display the same Outlet Master name/type as the configured database.
-        app.MapGet("/public/specialization", async (Db db) =>
+        app.MapGet("/public/specialization", async (Db db, HttpContext ctx) =>
         {
-            var o = await db.QuerySingleAsync("SELECT TOP 1 OutletName,StoreType FROM OutletMaster ORDER BY Id");
-            var type = o.GetValueOrDefault("StoreType")?.ToString() ?? "Retail Shop";
-            return Results.Ok(new { OutletName = o.GetValueOrDefault("OutletName")?.ToString() ?? "Main Outlet", StoreType = type, IsJewellery = IsJewellery(type), IsUom = !IsJewellery(type) });
+            ctx.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            ctx.Response.Headers.Pragma = "no-cache";
+            ctx.Response.Headers.Expires = "0";
+            var o = await db.QuerySingleAsync("SELECT TOP 1 OutletName,StoreType,UpdatedAt FROM OutletMaster ORDER BY Id");
+            var name = o.GetValueOrDefault("OutletName")?.ToString();
+            var type = o.GetValueOrDefault("StoreType")?.ToString();
+            if (string.IsNullOrWhiteSpace(name)) name = "Main Outlet";
+            if (string.IsNullOrWhiteSpace(type)) type = "Retail Shop";
+            return Results.Ok(new {
+                OutletName = name,
+                StoreType = type,
+                IsJewellery = IsJewellery(type),
+                IsUom = !IsJewellery(type),
+                UpdatedAt = o.GetValueOrDefault("UpdatedAt")
+            });
         });
 
         app.MapGet("/api/specialization", async (Db db) =>
