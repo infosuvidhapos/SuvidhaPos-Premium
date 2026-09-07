@@ -132,6 +132,7 @@
         }
 
         show('Login successful. Opening dashboard...');
+        d.body.setAttribute('data-authenticated','true');
 
         if (remember) {
           postDesktop('remember', { enabled: true, userName: user, password: pass });
@@ -140,13 +141,17 @@
         }
 
         var screen = el('loginScreen');
-        if (screen) screen.style.display = 'none';
+        if (screen) screen.style.setProperty('display', 'none', 'important');
 
         var pill = el('userPill');
         if (pill) pill.textContent = userObj.DisplayName + ' \u00b7 ' + userObj.Role;
 
         busy = false;
         setButton(false);
+        w.setTimeout(function(){
+          var s2=el('loginScreen');
+          if(s2)s2.style.setProperty('display','none','important');
+        },0);
 
         try {
           if (typeof w.loadDashboard === 'function') {

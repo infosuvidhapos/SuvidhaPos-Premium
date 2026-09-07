@@ -34,8 +34,15 @@ async function api(url,opt={}){
   if(token) headers.set('Authorization','Bearer '+token);
   const r=await fetch(url,{...opt,headers,credentials:'same-origin',cache:opt.cache||'no-store'});
   let d={};try{d=await r.json()}catch{}
-  if(r.status===401){document.querySelector('#loginScreen').style.display='flex';throw new Error('Login required')}
-  if(!r.ok)throw new Error(d.message||d.detail||'Request failed');
+  if(r.status===401){
+    if(!token){
+      const screen=document.querySelector('#loginScreen');
+      if(screen)screen.style.display='flex';
+      throw new Error('Login required');
+    }
+    throw new Error('Authenticated session rejected by '+url);
+  }
+  if(!r.ok)throw new Error((d.message||d.detail||'Request failed')+' ['+url+']');
   return d
 }
 const money=x=>Number(x||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -136,6 +143,34 @@ function modal(head,body,actions=''){const m=document.createElement('div');m.cla
 function closeModal(){document.querySelectorAll('.modal').forEach(x=>x.remove())}
 
 document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>({dashboard:loadDashboard,billing:loadBilling,products:loadProducts,purchase:loadPurchase,sales:loadSales,customers:loadCustomers,suppliers:loadSuppliers,aiimport:loadAIImport,expiry:loadExpiry,returns:loadReturns,expenses:loadExpenses,reports:loadReports}[b.dataset.page]||loadDashboard)()));
-async function boot(){try{currentUser=await api('/api/me');document.querySelector('#loginScreen').style.display='none';document.querySelector('#userPill').textContent=currentUser.DisplayName+' · '+currentUser.Role;loadDashboard();}catch{document.querySelector('#loginScreen').style.display='flex';}} boot();loadHealth();
+async function boot(){
+  let token=null;try{token=sessionStorage.getItem('suvidha_auth_token')}catch{}
+  if(!token){
+    const screen=document.querySelector('#loginScreen');
+    if(screen)screen.style.display='flex';
+    return;
+  }
+  window.suvidhaAuthToken=token;
+  try{
+    const raw=await api('/api/me');
+    currentUser={
+      Id:raw.Id??raw.id,
+      UserName:raw.UserName??raw.userName??'',
+      DisplayName:raw.DisplayName??raw.displayName??raw.UserName??raw.userName??'User',
+      Role:raw.Role??raw.role??'User'
+    };
+    window.currentUser=currentUser;
+    const screen=document.querySelector('#loginScreen');
+    if(screen)screen.style.setProperty('display','none','important');
+    document.querySelector('#userPill').textContent=currentUser.DisplayName+' · '+currentUser.Role;
+    loadDashboard();
+  }catch(e){
+    try{sessionStorage.removeItem('suvidha_auth_token')}catch{}
+    window.suvidhaAuthToken=null;
+    const screen=document.querySelector('#loginScreen');
+    if(screen)screen.style.display='flex';
+  }
+}
+boot();loadHealth();
 
 document.addEventListener('keydown',e=>{if(document.querySelector('#loginScreen')?.style.display!=='none' && e.key==='Enter')login(); if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();document.querySelector('#billSearch')?.focus();}});
