@@ -147,7 +147,7 @@ jobs:
         shell: powershell
         run: |
           $html=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
-          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.11.3-jewelpolish')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
+          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.11.4-restoredjewel')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
           $app=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           foreach($token in @('Business Command Center',"Today's completed billing",'window.scrollTo')){if(-not $app.Contains($token)){throw "Dashboard premium behavior missing: $token"}}
           if($app.Contains("'Live from SQL'")){throw 'Dashboard still shows Live from SQL'}
@@ -326,15 +326,13 @@ jobs:
           & $sqlcmd.FullName -I -S $server -E -b -Q "RESTORE HEADERONLY FROM DISK=N'$bak';"
           if($LASTEXITCODE -ne 0){throw 'Backup header validation failed'}
           Copy-Item $bak 'publish/desktop/win-x64/Database/SuvidhaPos.bak' -Force
-      - name: Validate per-user setup and SQL-only elevation
+      - name: Validate administrator setup and Program Files install
         shell: powershell
         run: |
           $iss = Get-Content 'installer/SuvidhaPOS.iss' -Raw -Encoding UTF8
-          foreach($token in @('PrivilegesRequired=lowest','UsePreviousAppDir=no','EnsureSqlExpress','IsSqlConnectionReady','WaitForSqlReady','SQLBOOTSTRAP:','MSSQL$SQLEXPRESS','SQL2019-SQLEXPR_x64_ENU.exe','ShellExec(','RequestSqlInstallerElevation','RepairExistingSqlAccess','OriginalWindowsUser','SQLSYSADMINACCOUNTS="BUILTIN\ADMINISTRATORS"','CanLaunchApplication','NeedRestart','runasoriginaluser')){ if(-not $iss.Contains($token)){ throw "Per-user/SQL elevation policy missing: $token" } }
-          if(-not $iss.Contains("    'runas',")){ throw 'SQL prerequisite UAC verb is missing' }
-          if($iss.Contains('PrivilegesRequired=admin')){ throw 'Whole SuvidhaPOS Setup must not request Administrator mode' }
+          foreach($token in @('PrivilegesRequired=admin','DefaultDirName={autopf}\SuvidhaPOS Premium','UsePreviousAppDir=no','Name: "{app}"; Permissions: users-modify','EnsureSqlExpress','IsSqlConnectionReady','WaitForSqlReady','SQLBOOTSTRAP:','MSSQL$SQLEXPRESS','SQL2019-SQLEXPR_x64_ENU.exe','OriginalWindowsUser','SQLSYSADMINACCOUNTS="BUILTIN\ADMINISTRATORS"','CanLaunchApplication','NeedRestart','runasoriginaluser')){ if(-not $iss.Contains($token)){ throw "Administrator/Program Files setup policy missing: $token" } }
+          if($iss.Contains('PrivilegesRequired=lowest')){ throw 'Setup must request Administrator permission so {autopf} resolves to Program Files' }
           if($iss.Contains('Check: ShouldInstallSqlExpress')){ throw 'Legacy registry-only SQL install check must not be used' }
-          if($iss.Contains('Exec(SqlInstaller')){ throw 'SQL installer must be launched through SQL-only UAC elevation' }
           if($iss -match 'SQL2019-SQLEXPR_x64_ENU\.exe.*skipifsilent'){ throw 'SQL Express must not be skipped during silent installation' }
           $helper = Get-Content 'installer/Ensure-SqlAccess.ps1' -Raw -Encoding UTF8
           foreach($token in @('MSSQL$SQLEXPRESS','CREATE LOGIN','ALTER SERVER ROLE [sysadmin] ADD MEMBER')){ if(-not $helper.Contains($token)){ throw "SQL access helper missing: $token" } }
