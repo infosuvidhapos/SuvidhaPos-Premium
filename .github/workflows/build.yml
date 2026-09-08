@@ -113,7 +113,7 @@ jobs:
           $special = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js' -Raw -Encoding UTF8
           foreach($token in @('list="uomUnitList"','unitDatalist','canonicalUnit','Unit Master me nahi hai','list="bulkUnitList"')){ if(-not $special.Contains($token)){ throw "Searchable unit selector missing: $token" } }
           $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/unit-master.js' -Raw -Encoding UTF8
-          foreach($token in @('loadUnitMaster','Add Unit','Edit Unit','Duplicate Unit Name / Unit Code')){ if(-not $ui.Contains($token)){ throw "Unit Master UI missing: $token" } }
+          foreach($token in @('loadUnitMaster','openUnitEditor','Save Unit','Duplicate Unit Name / Unit Code')){ if(-not $ui.Contains($token)){ throw "Unit Master UI missing: $token" } }
       - name: Validate bidirectional UOM rate auto-calculation
         shell: powershell
         run: |
