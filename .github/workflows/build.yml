@@ -119,6 +119,23 @@ jobs:
           if(-not $app.Contains('openProductBulkEdit')){ throw 'Bulk edit UI missing' }
           $special = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js' -Raw -Encoding UTF8
           if(-not $special.Contains('Validate & Save All')){ throw 'Specialized bulk duplicate validation UI missing' }
+      - name: Validate AI and live outlet runtime routing
+        shell: powershell
+        run: |
+          $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
+          if(-not $program.Contains('SuvidhaPOS.Premium.SpecializedModules.Map(app);')){ throw 'SpecializedModules is not mapped in source' }
+          if(-not $program.Contains('SuvidhaPOS.Premium.ReportTaxModules.Map(app);')){ throw 'ReportTaxModules is not mapped in source' }
+          $special = Get-Content 'src/SuvidhaPOS-Premium/SpecializedModules.cs' -Raw -Encoding UTF8
+          if($special.Contains('app.MapGet("/api/ai/config"')){ throw 'Duplicate /api/ai/config mapping remains in SpecializedModules' }
+          if(-not $special.Contains('app.MapGet("/public/specialization"')){ throw 'Public outlet specialization endpoint missing' }
+          $sync = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-login-sync.js' -Raw -Encoding UTF8
+          if(-not $sync.Contains("read(x,'OutletName','outletName')")){ throw 'Login outlet sync is not camelCase tolerant' }
+          if(-not $sync.Contains("read(x,'StoreType','storeType')")){ throw 'Login store type sync is not camelCase tolerant' }
+          $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
+          if(-not $jewel.Contains("prop(s,'StoreType','storeType')")){ throw 'Jewellery mode profile is not camelCase tolerant' }
+          $app = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
+          if($app.Contains('disabled title="Configure OpenAI API key first"')){ throw 'AI extract is still silently disabled on config status failure' }
+          if(-not $app.Contains('id="aiExtractBtn"')){ throw 'AI extract runtime control missing' }
       - name: Validate Bill Management Master stock safety
         shell: powershell
         run: |

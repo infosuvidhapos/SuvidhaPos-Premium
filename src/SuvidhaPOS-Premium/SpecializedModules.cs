@@ -36,19 +36,6 @@ public static class SpecializedModules
             return Results.Ok(new { OutletName = o.GetValueOrDefault("OutletName")?.ToString() ?? "Main Outlet", StoreType = type, IsJewellery = IsJewellery(type), IsUom = !IsJewellery(type) });
         });
 
-        app.MapGet("/api/ai/config", async (Db db) =>
-        {
-            var envKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-            var row = await db.QuerySingleAsync("SELECT [Value] FROM AppSettings WHERE [Key]='OpenAI.ApiKey'");
-            var dbKey = row.GetValueOrDefault("Value")?.ToString();
-            var key = !string.IsNullOrWhiteSpace(envKey) ? envKey : dbKey;
-            var modelRow = await db.QuerySingleAsync("SELECT [Value] FROM AppSettings WHERE [Key]='OpenAI.Model'");
-            var model = Environment.GetEnvironmentVariable("OPENAI_MODEL") ?? modelRow.GetValueOrDefault("Value")?.ToString() ?? "gpt-5.6-luna";
-            var source = !string.IsNullOrWhiteSpace(envKey) ? "environment" : (!string.IsNullOrWhiteSpace(dbKey) ? "database" : "none");
-            var masked = string.IsNullOrWhiteSpace(key) ? "" : (key!.Length <= 8 ? "••••••••" : "••••••••" + key[^4..]);
-            return Results.Ok(new { configured = !string.IsNullOrWhiteSpace(key), source, maskedKey = masked, model });
-        });
-
         app.MapPost("/api/backup-master", async (Db db, BackupMasterRequest x) =>
         {
             if (string.IsNullOrWhiteSpace(x.Folder)) return Results.BadRequest(new { message = "Primary backup folder is required" });

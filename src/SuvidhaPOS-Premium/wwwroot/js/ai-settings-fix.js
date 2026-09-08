@@ -20,6 +20,7 @@
       }
     }catch(e){}
   }
+  window.refreshAiKeyStatus=refreshAiKeyStatus;
   const originalLoadSettings=window.loadSettings;
   if(typeof originalLoadSettings==='function')window.loadSettings=async function(){await originalLoadSettings();await refreshAiKeyStatus()};
   const originalSaveAISettings=window.saveAISettings;

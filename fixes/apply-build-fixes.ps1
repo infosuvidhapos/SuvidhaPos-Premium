@@ -66,9 +66,11 @@ if($text.Contains($cookieOld)){$text=$text.Replace($cookieOld,$cookieNew)}
 # index.html is now committed directly in UTF-8. Do not rewrite it here.
 # This avoids Windows PowerShell 5.1 decoding UTF-8 emoji/symbols as ANSI.
 
-# Keep endpoint mappings deterministic.
-if(-not $text.Contains('SuvidhaPOS.Premium.SpecializedModules.Map(app);')){$text=$text.Replace('SpecializedModules.Map(app);','SuvidhaPOS.Premium.SpecializedModules.Map(app);');$text=$text.Replace('ReportTaxModules.Map(app);','SuvidhaPOS.Premium.ReportTaxModules.Map(app);')}
-if(-not $text.Contains('SuvidhaPOS.Premium.ReportTaxModules.Map(app);')){$text=$text.Replace("app.Run();","SuvidhaPOS.Premium.SpecializedModules.Map(app);`r`nSuvidhaPOS.Premium.ReportTaxModules.Map(app);`r`n`r`napp.Run();")}
+# Keep endpoint mappings deterministic. Source now owns the mappings; only qualify legacy short names.
+$text=$text.Replace('SpecializedModules.Map(app);','SuvidhaPOS.Premium.SpecializedModules.Map(app);')
+$text=$text.Replace('ReportTaxModules.Map(app);','SuvidhaPOS.Premium.ReportTaxModules.Map(app);')
+if(-not $text.Contains('SuvidhaPOS.Premium.SpecializedModules.Map(app);')){throw 'SpecializedModules.Map(app) missing from Program.cs'}
+if(-not $text.Contains('SuvidhaPOS.Premium.ReportTaxModules.Map(app);')){throw 'ReportTaxModules.Map(app) missing from Program.cs'}
 
 Set-Content $program $text -Encoding UTF8
 Set-Content $project $proj -Encoding UTF8

@@ -7,9 +7,10 @@
     if(/^(Gold & Diamond Jewellery|Silver Jewellery)$/i.test(v))return 'Jewellery Shop';
     return v||'Retail Shop';
   }
+  function read(x,a,b){return x&&x[a]!==undefined?x[a]:(x&&x[b]!==undefined?x[b]:undefined)}
   function apply(x){
-    var name=String(x&&x.OutletName||'Main Outlet').trim()||'Main Outlet';
-    var type=canonicalType(x&&x.StoreType);
+    var name=String(read(x,'OutletName','outletName')||'Main Outlet').trim()||'Main Outlet';
+    var type=canonicalType(read(x,'StoreType','storeType'));
     var e=target();
     if(e){
       e.textContent=name+' · '+type;
@@ -18,7 +19,7 @@
       e.title='Outlet Master: '+name+' / '+type;
     }
     var pill=d.getElementById('outletPill');if(pill)pill.textContent=name;
-    w.suvidhaOutlet={OutletName:name,StoreType:type,IsJewellery:type==='Jewellery Shop'||!!(x&&x.IsJewellery),IsUom:type!=='Jewellery Shop',UpdatedAt:x&&x.UpdatedAt||null};
+    w.suvidhaOutlet={OutletName:name,StoreType:type,IsJewellery:type==='Jewellery Shop'||!!read(x,'IsJewellery','isJewellery'),IsUom:type!=='Jewellery Shop',UpdatedAt:read(x,'UpdatedAt','updatedAt')||null};
     try{localStorage.setItem('suvidha_outlet_display',JSON.stringify(w.suvidhaOutlet))}catch{}
     try{w.dispatchEvent(new CustomEvent('suvidha:outlet-synced',{detail:w.suvidhaOutlet}))}catch{}
     return w.suvidhaOutlet;

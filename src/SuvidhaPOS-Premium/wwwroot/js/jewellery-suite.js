@@ -219,7 +219,8 @@
   window.jewelComingSoon=function(name){notify(name+' is available only in Jewellery Shop workspace; detailed transaction workflow can be added next.')};
 
   const canonicalStoreType=v=>/^(Gold & Diamond Jewellery|Silver Jewellery)$/i.test(String(v||'').trim())?'Jewellery Shop':String(v||'').trim();
-  const isJewelleryProfile=s=>!!s&&(s.IsJewellery===true||canonicalStoreType(s.StoreType)==='Jewellery Shop');
+  const prop=(s,a,b)=>s&&s[a]!==undefined?s[a]:(s&&s[b]!==undefined?s[b]:undefined);
+  const isJewelleryProfile=s=>!!s&&(prop(s,'IsJewellery','isJewellery')===true||canonicalStoreType(prop(s,'StoreType','storeType'))==='Jewellery Shop');
   async function enable(profile){
     let s=profile;
     if(!s){
@@ -227,7 +228,7 @@
     }
     if(!isJewelleryProfile(s)){
       document.body.classList.remove('jewel-suite-mode');
-      window.__jewelSuiteEnabled=false;
+      window.__jewelSuiteEnabled=false;JS.enabled=false;
       return false;
     }
     if(JS.enabled&&document.body.classList.contains('jewel-suite-mode'))return true;
@@ -243,6 +244,6 @@
     return true;
   }
   window.applyJewelleryOutletMode=enable;
-  window.addEventListener('suvidha:outlet-synced',e=>{if(isJewelleryProfile(e.detail))enable(e.detail)});
+  window.addEventListener('suvidha:outlet-synced',e=>enable(e.detail));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>enable(window.suvidhaOutlet),0));else setTimeout(()=>enable(window.suvidhaOutlet),0);
 })();
