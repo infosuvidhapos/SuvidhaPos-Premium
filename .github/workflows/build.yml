@@ -142,7 +142,7 @@ jobs:
         shell: powershell
         run: |
           $html=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
-          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.11.1-jewelui')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
+          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.11.2-layoutfix')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
           $app=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           foreach($token in @('Business Command Center',"Today's completed billing",'window.scrollTo')){if(-not $app.Contains($token)){throw "Dashboard premium behavior missing: $token"}}
           if($app.Contains("'Live from SQL'")){throw 'Dashboard still shows Live from SQL'}
@@ -150,6 +150,13 @@ jobs:
           foreach($token in @('dashboard-premium','html[data-theme="light"]','@media(min-width:2400px)','.brandmark{width:48px')){if(-not $css.Contains($token)){throw "Responsive CSS missing: $token"}}
           $login=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/login-premium.css' -Raw -Encoding UTF8
           foreach($token in @('1366x768','font-size:42px','min-width:1900px')){if(-not $login.Contains($token)){throw "Login responsive CSS missing: $token"}}
+      - name: Validate compact sidebar and page subtitle reset
+        shell: powershell
+        run: |
+          $app=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
+          foreach($token in @('const pageSubtitles=',"settings:'Company, outlet, AI and database configuration'",'sub.textContent=pageSubtitles[p]')){if(-not $app.Contains($token)){throw "Page subtitle reset missing: $token"}}
+          $css=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/app.css' -Raw -Encoding UTF8
+          foreach($token in @('aside>nav{flex:1 1 auto','overflow-y:auto','max-height:min(38vh,290px)')){if(-not $css.Contains($token)){throw "Sidebar overflow alignment missing: $token"}}
       - name: Validate sidebar navigation runtime routing
         shell: powershell
         run: |
