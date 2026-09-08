@@ -1,5 +1,6 @@
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
+using Google.Apis.Http;
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
 using Microsoft.Data.SqlClient;
@@ -20,8 +21,8 @@ public static class BackupMasterModules
     public static void Map(WebApplication app)
     {
         app.MapGet("/api/backup-master/status",async(Db db)=>{
-            var server=await db.ScalarAsync("SELECT CAST(SERVERPROPERTY('ServerName') AS nvarchar(256))")?.ConfigureAwait(false);
-            var database=await db.ScalarAsync("SELECT DB_NAME()")?.ConfigureAwait(false);
+            var server=await db.ScalarAsync("SELECT CAST(SERVERPROPERTY('ServerName') AS nvarchar(256))");
+            var database=await db.ScalarAsync("SELECT DB_NAME()");
             var defaultFolder=DefaultBackupFolder();
             return Results.Ok(new{
                 server=server?.ToString()??@".\SQLEXPRESS",
