@@ -52,7 +52,7 @@ public static class LicenseGuardModules
             if(payload is null || string.IsNullOrWhiteSpace(payload.OutletCode))
                 return LicenseStatus.Invalid("License payload is invalid.",nowUtc,WarningWindowDays);
 
-            var machine=DeviceId();
+            var machine=CurrentDeviceId();
             if(string.IsNullOrWhiteSpace(payload.DeviceId) || !CryptographicOperations.FixedTimeEquals(
                 Encoding.UTF8.GetBytes(payload.DeviceId.Trim().ToUpperInvariant()),
                 Encoding.UTF8.GetBytes(machine)))
@@ -130,7 +130,7 @@ public static class LicenseGuardModules
         try{Registry.SetValue(ManagedRegistry,"Managed","1",RegistryValueKind.String);}catch{}
     }
 
-    static string DeviceId()
+    static string CurrentDeviceId()
     {
         string raw="";
         try{raw=Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography","MachineGuid","")?.ToString()??"";}catch{}
@@ -193,25 +193,25 @@ public static class LicenseGuardModules
         public static LicenseStatus Unmanaged(DateTime now,int warn)=>new(
             false,true,true,false,false,"UNMANAGED","LICENSE • NOT LINKED",
             "Central license server is not linked yet. Current installation remains usable until a signed server license is activated.",
-            null,null,null,null,null,null,null,DeviceId(),warn,now);
+            null,null,null,null,null,null,null,CurrentDeviceId(),warn,now);
 
         public static LicenseStatus Invalid(string message,DateTime now,int warn)=>new(
-            true,false,false,false,false,"INVALID","LICENSE INVALID",message,null,null,null,null,null,null,null,DeviceId(),warn,now);
+            true,false,false,false,false,"INVALID","LICENSE INVALID",message,null,null,null,null,null,null,null,CurrentDeviceId(),warn,now);
 
         public static LicenseStatus Blocked(string message,LicensePayload p,DateTime now,int warn,string code)=>new(
-            true,false,false,false,false,code,"LICENSE BLOCKED",message,p.ValidFrom,p.ValidTill,null,p.OutletCode,p.OutletName,p.StoreType,p.Plan,DeviceId(),warn,now);
+            true,false,false,false,false,code,"LICENSE BLOCKED",message,p.ValidFrom,p.ValidTill,null,p.OutletCode,p.OutletName,p.StoreType,p.Plan,CurrentDeviceId(),warn,now);
 
         public static LicenseStatus CreateExpired(LicensePayload p,DateOnly validTill,DateTime now,int warn)=>new(
             true,false,false,true,false,"EXPIRED","LICENSE EXPIRED",
             $"SuvidhaPOS validity expired on {validTill:dd-MMM-yyyy}. Please renew and check license.",p.ValidFrom,p.ValidTill,
-            -1,p.OutletCode,p.OutletName,p.StoreType,p.Plan,DeviceId(),warn,now);
+            -1,p.OutletCode,p.OutletName,p.StoreType,p.Plan,CurrentDeviceId(),warn,now);
 
         public static LicenseStatus CreateActive(LicensePayload p,DateOnly validTill,int days,DateTime now,int warn)
         {
             var warning=days>=0&&days<=warn;
             var text=days==0?"EXPIRES TODAY":warning?$"EXPIRES IN {days} DAY{(days==1?"":"S")}":$"VALID TILL {validTill:dd MMM yyyy}".ToUpperInvariant();
             var msg=days==0?"Your SuvidhaPOS license expires today.":warning?$"Your billing software is going to expire in {days} day{(days==1?"":"s")}.":$"License active till {validTill:dd-MMM-yyyy}.";
-            return new(true,true,true,false,warning,"ACTIVE",text,msg,p.ValidFrom,p.ValidTill,days,p.OutletCode,p.OutletName,p.StoreType,p.Plan,DeviceId(),warn,now);
+            return new(true,true,true,false,warning,"ACTIVE",text,msg,p.ValidFrom,p.ValidTill,days,p.OutletCode,p.OutletName,p.StoreType,p.Plan,CurrentDeviceId(),warn,now);
         }
     }
 }
