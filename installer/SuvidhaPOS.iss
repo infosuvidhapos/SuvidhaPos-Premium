@@ -1,5 +1,5 @@
 #define MyAppName "SuvidhaPOS Premium"
-#define MyAppVersion "2.8.0"
+#define MyAppVersion "2.8.1"
 #define MyAppPublisher "SuvidhaPOS"
 #define MyAppExeName "SuvidhaPOS.Desktop.exe"
 [Setup]
@@ -34,7 +34,7 @@ Name: "{group}\SuvidhaPOS Premium"; Filename: "{app}\{#MyAppExeName}"; WorkingDi
 [Run]
 Filename: "{app}\Prerequisites\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft WebView2 Runtime..."; Flags: waituntilterminated skipifsilent
 Filename: "{app}\Prerequisites\SQL2019-SQLEXPR_x64_ENU.exe"; Parameters: "{code:GetSqlInstallParameters}"; StatusMsg: "Installing SQL Server 2019 Express..."; Flags: waituntilterminated skipifsilent; Check: ShouldInstallSqlExpress
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch SuvidhaPOS Premium"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch SuvidhaPOS Premium"; Flags: nowait postinstall skipifsilent runasoriginaluser
 [Code]
 function GetSqlInstallParameters(Param: String): String;
 begin

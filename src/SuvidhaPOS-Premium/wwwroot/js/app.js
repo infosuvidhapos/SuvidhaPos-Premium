@@ -35,12 +35,12 @@ async function api(url,opt={}){
   const r=await fetch(url,{...opt,headers,credentials:'same-origin',cache:opt.cache||'no-store'});
   let d={};try{d=await r.json()}catch{}
   if(r.status===401){
-    if(!token){
-      const screen=document.querySelector('#loginScreen');
-      if(screen)screen.style.display='flex';
-      throw new Error('Login required');
-    }
-    throw new Error('Authenticated session rejected by '+url);
+    window.suvidhaAuthToken=null;
+    try{sessionStorage.removeItem('suvidha_auth_token')}catch{}
+    document.body.removeAttribute('data-authenticated');
+    const screen=document.querySelector('#loginScreen');
+    if(screen)screen.style.setProperty('display','flex','important');
+    throw new Error(token?'Session expired. Please login again.':'Login required');
   }
   if(!r.ok)throw new Error((d.message||d.detail||'Request failed')+' ['+url+']');
   return d
@@ -185,7 +185,21 @@ async function toggleUser(id){await api('/api/users/'+id+'/toggle',{method:'POST
 function modal(head,body,actions=''){const m=document.createElement('div');m.className='modal open';m.id='modal';m.innerHTML=`<div class="modalbox"><div class="panelhead"><h2>${head}</h2><button class="btn small secondary" onclick="closeModal()">×</button></div>${body}<div class="toolbar" style="justify-content:flex-end;margin-top:15px">${actions}<button class="btn secondary" onclick="closeModal()">Cancel</button></div></div>`;document.body.appendChild(m);return m}
 function closeModal(){document.querySelectorAll('.modal').forEach(x=>x.remove())}
 
-document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>({dashboard:loadDashboard,billing:loadBilling,products:loadProducts,openingstock:loadOpeningStockMaster,purchase:loadPurchase,sales:loadSales,billmaster:loadBillMaster,customers:loadCustomers,suppliers:loadSuppliers,aiimport:loadAIImport,expiry:loadExpiry,returns:loadReturns,expenses:loadExpenses,taxmaster:loadTaxMaster,unitmaster:loadUnitMaster,reports:loadReports}[b.dataset.page]||loadDashboard)()));
+function navigateFromSidebar(page){
+  const routes={dashboard:loadDashboard,billing:window.loadBilling||loadBilling,products:loadProducts,openingstock:window.loadOpeningStockMaster||loadOpeningStockMaster,purchase:window.loadPurchase||loadPurchase,sales:loadSales,billmaster:window.loadBillMaster||loadBillMaster,customers:loadCustomers,suppliers:loadSuppliers,aiimport:loadAIImport,expiry:loadExpiry,returns:loadReturns,expenses:loadExpenses,taxmaster:window.loadTaxMaster||loadTaxMaster,unitmaster:window.loadUnitMaster||loadUnitMaster,reports:window.loadReports||loadReports};
+  const fn=routes[page]||loadDashboard;
+  try{const p=fn();if(p&&typeof p.catch==='function')p.catch(e=>{app.innerHTML=errorBox(e)})}catch(e){app.innerHTML=errorBox(e)}
+}
+window.navigateFromSidebar=navigateFromSidebar;
+const sidebar=document.querySelector('#sidebar');
+if(sidebar){
+  sidebar.addEventListener('click',e=>{
+    const b=e.target.closest&&e.target.closest('.nav[data-page]');
+    if(!b||!sidebar.contains(b))return;
+    e.preventDefault();
+    navigateFromSidebar(b.dataset.page);
+  });
+}
 async function boot(){
   let token=null;try{token=sessionStorage.getItem('suvidha_auth_token')}catch{}
   if(!token){

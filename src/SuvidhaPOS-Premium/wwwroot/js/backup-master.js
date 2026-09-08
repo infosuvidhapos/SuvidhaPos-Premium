@@ -27,7 +27,7 @@ window.backupBrowseFolder=function(target){const p=$(target)?.value||'';if(windo
 window.backupBrowseJson=function(){const p=$('bkGoogle')?.value||'';if(window.desktopBrowseJson)window.desktopBrowseJson('bkGoogle',p);else{const v=prompt('Enter Google credentials JSON path:',p);if(v!==null)$('bkGoogle').value=v}}
 window.backupSelectDrive=function(){const root=$('bkDrive').value;if(root){$('bkExternalFolder').value=root+'SuvidhaBackup';externalState()}}
 window.backupTestGoogle=async function(){const p=$('bkGoogle').value.trim();if(!p)return status('Browse and select Google Drive credentials JSON first.','warn');status('Connecting to Google Drive…');try{const r=await api('/api/backup-master/google/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({JsonPath:p})});$('bkGoogleState').textContent='CONNECTED';status(r.message||'Google Drive connected.','ok')}catch(e){$('bkGoogleState').textContent='NOT CONNECTED';status(e.message,'warn')}}
-window.openBackupLog=async function(){try{const r=await fetch('/api/backup-master/log',{headers:{Authorization:'Bearer '+(localStorage.getItem('suvidha_token')||'')}});const t=await r.text();modal('Backup Log','<pre class="backup-log">'+esc(t)+'</pre>',`<button class="btn" onclick="closeModal()">Close</button>`)}catch(e){alert(e.message)}}
+window.openBackupLog=async function(){try{let token=window.suvidhaAuthToken||'';if(!token){try{token=sessionStorage.getItem('suvidha_auth_token')||''}catch{}}const r=await fetch('/api/backup-master/log',{credentials:'same-origin',cache:'no-store',headers:token?{Authorization:'Bearer '+token}:{}});if(r.status===401){window.suvidhaAuthToken=null;try{sessionStorage.removeItem('suvidha_auth_token')}catch{}const s=document.getElementById('loginScreen');if(s)s.style.setProperty('display','flex','important');throw new Error('Session expired. Please login again.')}if(!r.ok)throw new Error('Backup log API failed: HTTP '+r.status);const t=await r.text();modal('Backup Log','<pre class="backup-log">'+esc(t)+'</pre>',`<button class="btn" onclick="closeModal()">Close</button>`)}catch(e){alert(e.message)}}
 async function refreshRuntime(){
  try{const s=await api('/api/backup-master/status');drives=s.drives||[];renderDriveOptions(driveRoot($('bkExternalFolder')?.value||''));if($('bkLast'))$('bkLast').textContent=fmtDate(s.lastBackup);if($('bkLastResult')&&s.lastResult)$('bkLastResult').textContent=s.lastResult;if(s.nextBackup&&$('bkNext'))$('bkNext').textContent=fmtDate(s.nextBackup);externalState()}catch{}
 }
@@ -63,13 +63,14 @@ window.saveBackupMaster=async function(){
   for(const [k,val] of Object.entries(data))await setSetting(k,val);
   const n=calcNext();if(n)await setSetting('Backup.NextRun',n.toISOString());
   if(window.desktopBackupStartup)window.desktopBackupStartup($('bkStart').checked);
-  status('Settings saved. Scheduler updated.','ok');updateNextCard()
- }catch(e){status('Save failed: '+e.message,'warn')}
+  status('Settings saved. Scheduler updated.','ok');updateNextCard();return true
+ }catch(e){status('Save failed: '+e.message,'warn');return false}
 };
 window.backupNowMaster=async function(){
  const btn=$('bkNow');btn.disabled=true;btn.textContent='BACKING UP…';status('Creating verified SQL Server backup…');
  try{
-  await saveBackupMaster();
+  const saved=await saveBackupMaster();
+  if(!saved)throw new Error('Backup settings API failed. Login again if your session expired.');
   const body={Server:$('bkServer').value.trim(),Databases:$('bkDb').value.trim(),Labels:$('bkLabels').value.trim(),Folder:$('bkFolder').value.trim(),Schedule:$('bkSchedule').value,RetentionDays:Math.max(0,Number($('bkDays').value||0)),LocalEnabled:$('bkLocal').checked,Zip:$('bkZip').checked,AutoCleanup:$('bkCleanup').checked,ExternalFolder:$('bkExternalFolder').value.trim(),ExternalEnabled:$('bkExternalEnable').checked,GoogleDriveJson:$('bkGoogle').value.trim(),GoogleDriveEnabled:$('bkGoogleEnable').checked};
   const r=await api('/api/backup-master',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const w=r.warnings||[];const clean=(r.cleanupDeleted??r.CleanupDeleted??0),cleanFail=(r.cleanupFailures??r.CleanupFailures??0);status(r.message+(w.length?' — '+w.join(' | '):'')+(clean||cleanFail?' · Cleanup: '+clean+' deleted'+(cleanFail?', '+cleanFail+' failed':''):''),w.length||cleanFail?'warn':'ok');$('bkLast').textContent=new Date(r.completedAt||Date.now()).toLocaleString('en-IN');$('bkLastResult').textContent=w.length?'Success with warnings':'Success';await refreshRuntime()
