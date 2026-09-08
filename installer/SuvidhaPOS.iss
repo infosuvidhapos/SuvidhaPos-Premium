@@ -1,5 +1,5 @@
 #define MyAppName "SuvidhaPOS Premium"
-#define MyAppVersion "2.9.3"
+#define MyAppVersion "2.9.4"
 #define MyAppPublisher "SuvidhaPOS"
 #define MyAppExeName "SuvidhaPOS.Desktop.exe"
 [Setup]
@@ -17,14 +17,14 @@ UninstallDisplayIcon={app}\suvidha-pos.ico
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
-PrivilegesRequired=lowest
+PrivilegesRequired=admin
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\wwwroot"
 [Dirs]
-Name: "{app}"
+Name: "{app}"; Permissions: users-modify
 [Files]
 Source: "..\publish\desktop\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "Prerequisites\SQL2019-SQLEXPR_x64_ENU.exe"; DestDir: "{app}\Prerequisites"; Flags: ignoreversion
