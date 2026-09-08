@@ -131,7 +131,7 @@ jobs:
           $j=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
           foreach($token in @('SUVIDHA POS','JEWELLERY PREMIUM','loadJewelDaybook','loadJewelSalesReport','loadJewelGstReport','loadJewelStockReport','loadJewelGirviReport','jewelRefreshLiveRates')){if(-not $j.Contains($token)){throw "Jewellery premium shell missing: $token"}}
           if($j.Contains('Jewel Suite')){throw 'Legacy Jewel Suite branding remains'}
-          if($j.Contains('Diamond 22K<b>₹1,500.00')){throw 'Fabricated diamond rate remains'}
+          if($j.Contains('Diamond 22K')){throw 'Fabricated/static diamond rate content remains'}
           $r=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-premium-ui.js' -Raw -Encoding UTF8
           foreach($token in @('loadJewelDaybook','loadJewelSalesReport','loadJewelGstReport','loadJewelStockReport','loadJewelGirviReport','Girvi transactions are not enabled yet')){if(-not $r.Contains($token)){throw "Jewellery report missing: $token"}}
           $live=Get-Content 'src/SuvidhaPOS-Premium/JewelleryLiveRateModules.cs' -Raw -Encoding UTF8
