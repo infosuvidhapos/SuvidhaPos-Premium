@@ -19,7 +19,7 @@ w.jewelSyncLiveRates=async function(force){
     s.liveRateMeta=r;
     const rows=Array.isArray(r.rates)?r.rates:[];
     if(rows.length){
-      s.rates=rows.map(x=>({MetalType:x.MetalType??x.metalType,Purity:x.Purity??x.purity,RatePerGram:Number(x.RatePerGram??x.ratePerGram||0),EffectiveAt:r.updatedAt||new Date().toISOString()}));
+      s.rates=rows.map(x=>({MetalType:x.MetalType??x.metalType,Purity:x.Purity??x.purity,RatePerGram:Number((x.RatePerGram??x.ratePerGram) || 0),EffectiveAt:r.updatedAt||new Date().toISOString()}));
       s.lastLiveSync=now;
     }
     return s.rates||[];
