@@ -125,6 +125,18 @@ jobs:
           foreach($token in @('showLicenseWarning','Days Remaining','LICENSE EXPIRED','CHECK LICENSE','Local SQL cannot extend it','openLicenseDetails')){ if(-not $ui.Contains($token)){ throw "Premium validity UI missing: $token" } }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           if(-not $html.Contains('id="licensePill"')){ throw 'Dashboard header license pill missing' }
+      - name: Validate sidebar navigation runtime routing
+        shell: powershell
+        run: |
+          $app = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
+          foreach($token in @('const sidebarRoutes=','resolveSidebarRoute','window[name]','window.navigateFromSidebar=navigateFromSidebar')){ if(-not $app.Contains($token)){ throw "Sidebar runtime router missing: $token" } }
+          foreach($bad in @('window.loadOpeningStockMaster||loadOpeningStockMaster','window.loadBillMaster||loadBillMaster','window.loadTaxMaster||loadTaxMaster','window.loadUnitMaster||loadUnitMaster','window.loadReports||loadReports')){ if($app.Contains($bad)){ throw "Unsafe eager sidebar route remains: $bad" } }
+          $tax = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/tax-master.js' -Raw -Encoding UTF8
+          if($tax.Contains('stopImmediatePropagation')){ throw 'Tax Master must not intercept sidebar navigation separately' }
+          if(-not $tax.Contains('window.loadTaxMaster=window.loadTaxmaster')){ throw 'Tax Master unified route alias missing' }
+          $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
+          $pages = @('dashboard','billing','products','openingstock','aiimport','purchase','sales','billmaster','customers','suppliers','expiry','returns','expenses','taxmaster','unitmaster','reports')
+          foreach($page in $pages){ if(-not $html.Contains('data-page="'+$page+'"')){ throw "Sidebar page missing: $page" } }
       - name: Validate keyboard-first base-unit billing flow
         shell: powershell
         run: |

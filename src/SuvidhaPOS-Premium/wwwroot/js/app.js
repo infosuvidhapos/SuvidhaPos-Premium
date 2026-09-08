@@ -185,11 +185,46 @@ async function toggleUser(id){await api('/api/users/'+id+'/toggle',{method:'POST
 function modal(head,body,actions=''){const m=document.createElement('div');m.className='modal open';m.id='modal';m.innerHTML=`<div class="modalbox"><div class="panelhead"><h2>${head}</h2><button class="btn small secondary" onclick="closeModal()">×</button></div>${body}<div class="toolbar" style="justify-content:flex-end;margin-top:15px">${actions}<button class="btn secondary" onclick="closeModal()">Cancel</button></div></div>`;document.body.appendChild(m);return m}
 function closeModal(){document.querySelectorAll('.modal').forEach(x=>x.remove())}
 
-function navigateFromSidebar(page){
-  const routes={dashboard:loadDashboard,billing:window.loadBilling||loadBilling,products:loadProducts,openingstock:window.loadOpeningStockMaster||loadOpeningStockMaster,purchase:window.loadPurchase||loadPurchase,sales:loadSales,billmaster:window.loadBillMaster||loadBillMaster,customers:loadCustomers,suppliers:loadSuppliers,aiimport:loadAIImport,expiry:loadExpiry,returns:loadReturns,expenses:loadExpenses,taxmaster:window.loadTaxMaster||loadTaxMaster,unitmaster:window.loadUnitMaster||loadUnitMaster,reports:window.loadReports||loadReports};
-  const fn=routes[page]||loadDashboard;
-  try{const p=fn();if(p&&typeof p.catch==='function')p.catch(e=>{app.innerHTML=errorBox(e)})}catch(e){app.innerHTML=errorBox(e)}
+const sidebarRoutes={
+  dashboard:['loadDashboard'],
+  billing:['loadBilling'],
+  products:['loadProducts'],
+  openingstock:['loadOpeningStockMaster','loadOpeningStock'],
+  purchase:['loadPurchase'],
+  sales:['loadSales'],
+  billmaster:['loadBillMaster'],
+  customers:['loadCustomers'],
+  suppliers:['loadSuppliers'],
+  aiimport:['loadAIImport'],
+  expiry:['loadExpiry'],
+  returns:['loadReturns'],
+  expenses:['loadExpenses'],
+  taxmaster:['loadTaxMaster','loadTaxmaster'],
+  unitmaster:['loadUnitMaster','loadUnitmaster'],
+  reports:['loadReports']
+};
+function resolveSidebarRoute(page){
+  const names=sidebarRoutes[page]||sidebarRoutes.dashboard;
+  for(const name of names){
+    const fn=window[name];
+    if(typeof fn==='function')return fn;
+  }
+  return typeof window.loadDashboard==='function'?window.loadDashboard:null;
 }
+function navigateFromSidebar(page){
+  const fn=resolveSidebarRoute(page);
+  if(!fn){
+    app.innerHTML=errorBox(new Error('Page module is not loaded: '+page));
+    return;
+  }
+  try{
+    const p=fn();
+    if(p&&typeof p.catch==='function')p.catch(e=>{app.innerHTML=errorBox(e)});
+  }catch(e){
+    app.innerHTML=errorBox(e);
+  }
+}
+window.resolveSidebarRoute=resolveSidebarRoute;
 window.navigateFromSidebar=navigateFromSidebar;
 const sidebar=document.querySelector('#sidebar');
 if(sidebar){

@@ -46,6 +46,6 @@
   window.editTax=(id,name,rate)=>modal('Edit Custom Tax',`<div class="formgrid"><label>Tax Name<input id="tnm" class="input" value="${escT(name)}"></label><label>Rate %<input id="trt" class="input" type="number" step="0.01" min="0" max="100" value="${rate}"></label></div>`,`<button class="btn" onclick="saveTax(${id})">Update Tax</button>`);
   window.saveTax=async id=>{try{await api(id?'/api/taxes/'+id:'/api/taxes',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({TaxName:tnm.value,Rate:+trt.value})});closeModal();await loadTaxmaster();toast('Tax Master saved');await refreshTaxControls()}catch(e){alert(e.message)}};
   window.deleteTax=async id=>{if(!confirm('Delete this custom tax?'))return;try{await api('/api/taxes/'+id,{method:'DELETE'});await loadTaxmaster();await refreshTaxControls();toast('Tax removed')}catch(e){alert(e.message)}};
-  document.addEventListener('click',e=>{const b=e.target.closest('.nav[data-page="taxmaster"]');if(b){e.stopImmediatePropagation();loadTaxmaster()}} ,true);
+  window.loadTaxMaster=window.loadTaxmaster;
   const mo=new MutationObserver(()=>enhance(document));mo.observe(document.body,{childList:true,subtree:true}); loadTaxes().then(()=>enhance(document));
 })();
