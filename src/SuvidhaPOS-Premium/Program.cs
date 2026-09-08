@@ -438,6 +438,7 @@ SuvidhaPOS.Premium.LicenseGuardModules.Map(app);
 SuvidhaPOS.Premium.UnitMasterModules.Map(app);
 SuvidhaPOS.Premium.BackupMasterModules.Map(app);
 SuvidhaPOS.Premium.SpecializedModules.Map(app);
+SuvidhaPOS.Premium.JewelleryLiveRateModules.Map(app);
 SuvidhaPOS.Premium.ReportTaxModules.Map(app);
 SuvidhaPOS.Premium.BillManagementModules.Map(app);
 SuvidhaPOS.Premium.PremiumFeatureModules.Map(app);

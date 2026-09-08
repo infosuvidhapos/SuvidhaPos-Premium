@@ -90,8 +90,8 @@ WHEN NOT MATCHED THEN
             return Results.Ok(new { saved=true, BaseUnit=baseUnit, InnerUnit=innerUnit, PackUnit=packUnit, ConversionFactor=totalFactor, InnerConversionFactor=innerFactor, PackInnerFactor=packInnerFactor });
         });
 
-        app.MapGet("/api/jewellery/metal-rates", async (Db db) => Results.Ok(await db.QueryAsync("SELECT Id,MetalType,Purity,RatePerGram,EffectiveAt FROM JewelleryMetalRates WHERE IsActive=1 ORDER BY MetalType,Purity")));
-        app.MapPost("/api/jewellery/metal-rates", async (Db db, MetalRateRequest x) => Results.Ok(new { id=await db.ScalarAsync("INSERT JewelleryMetalRates(MetalType,Purity,RatePerGram,EffectiveAt,IsActive) VALUES(@m,@p,@r,COALESCE(@e,SYSDATETIME()),1);SELECT CAST(SCOPE_IDENTITY() AS int)",P("@m",x.MetalType),P("@p",x.Purity),P("@r",x.RatePerGram),P("@e",x.EffectiveAt)) }));
+        app.MapGet("/api/jewellery/metal-rates", async (Db db) => Results.Ok(await db.QueryAsync(@"WITH r AS(SELECT Id,MetalType,Purity,RatePerGram,EffectiveAt,ROW_NUMBER() OVER(PARTITION BY MetalType,Purity ORDER BY EffectiveAt DESC,Id DESC) rn FROM JewelleryMetalRates WHERE IsActive=1) SELECT Id,MetalType,Purity,RatePerGram,EffectiveAt FROM r WHERE rn=1 ORDER BY MetalType,Purity")));
+        app.MapPost("/api/jewellery/metal-rates", async (Db db, MetalRateRequest x) => { var id=await db.ScalarAsync("UPDATE JewelleryMetalRates SET IsActive=0 WHERE MetalType=@m AND Purity=@p AND IsActive=1;INSERT JewelleryMetalRates(MetalType,Purity,RatePerGram,EffectiveAt,IsActive) VALUES(@m,@p,@r,COALESCE(@e,SYSDATETIME()),1);SELECT CAST(SCOPE_IDENTITY() AS int)",P("@m",x.MetalType),P("@p",x.Purity),P("@r",x.RatePerGram),P("@e",x.EffectiveAt));return Results.Ok(new{id}); });
         app.MapGet("/api/jewellery/catalog", async (Db db, string? q) => Results.Ok(await db.QueryAsync(@"SELECT j.Id,j.TagNo,j.Barcode,j.ItemName,j.Category,j.MetalType,j.Purity,j.PurityPercent,j.Huid,j.GrossWeight,j.NetWeight,j.StoneWeight,j.MakingChargeType,j.MakingValue,j.Status,j.RackName FROM JewelleryItems j WHERE j.Status IN ('IN_STOCK','APPROVAL','KARIGAR_WORK') AND (@q='' OR j.TagNo LIKE @l OR ISNULL(j.Barcode,'') LIKE @l OR j.ItemName LIKE @l OR ISNULL(j.Huid,'') LIKE @l) ORDER BY j.ItemName",P("@q",q??""),P("@l","%"+(q??"")+"%"))));
         app.MapPost("/api/jewellery/items", async (Db db, JewelleryItemRequest x) =>
         {
@@ -104,7 +104,7 @@ WHEN NOT MATCHED THEN
             var term=q?.Trim()??"";
             var f=(from??new DateTime(2000,1,1)).Date;
             var e=(to??DateTime.Today).Date.AddDays(1);
-            return Results.Ok(await db.QueryAsync(@"SELECT TOP 500 Id,InvoiceNo,BillDate,CustomerName,PaymentMode,GrossAmount,OldMetalCredit,NetPayable,PaidAmount,
+            return Results.Ok(await db.QueryAsync(@"SELECT TOP 500 Id,InvoiceNo,BillDate,CustomerName,PaymentMode,MetalAmount,StoneAmount,MakingAmount,GrossAmount,GstRate,Cgst,Sgst,OldMetalCredit,NetPayable,PaidAmount,
 CAST(NetPayable-PaidAmount AS decimal(18,2)) Balance,
 CASE WHEN PaidAmount>=NetPayable THEN 'paid' ELSE 'unpaid' END [Status],
 'retail' [Type]

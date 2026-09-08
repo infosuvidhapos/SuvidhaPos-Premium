@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const JS={enabled:false,mode:'retail',items:[],rates:[],cart:[],oldMetal:[],payments:[{mode:'Cash',amount:0,reference:''}]};
+  const JS={enabled:false,mode:'retail',items:[],rates:[],cart:[],oldMetal:[],payments:[{mode:'Cash',amount:0,reference:''}],liveRateMeta:null,lastLiveSync:0};window.__jewelSuiteState=JS;
   const money=n=>Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const appBox=()=>document.getElementById('app');
@@ -14,7 +14,7 @@
   function shell(){
     const side=document.getElementById('sidebar'); if(!side)return;
     side.innerHTML=`
-      <div class="js-brand">✦ <span>Jewel Suite</span></div>
+      <div class="js-brand"><img src="/img/suvidha-pos-mark.svg?v=6111jewelui" alt="Suvidha POS"><div><b>SUVIDHA POS</b><small>JEWELLERY PREMIUM</small></div><button data-theme-toggle onclick="toggleSuvidhaTheme()" title="Switch theme">☀</button></div>
       <div class="js-quick"><span>⌘ K</span><input id="jsQuickSearch" placeholder="Quick search"></div>
       <div class="js-side-scroll">
         <div class="js-section">OVERVIEW</div>
@@ -39,7 +39,11 @@
         <div class="js-section">INVENTORY</div>
         <button class="nav js-nav" data-page="products" onclick="loadProducts()">${icon('◇')}<span>Stock</span></button>
         <div class="js-section">REPORTS</div>
-        <button class="nav js-nav" data-page="reports" onclick="loadReports()">${icon('⌁')}<span>All Reports</span></button>
+        <button class="nav js-nav" data-page="jDaybook" onclick="loadJewelDaybook()">${icon('▣')}<span>Daybook</span></button>
+        <button class="nav js-nav" data-page="jSalesReport" onclick="loadJewelSalesReport()">${icon('⌁')}<span>Sales Report</span></button>
+        <button class="nav js-nav" data-page="jGstReport" onclick="loadJewelGstReport()">${icon('%')}<span>GST Report</span></button>
+        <button class="nav js-nav" data-page="jStockReport" onclick="loadJewelStockReport()">${icon('◇')}<span>Stock Report</span></button>
+        <button class="nav js-nav" data-page="jGirviReport" onclick="loadJewelGirviReport()">${icon('⚖')}<span>Girvi Report</span></button>
         <div class="js-section">MASTERS</div>
         <button class="nav js-nav" data-page="customers" onclick="loadCustomers()">${icon('♙')}<span>Customers</span></button>
         <button class="nav js-nav" onclick="loadJewelRates()">${icon('↗')}<span>Au/Ag Rates</span></button>
@@ -53,6 +57,7 @@
 
   function activate(page){
     document.querySelectorAll('#sidebar .js-nav').forEach(x=>x.classList.toggle('active',x.dataset.page===page));
+    try{window.scrollTo({top:0,left:0,behavior:'instant'});document.documentElement.scrollTop=0;document.body.scrollTop=0;appBox().scrollTop=0}catch{}
   }
   function pageHeading(title,sub,actions=''){
     return `<div class="js-page-head"><div><h1>${esc(title)}</h1><p>${esc(sub||'')}</p></div><div class="js-page-actions">${actions}</div></div>`;
@@ -69,7 +74,7 @@
       api('/api/jewellery/sales').catch(()=>[]),
       api('/api/purchases').catch(()=>[])
     ]);
-    JS.rates=rates;JS.items=items;
+    JS.rates=rates;JS.items=items;if(window.jewelSyncLiveRates)await window.jewelSyncLiveRates(false);
     const today=new Date().toISOString().slice(0,10),month=today.slice(0,7);
     const todaySales=sales.filter(x=>String(x.BillDate||'').slice(0,10)===today).reduce((a,x)=>a+Number(x.NetPayable||0),0);
     const monthSales=sales.filter(x=>String(x.BillDate||'').slice(0,7)===month).reduce((a,x)=>a+Number(x.NetPayable||0),0);
@@ -80,16 +85,15 @@
     const find=(m,p)=>rate(m,p);
     appBox().innerHTML=`<div class="js-content">
       ${pageHeading('Dashboard',"Welcome back — here's today's quick view")}
-      <div class="js-block-title">↗ &nbsp; GOLD & SILVER RATE TODAY</div>
+      <div class="js-block-title">↗ &nbsp; GOLD & SILVER RATE TODAY <small class="js-rate-source">${esc(JS.liveRateMeta?.source||'Saved rate master')}${JS.liveRateMeta?.stale?' · STALE':''}</small></div>
       <div class="js-rate-strip">
-        <div class="js-rate-chip"><i>Ag</i><span>Diamond 22K<b>₹1,500.00<small>/g</small></b></span></div>
-        <div class="js-rate-chip"><i>Ag</i><span>Diamond VS2<b>₹0.00<small>/g</small></b></span></div>
-        <div class="js-rate-chip"><i>Ag</i><span>Diamond VVS1<b>₹0.00<small>/g</small></b></span></div>
+        <div class="js-rate-chip gold"><i>Au</i><span>Gold 24K<b>₹${money(find('Gold','24K'))}<small>/g</small></b></span></div>
         <div class="js-rate-chip gold"><i>Au</i><span>Gold 22K<b>₹${money(find('Gold','22K'))}<small>/g</small></b></span></div>
-        <div class="js-rate-chip"><i>Ag</i><span>Platinum 950<b>₹${money(find('Platinum','950'))}<small>/g</small></b></span></div>
-        <div class="js-rate-chip"><i>Ag</i><span>Silver 925<b>₹${money(find('Silver','925'))}<small>/g</small></b></span></div>
+        <div class="js-rate-chip gold"><i>Au</i><span>Gold 18K<b>₹${money(find('Gold','18K'))}<small>/g</small></b></span></div>
         <div class="js-rate-chip"><i>Ag</i><span>Silver 999<b>₹${money(find('Silver','999'))}<small>/g</small></b></span></div>
-        <button onclick="loadJewelRates()">↻ &nbsp; Update Rates</button>
+        <div class="js-rate-chip"><i>Ag</i><span>Silver 925<b>₹${money(find('Silver','925'))}<small>/g</small></b></span></div>
+        <div class="js-rate-chip"><i>Pt</i><span>Platinum 950<b>₹${money(find('Platinum','950'))}<small>/g</small></b></span></div>
+        <button onclick="jewelRefreshLiveRates()">↻ &nbsp; Internet Rates</button>
       </div>
       <div class="js-block-title">＋ &nbsp; CREATE INVOICE</div>
       <div class="js-create-grid">
@@ -212,7 +216,7 @@
 
   async function ratesPage(){
     const rows=await api('/api/jewellery/metal-rates').catch(()=>[]);JS.rates=rows;
-    appBox().innerHTML=`<div class="js-content">${pageHeading('Au/Ag Rates','Gold, silver and platinum rate master','<button class="js-gold" onclick="openMetalRate()">＋ Update Rate</button>')}<div class="js-card"><table class="js-clean-table"><thead><tr><th>Metal</th><th>Purity</th><th>Rate / Gram</th><th>Effective</th></tr></thead><tbody>${rows.map(x=>`<tr><td><b>${esc(x.MetalType)}</b></td><td>${esc(x.Purity)}</td><td class="js-gold-text">₹${money(x.RatePerGram)}</td><td>${new Date(x.EffectiveAt).toLocaleString('en-IN')}</td></tr>`).join('')||'<tr><td colspan="4" class="js-empty">No rates configured</td></tr>'}</tbody></table></div></div>`};
+    appBox().innerHTML=`<div class="js-content">${pageHeading('Au/Ag Rates','Gold & silver internet reference + manual rate master','<button class="js-outline" onclick="jewelRefreshLiveRates()">↻ Internet Rate</button><button class="js-gold" onclick="openMetalRate()">＋ Manual Rate</button>')}<div class="js-card"><table class="js-clean-table"><thead><tr><th>Metal</th><th>Purity</th><th>Rate / Gram</th><th>Effective</th></tr></thead><tbody>${rows.map(x=>`<tr><td><b>${esc(x.MetalType)}</b></td><td>${esc(x.Purity)}</td><td class="js-gold-text">₹${money(x.RatePerGram)}</td><td>${new Date(x.EffectiveAt).toLocaleString('en-IN')}</td></tr>`).join('')||'<tr><td colspan="4" class="js-empty">No rates configured</td></tr>'}</tbody></table></div></div>`};
   window.loadJewelRates=ratesPage;
   window.loadJewelInvoices=invoices;
   window.jewelSuiteInvoice=invoice;
@@ -236,6 +240,7 @@
     document.body.classList.add('jewel-suite-mode');
     document.body.dataset.storeType='jewellery-shop';
     shell();
+    setTimeout(()=>window.jewelSyncLiveRates&&window.jewelSyncLiveRates(false),180);
     window.loadDashboard=dashboard;
     window.loadBilling=()=>invoice('retail');
     window.loadPurchase=()=>invoice('purchase');

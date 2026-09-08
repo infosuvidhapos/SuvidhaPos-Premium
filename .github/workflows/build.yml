@@ -125,6 +125,19 @@ jobs:
           foreach($token in @('showLicenseWarning','Days Remaining','LICENSE EXPIRED','CHECK LICENSE','Local SQL cannot extend it','openLicenseDetails')){ if(-not $ui.Contains($token)){ throw "Premium validity UI missing: $token" } }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           if(-not $html.Contains('id="licensePill"')){ throw 'Dashboard header license pill missing' }
+      - name: Validate jewellery premium reports and internet rates
+        shell: powershell
+        run: |
+          $j=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
+          foreach($token in @('SUVIDHA POS','JEWELLERY PREMIUM','loadJewelDaybook','loadJewelSalesReport','loadJewelGstReport','loadJewelStockReport','loadJewelGirviReport','jewelRefreshLiveRates')){if(-not $j.Contains($token)){throw "Jewellery premium shell missing: $token"}}
+          if($j.Contains('Jewel Suite')){throw 'Legacy Jewel Suite branding remains'}
+          if($j.Contains('Diamond 22K<b>₹1,500.00')){throw 'Fabricated diamond rate remains'}
+          $r=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-premium-ui.js' -Raw -Encoding UTF8
+          foreach($token in @('loadJewelDaybook','loadJewelSalesReport','loadJewelGstReport','loadJewelStockReport','loadJewelGirviReport','Girvi transactions are not enabled yet')){if(-not $r.Contains($token)){throw "Jewellery report missing: $token"}}
+          $live=Get-Content 'src/SuvidhaPOS-Premium/JewelleryLiveRateModules.cs' -Raw -Encoding UTF8
+          foreach($token in @('xaus.com/api/v1/spot?currency=INR&unit=gram','silver_usd_oz','gold*22m/24m','Saved rate fallback')){if(-not $live.Contains($token)){throw "Internet metal rate integration missing: $token"}}
+          $css=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
+          foreach($token in @('js-report-metrics','js-trend-chart','jewel-suite-mode[data-theme="light"]')){if(-not $css.Contains($token)){throw "Jewellery report/theme CSS missing: $token"}}
       - name: Validate premium responsive shell
         shell: powershell
         run: |
