@@ -125,6 +125,18 @@ jobs:
           foreach($token in @('showLicenseWarning','Days Remaining','LICENSE EXPIRED','CHECK LICENSE','Local SQL cannot extend it','openLicenseDetails')){ if(-not $ui.Contains($token)){ throw "Premium validity UI missing: $token" } }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           if(-not $html.Contains('id="licensePill"')){ throw 'Dashboard header license pill missing' }
+      - name: Validate premium responsive shell
+        shell: powershell
+        run: |
+          $html=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
+          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.11.0-premiumui')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
+          $app=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
+          foreach($token in @('Business Command Center',"Today's completed billing",'window.scrollTo')){if(-not $app.Contains($token)){throw "Dashboard premium behavior missing: $token"}}
+          if($app.Contains("'Live from SQL'")){throw 'Dashboard still shows Live from SQL'}
+          $css=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/app.css' -Raw -Encoding UTF8
+          foreach($token in @('dashboard-premium','html[data-theme="light"]','@media(min-width:2400px)','.brandmark{width:48px')){if(-not $css.Contains($token)){throw "Responsive CSS missing: $token"}}
+          $login=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/login-premium.css' -Raw -Encoding UTF8
+          foreach($token in @('1366x768','font-size:42px','min-width:1900px')){if(-not $login.Contains($token)){throw "Login responsive CSS missing: $token"}}
       - name: Validate sidebar navigation runtime routing
         shell: powershell
         run: |
