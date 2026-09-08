@@ -23,11 +23,16 @@ public static class LicenseGuardModules
         var nowUtc=DateTime.UtcNow;
         var tokenPath=TokenPath();
         var keyPem=LoadPublicKey();
+        var managedBefore=HasManagedMarker();
 
-        // Backward-compatible until the central IIS license server is linked.
+        // Backward-compatible only before the first signed central activation.
         // There is deliberately NO SQL fallback for validity or expiry.
-        if(string.IsNullOrWhiteSpace(keyPem) || !File.Exists(tokenPath))
-            return LicenseStatus.Unmanaged(nowUtc, WarningWindowDays);
+        if(!File.Exists(tokenPath))
+            return managedBefore
+                ? LicenseStatus.Invalid("Managed license cache is missing. Check license online.",nowUtc,WarningWindowDays)
+                : LicenseStatus.Unmanaged(nowUtc, WarningWindowDays);
+        if(string.IsNullOrWhiteSpace(keyPem))
+            return LicenseStatus.Invalid("License public key is missing. Reinstall or repair SuvidhaPOS.",nowUtc,WarningWindowDays);
 
         try
         {
@@ -42,6 +47,7 @@ public static class LicenseGuardModules
             if(!rsa.VerifyData(payloadBytes,signature,HashAlgorithmName.SHA256,RSASignaturePadding.Pkcs1))
                 return LicenseStatus.Invalid("License signature verification failed.",nowUtc,WarningWindowDays);
 
+            MarkManaged();
             var payload=JsonSerializer.Deserialize<LicensePayload>(payloadBytes,JsonOptions);
             if(payload is null || string.IsNullOrWhiteSpace(payload.OutletCode))
                 return LicenseStatus.Invalid("License payload is invalid.",nowUtc,WarningWindowDays);
@@ -74,10 +80,10 @@ public static class LicenseGuardModules
 
             var days=validTill.DayNumber-today.DayNumber;
             if(days<0)
-                return LicenseStatus.Expired(payload,validTill,nowUtc,WarningWindowDays);
+                return LicenseStatus.CreateExpired(payload,validTill,nowUtc,WarningWindowDays);
 
             PersistTrustedClock(nowUtc);
-            return LicenseStatus.Active(payload,validTill,days,nowUtc,WarningWindowDays);
+            return LicenseStatus.CreateActive(payload,validTill,days,nowUtc,WarningWindowDays);
         }
         catch(Exception ex)
         {
@@ -102,6 +108,27 @@ public static class LicenseGuardModules
     }
     static string TokenPath()=>Path.Combine(LicenseFolder(),"license.token.json");
     static string ClockPath()=>Path.Combine(LicenseFolder(),"trusted-clock.bin");
+    static string ManagedPath()=>Path.Combine(LicenseFolder(),"managed-license.bin");
+    const string ManagedRegistry=@"HKEY_CURRENT_USER\Software\SuvidhaPOS Premium\License";
+
+    static bool HasManagedMarker()
+    {
+        try{if(File.Exists(ManagedPath()))return true;}catch{}
+        try{return string.Equals(Registry.GetValue(ManagedRegistry,"Managed","")?.ToString(),"1",StringComparison.Ordinal);}catch{return false;}
+    }
+
+    static void MarkManaged()
+    {
+        try
+        {
+            if(!File.Exists(ManagedPath()))
+            {
+                var plain=Encoding.UTF8.GetBytes("SUVIDHAPOS-MANAGED-LICENSE-V1");
+                File.WriteAllBytes(ManagedPath(),ProtectedData.Protect(plain,null,DataProtectionScope.LocalMachine));
+            }
+        }catch{}
+        try{Registry.SetValue(ManagedRegistry,"Managed","1",RegistryValueKind.String);}catch{}
+    }
 
     static string DeviceId()
     {
@@ -174,12 +201,12 @@ public static class LicenseGuardModules
         public static LicenseStatus Blocked(string message,LicensePayload p,DateTime now,int warn,string code)=>new(
             true,false,false,false,false,code,"LICENSE BLOCKED",message,p.ValidFrom,p.ValidTill,null,p.OutletCode,p.OutletName,p.StoreType,p.Plan,DeviceId(),warn,now);
 
-        public static LicenseStatus Expired(LicensePayload p,DateOnly validTill,DateTime now,int warn)=>new(
+        public static LicenseStatus CreateExpired(LicensePayload p,DateOnly validTill,DateTime now,int warn)=>new(
             true,false,false,true,false,"EXPIRED","LICENSE EXPIRED",
             $"SuvidhaPOS validity expired on {validTill:dd-MMM-yyyy}. Please renew and check license.",p.ValidFrom,p.ValidTill,
             -1,p.OutletCode,p.OutletName,p.StoreType,p.Plan,DeviceId(),warn,now);
 
-        public static LicenseStatus Active(LicensePayload p,DateOnly validTill,int days,DateTime now,int warn)
+        public static LicenseStatus CreateActive(LicensePayload p,DateOnly validTill,int days,DateTime now,int warn)
         {
             var warning=days>=0&&days<=warn;
             var text=days==0?"EXPIRES TODAY":warning?$"EXPIRES IN {days} DAY{(days==1?"":"S")}":$"VALID TILL {validTill:dd MMM yyyy}".ToUpperInvariant();
