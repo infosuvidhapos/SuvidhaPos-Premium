@@ -66,11 +66,13 @@ if($text.Contains($cookieOld)){$text=$text.Replace($cookieOld,$cookieNew)}
 # index.html is now committed directly in UTF-8. Do not rewrite it here.
 # This avoids Windows PowerShell 5.1 decoding UTF-8 emoji/symbols as ANSI.
 
-# Keep endpoint mappings deterministic. Source now owns the mappings; only qualify legacy short names.
-$text=$text.Replace('SpecializedModules.Map(app);','SuvidhaPOS.Premium.SpecializedModules.Map(app);')
-$text=$text.Replace('ReportTaxModules.Map(app);','SuvidhaPOS.Premium.ReportTaxModules.Map(app);')
+# Keep endpoint mappings deterministic.
+# Program.cs owns the fully-qualified mappings. Do not rewrite substrings here:
+# replacing "SpecializedModules.Map(app);" inside an already-qualified call would produce
+# "SuvidhaPOS.Premium.SuvidhaPOS.Premium.SpecializedModules.Map(app);" and break compilation.
 if(-not $text.Contains('SuvidhaPOS.Premium.SpecializedModules.Map(app);')){throw 'SpecializedModules.Map(app) missing from Program.cs'}
 if(-not $text.Contains('SuvidhaPOS.Premium.ReportTaxModules.Map(app);')){throw 'ReportTaxModules.Map(app) missing from Program.cs'}
+if($text.Contains('SuvidhaPOS.Premium.SuvidhaPOS.Premium.')){throw 'Endpoint mapping was double-qualified'}
 
 Set-Content $program $text -Encoding UTF8
 Set-Content $project $proj -Encoding UTF8
