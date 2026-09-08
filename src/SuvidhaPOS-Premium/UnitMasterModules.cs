@@ -26,7 +26,7 @@ ORDER BY SortOrder,UnitName",P("@all",includeInactive),P("@q",term),P("@like","%
         });
 
         app.MapPost("/api/unit-master",async(Db db,UnitMasterRequest x)=>{
-            var name=Clean(x.UnitName,40);var code=Clean(x.UnitCode,20);
+            var name=Clean(x.UnitName,20);var code=Clean(x.UnitCode,20);
             if(string.IsNullOrWhiteSpace(name)||string.IsNullOrWhiteSpace(code))return Results.BadRequest(new{message="Unit Name and Unit Code are required"});
             var dup=await Duplicate(db,name,code,0);
             if(dup.Count>0)return Results.BadRequest(new{message=$"Duplicate unit blocked: '{dup["UnitName"]}' / '{dup["UnitCode"]}' already exists.",duplicate=true,conflict=dup});
@@ -41,7 +41,7 @@ VALUES(@n,@c,@d,@cat,@s,1,0);SELECT CAST(SCOPE_IDENTITY() AS int)",
         });
 
         app.MapPut("/api/unit-master/{id:int}",async(Db db,int id,UnitMasterRequest x)=>{
-            var name=Clean(x.UnitName,40);var code=Clean(x.UnitCode,20);
+            var name=Clean(x.UnitName,20);var code=Clean(x.UnitCode,20);
             if(string.IsNullOrWhiteSpace(name)||string.IsNullOrWhiteSpace(code))return Results.BadRequest(new{message="Unit Name and Unit Code are required"});
             var current=await db.QuerySingleAsync("SELECT Id,UnitName,UnitCode,IsSystem FROM UnitMaster WHERE Id=@id",P("@id",id));
             if(current.Count==0)return Results.NotFound(new{message="Unit not found"});
@@ -76,8 +76,9 @@ WHERE UPPER(LTRIM(RTRIM(ISNULL(BaseUnit,''))))=UPPER(@old)
 
     public static async Task<string?> ResolveActiveNameAsync(Db db,string? raw)
     {
-        var v=(raw??"").Trim();
+        var v=(raw??"").Trim().ToUpperInvariant();
         if(string.IsNullOrWhiteSpace(v))return null;
+        v=v switch{"PIECE"=>"PCS","PIECES"=>"PCS","EACH"=>"PCS","NUMBER"=>"NOS","NUMBERS"=>"NOS","BTL"=>"BOTTLE","PKT"=>"PACKET","LITER"=>"LITRE","LITERS"=>"LITRE","LITRES"=>"LITRE","MILLILITER"=>"ML","MILLILITRE"=>"ML","KILOGRAM"=>"KG","KILOGRAMS"=>"KG","GMS"=>"GRAM","GRAMS"=>"GRAM","METRE"=>"METER","METRES"=>"METER",_=>v};
         var r=await db.QuerySingleAsync(@"SELECT TOP 1 UnitName FROM UnitMaster
 WHERE IsActive=1 AND (UPPER(LTRIM(RTRIM(UnitName)))=UPPER(@v) OR UPPER(LTRIM(RTRIM(UnitCode)))=UPPER(@v))
 ORDER BY CASE WHEN UPPER(LTRIM(RTRIM(UnitName)))=UPPER(@v) THEN 0 ELSE 1 END,SortOrder,Id",P("@v",v));

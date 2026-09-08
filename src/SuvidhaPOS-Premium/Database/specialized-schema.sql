@@ -100,7 +100,7 @@ GO
 -- Unit Master: canonical searchable units used by Item Master / UOM conversion.
 IF OBJECT_ID('dbo.UnitMaster') IS NULL CREATE TABLE dbo.UnitMaster(
  Id int IDENTITY PRIMARY KEY,
- UnitName nvarchar(40) NOT NULL,
+ UnitName nvarchar(20) NOT NULL,
  UnitCode nvarchar(20) NOT NULL,
  Description nvarchar(120) NULL,
  UnitCategory nvarchar(30) NOT NULL CONSTRAINT DF_UnitMaster_Category DEFAULT 'COUNT',

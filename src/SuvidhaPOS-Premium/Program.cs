@@ -107,6 +107,8 @@ app.MapGet("/api/products/identity-check",async(Db db,string? name,string? barco
 app.MapPost("/api/products",async(Db db,ProductRequest x)=>{
  var name=(x.Name??"").Trim(); var barcode=string.IsNullOrWhiteSpace(x.Barcode)?null:x.Barcode.Trim();
  if(string.IsNullOrWhiteSpace(name))return Results.BadRequest(new{message="Product name is required"});
+ var unitName=await SuvidhaPOS.Premium.UnitMasterModules.ResolveActiveNameAsync(db,x.Unit??"PCS");
+ if(unitName is null)return Results.BadRequest(new{message=$"Unit '{x.Unit}' is not in active Unit Master. Select a predefined unit or add it in Unit Master first."});
  var dup=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
  CASE WHEN UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) THEN 'Item Name' ELSE 'Barcode' END ConflictType
  FROM Products WHERE IsActive=1 AND
@@ -117,7 +119,7 @@ app.MapPost("/api/products",async(Db db,ProductRequest x)=>{
   var id=await db.ScalarAsync(@"INSERT Products(Name,Barcode,Sku,CategoryId,Category,Unit,Hsn,GstRate,Mrp,PurchasePrice,SalePrice,MinStock,MaxStock,LocationCode,RackName,ShelfName,TrackBatch,TrackExpiry)
  VALUES(@n,@b,@s,@cid,@cat,@u,@h,@g,@m,@pp,@sp,@min,@max,@loc,@rack,@shelf,@tb,@te);
  SELECT CAST(SCOPE_IDENTITY() AS int)",
- P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",x.Unit??"PCS"),P("@h",x.Hsn),P("@g",x.GstRate),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry));
+ P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",unitName),P("@h",x.Hsn),P("@g",x.GstRate),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry));
   return Results.Ok(new{id});
  }catch(SqlException e)when(e.Number==2601||e.Number==2627){return Results.BadRequest(new{message="Duplicate barcode is not allowed",duplicate=true});}
 });
@@ -125,6 +127,8 @@ app.MapPost("/api/products",async(Db db,ProductRequest x)=>{
 app.MapPut("/api/products/{id:int}",async(Db db,int id,ProductRequest x)=>{
  var name=(x.Name??"").Trim(); var barcode=string.IsNullOrWhiteSpace(x.Barcode)?null:x.Barcode.Trim();
  if(string.IsNullOrWhiteSpace(name))return Results.BadRequest(new{message="Product name is required"});
+ var unitName=await SuvidhaPOS.Premium.UnitMasterModules.ResolveActiveNameAsync(db,x.Unit??"PCS");
+ if(unitName is null)return Results.BadRequest(new{message=$"Unit '{x.Unit}' is not in active Unit Master. Select a predefined unit or add it in Unit Master first."});
  var dup=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
  CASE WHEN UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) THEN 'Item Name' ELSE 'Barcode' END ConflictType
  FROM Products WHERE IsActive=1 AND Id<>@id AND
@@ -133,7 +137,7 @@ app.MapPut("/api/products/{id:int}",async(Db db,int id,ProductRequest x)=>{
  if(dup.Count>0)return Results.BadRequest(new{message=$"Duplicate {dup["ConflictType"]}: existing item '{dup["Name"]}' already uses this value.",duplicate=true,conflict=dup});
  try{
   await db.ScalarAsync(@"UPDATE Products SET Name=@n,Barcode=@b,Sku=@s,CategoryId=@cid,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,MaxStock=@max,LocationCode=@loc,RackName=@rack,ShelfName=@shelf,TrackBatch=@tb,TrackExpiry=@te WHERE Id=@id",
-  P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",x.Unit??"PCS"),P("@h",x.Hsn),P("@g",x.GstRate),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry),P("@id",id));
+  P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",unitName),P("@h",x.Hsn),P("@g",x.GstRate),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry),P("@id",id));
   return Results.Ok(new{updated=true});
  }catch(SqlException e)when(e.Number==2601||e.Number==2627){return Results.BadRequest(new{message="Duplicate barcode is not allowed",duplicate=true});}
 });
@@ -141,6 +145,12 @@ app.MapPut("/api/products/{id:int}",async(Db db,int id,ProductRequest x)=>{
 app.MapPost("/api/products/bulk-edit",async(Db db,ProductBulkEditRequest x)=>{
  if(x.Rows is null||x.Rows.Count==0)return Results.BadRequest(new{message="No item rows supplied"});
  var conflicts=new List<object>();
+ var normalizedUnits=new Dictionary<int,string>();
+ foreach(var r in x.Rows){
+   var u=await SuvidhaPOS.Premium.UnitMasterModules.ResolveActiveNameAsync(db,r.Unit??"PCS");
+   if(u is null)conflicts.Add(new{r.Id,type="UNIT",value=r.Unit,message=$"Unit '{r.Unit}' is not in active Unit Master"});
+   else normalizedUnits[r.Id]=u;
+ }
  var seenNames=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase);
  var seenBarcodes=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase);
  foreach(var r in x.Rows){
@@ -168,7 +178,7 @@ app.MapPost("/api/products/bulk-edit",async(Db db,ProductBulkEditRequest x)=>{
  try{
    foreach(var r in x.Rows){
      var cmd=new SqlCommand(@"UPDATE Products SET Name=@n,Barcode=@b,Sku=@s,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,MaxStock=@max,LocationCode=@loc,RackName=@rack,ShelfName=@shelf WHERE Id=@id AND IsActive=1",c,tx);
-     cmd.Parameters.AddRange(new[]{P("@n",r.Name.Trim()),P("@b",string.IsNullOrWhiteSpace(r.Barcode)?null:r.Barcode.Trim()),P("@s",string.IsNullOrWhiteSpace(r.Sku)?null:r.Sku.Trim()),P("@cat",r.Category),P("@u",r.Unit??"PCS"),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@max",r.MaxStock),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName),P("@id",r.Id)});
+     cmd.Parameters.AddRange(new[]{P("@n",r.Name.Trim()),P("@b",string.IsNullOrWhiteSpace(r.Barcode)?null:r.Barcode.Trim()),P("@s",string.IsNullOrWhiteSpace(r.Sku)?null:r.Sku.Trim()),P("@cat",r.Category),P("@u",normalizedUnits[r.Id]),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@max",r.MaxStock),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName),P("@id",r.Id)});
      await cmd.ExecuteNonQueryAsync();
    }
    await tx.CommitAsync();return Results.Ok(new{updated=x.Rows.Count});
