@@ -261,6 +261,14 @@ jobs:
           & $sqlcmd.FullName -I -S $server -E -b -Q "RESTORE HEADERONLY FROM DISK=N'$bak';"
           if($LASTEXITCODE -ne 0){throw 'Backup header validation failed'}
           Copy-Item $bak 'publish/desktop/win-x64/Database/SuvidhaPos.bak' -Force
+      - name: Validate installer SQL Express bootstrap
+        shell: powershell
+        run: |
+          $iss = Get-Content 'installer/SuvidhaPOS.iss' -Raw -Encoding UTF8
+          foreach($token in @('EnsureSqlExpress','IsSqlConnectionReady','WaitForSqlReady','SQLBOOTSTRAP:','MSSQL$SQLEXPRESS','SQL2019-SQLEXPR_x64_ENU.exe','ResultCode <> 3010','ResultCode <> 1641','CanLaunchApplication','NeedRestart')){ if(-not $iss.Contains($token)){ throw "SQL installer bootstrap missing: $token" } }
+          if($iss.Contains('Check: ShouldInstallSqlExpress')){ throw 'Legacy registry-only SQL install check must not be used' }
+          if($iss -match 'SQL2019-SQLEXPR_x64_ENU\.exe.*skipifsilent'){ throw 'SQL Express must not be skipped during silent installation' }
+          if(-not $iss.Contains('SuvidhaPOS Setup cannot continue without a working SQLEXPRESS database engine.')){ throw 'SQL installation failure must stop Setup with a clear error' }
       - name: Install Inno Setup
         shell: powershell
         run: choco install innosetup --yes --no-progress
