@@ -56,6 +56,9 @@
   }
 
   function activate(page){
+    // Jewellery navigation must always re-assert its mode class; stale outlet refreshes must never leave the page unstyled.
+    document.body.classList.add('jewel-suite-mode');
+    document.body.dataset.storeType='jewellery-shop';
     document.querySelectorAll('#sidebar .js-nav').forEach(x=>x.classList.toggle('active',x.dataset.page===page));
     try{window.scrollTo({top:0,left:0,behavior:'instant'});document.documentElement.scrollTop=0;document.body.scrollTop=0;appBox().scrollTop=0}catch{}
   }
@@ -231,6 +234,9 @@
       try{s=await fetch('/public/specialization?_='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}}).then(r=>r.ok?r.json():null)}catch{}
     }
     if(!isJewelleryProfile(s)){
+      // Ignore a stale/incomplete refresh after Jewellery mode is active.
+      // A real outlet-type change already reloads the application from Outlet Master.
+      if(JS.enabled||document.body.classList.contains('jewel-suite-mode'))return true;
       document.body.classList.remove('jewel-suite-mode');
       window.__jewelSuiteEnabled=false;JS.enabled=false;
       return false;
