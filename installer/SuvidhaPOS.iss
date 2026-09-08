@@ -1,5 +1,5 @@
 #define MyAppName "SuvidhaPOS Premium"
-#define MyAppVersion "2.8.4"
+#define MyAppVersion "2.8.5"
 #define MyAppPublisher "SuvidhaPOS"
 #define MyAppExeName "SuvidhaPOS.Desktop.exe"
 [Setup]
@@ -9,6 +9,7 @@ AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\SuvidhaPOS Premium
 DefaultGroupName=SuvidhaPOS Premium
+UsePreviousAppDir=no
 OutputDir=installer-output
 OutputBaseFilename=SuvidhaPOS-Premium-Windows-Setup
 SetupIconFile=..\src\SuvidhaPOS-Premium\suvidha-pos.ico
@@ -16,17 +17,18 @@ UninstallDisplayIcon={app}\suvidha-pos.ico
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\wwwroot"
 [Dirs]
-Name: "{app}"; Permissions: users-modify
+Name: "{app}"
 [Files]
 Source: "..\publish\desktop\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "Prerequisites\SQL2019-SQLEXPR_x64_ENU.exe"; DestDir: "{app}\Prerequisites"; Flags: ignoreversion
+Source: "Ensure-SqlAccess.ps1"; DestDir: "{app}\Prerequisites"; Flags: ignoreversion
 Source: "Prerequisites\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{app}\Prerequisites"; Flags: ignoreversion
 [Icons]
 Name: "{autodesktop}\SuvidhaPOS Premium"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\suvidha-pos.ico"
@@ -39,9 +41,28 @@ var
   SqlReadyForLaunch: Boolean;
   SqlRestartRequired: Boolean;
 
-function GetSqlInstallParameters: String;
+function OriginalWindowsUser: String;
+var
+  DomainName, UserName: String;
 begin
-  Result := '/Q /ACTION=Install /IACCEPTSQLSERVERLICENSETERMS /FEATURES=SQLENGINE /INSTANCENAME=SQLEXPRESS /SQLSVCACCOUNT="NT AUTHORITY\SYSTEM" /SQLSYSADMINACCOUNTS="BUILTIN\ADMINISTRATORS" /TCPENABLED=1 /NPENABLED=1 /SQLSVCSTARTUPTYPE=Automatic /UPDATEENABLED=0';
+  DomainName := GetEnv('USERDOMAIN');
+  UserName := GetEnv('USERNAME');
+  if (DomainName <> '') and (UserName <> '') then
+    Result := DomainName + '\' + UserName
+  else
+    Result := UserName;
+end;
+
+function GetSqlInstallParameters: String;
+var
+  UserAccount: String;
+begin
+  UserAccount := OriginalWindowsUser;
+  Result :=
+    '/Q /ACTION=Install /IACCEPTSQLSERVERLICENSETERMS /FEATURES=SQLENGINE ' +
+    '/INSTANCENAME=SQLEXPRESS /SQLSVCACCOUNT="NT AUTHORITY\SYSTEM" ' +
+    '/SQLSYSADMINACCOUNTS="BUILTIN\ADMINISTRATORS" "' + UserAccount + '" ' +
+    '/TCPENABLED=1 /NPENABLED=1 /SQLSVCSTARTUPTYPE=Automatic /UPDATEENABLED=0';
 end;
 
 function SqlServiceExists: Boolean;
@@ -67,14 +88,6 @@ begin
     (ResultCode = 0);
 end;
 
-procedure StartSqlService;
-var
-  ResultCode: Integer;
-begin
-  Exec(ExpandConstant('{sys}\sc.exe'), 'start "MSSQL$SQLEXPRESS"', '',
-    SW_HIDE, ewWaitUntilTerminated, ResultCode);
-end;
-
 function WaitForSqlReady(SecondsToWait: Integer): Boolean;
 var
   I: Integer;
@@ -91,87 +104,144 @@ begin
   end;
 end;
 
+function RequestSqlInstallerElevation(SqlInstaller: String): Boolean;
+var
+  ErrorCode: Integer;
+begin
+  Log('SQLBOOTSTRAP: Requesting UAC only for SQL Server Express installation.');
+  Result := ShellExec(
+    'runas',
+    SqlInstaller,
+    GetSqlInstallParameters,
+    ExpandConstant('{app}\Prerequisites'),
+    SW_SHOWNORMAL,
+    ewWaitUntilTerminated,
+    ErrorCode);
+  if not Result then
+  begin
+    if ErrorCode = 1223 then
+      MsgBox(
+        'Administrator permission for SQL Server Express was cancelled.' + #13#10 + #13#10 +
+        'SuvidhaPOS Setup itself does not require Administrator mode, but SQL Server installation does.',
+        mbError, MB_OK)
+    else
+      MsgBox(
+        'Could not start SQL Server Express with Administrator permission.' + #13#10 +
+        'Windows error: ' + IntToStr(ErrorCode) + ' - ' + SysErrorMessage(ErrorCode),
+        mbError, MB_OK);
+  end;
+end;
+
+function RepairExistingSqlAccess: Boolean;
+var
+  ErrorCode: Integer;
+  PowerShellExe, Helper, Params, TargetUser: String;
+begin
+  PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+  Helper := ExpandConstant('{app}\Prerequisites\Ensure-SqlAccess.ps1');
+  TargetUser := OriginalWindowsUser;
+  Params :=
+    '-NoProfile -ExecutionPolicy Bypass -File "' + Helper + '" -TargetUser "' + TargetUser + '"';
+  Log('SQLBOOTSTRAP: Requesting UAC only to start/configure SQLEXPRESS for the POS user.');
+  Result := ShellExec(
+    'runas',
+    PowerShellExe,
+    Params,
+    ExpandConstant('{app}\Prerequisites'),
+    SW_SHOWNORMAL,
+    ewWaitUntilTerminated,
+    ErrorCode);
+  if not Result then
+  begin
+    if ErrorCode = 1223 then
+      MsgBox(
+        'Administrator permission for SQL Server configuration was cancelled.' + #13#10 + #13#10 +
+        'The SuvidhaPOS application remains a normal-user application.',
+        mbError, MB_OK)
+    else
+      MsgBox(
+        'Could not configure SQL Server Express.' + #13#10 +
+        'Windows error: ' + IntToStr(ErrorCode) + ' - ' + SysErrorMessage(ErrorCode),
+        mbError, MB_OK);
+  end;
+end;
+
 procedure EnsureSqlExpress;
 var
   SqlInstaller: String;
-  ResultCode: Integer;
 begin
   SqlReadyForLaunch := False;
   SqlRestartRequired := False;
 
   if IsSqlConnectionReady then
   begin
-    Log('SQLBOOTSTRAP: .\SQLEXPRESS is already reachable.');
+    Log('SQLBOOTSTRAP: .\SQLEXPRESS is already reachable by the current POS user. No UAC required.');
     SqlReadyForLaunch := True;
     exit;
   end;
 
   if SqlServiceExists then
   begin
-    Log('SQLBOOTSTRAP: SQLEXPRESS service exists but is not reachable. Attempting to start it.');
-    WizardForm.StatusLabel.Caption := 'Starting SQL Server Express...';
-    StartSqlService;
-    if WaitForSqlReady(30) then
+    Log('SQLBOOTSTRAP: SQLEXPRESS exists but current user cannot connect or service is stopped.');
+    WizardForm.StatusLabel.Caption := 'Preparing SQL Server Express...';
+
+    if not RepairExistingSqlAccess then
+      RaiseException('SQL Server Express requires Administrator permission to finish configuration.');
+
+    if WaitForSqlReady(45) then
     begin
-      Log('SQLBOOTSTRAP: Existing SQLEXPRESS started successfully.');
+      Log('SQLBOOTSTRAP: Existing SQLEXPRESS is ready for the normal POS user.');
       SqlReadyForLaunch := True;
       exit;
     end;
 
     MsgBox(
-      'SQL Server Express is installed on this PC but the SQLEXPRESS service could not be started or connected.' + #13#10 + #13#10 +
-      'SuvidhaPOS Setup will stop so the application is not installed in a broken database state.' + #13#10 +
-      'Please repair/remove the existing SQLEXPRESS instance and run Setup again.',
+      'SQL Server Express is installed but SuvidhaPOS still cannot connect to .\SQLEXPRESS.' + #13#10 + #13#10 +
+      'Please repair the existing SQLEXPRESS instance and run Setup again.',
       mbError, MB_OK);
-    RaiseException('Existing SQL Server Express instance is not usable.');
+    RaiseException('Existing SQLEXPRESS is not usable by the POS user.');
   end;
 
   SqlInstaller := ExpandConstant('{app}\Prerequisites\SQL2019-SQLEXPR_x64_ENU.exe');
   if not FileExists(SqlInstaller) then
     RaiseException('Bundled SQL Server 2019 Express installer is missing.');
 
-  WizardForm.StatusLabel.Caption := 'Installing SQL Server 2019 Express (SQLEXPRESS)...';
-  Log('SQLBOOTSTRAP: No SQLEXPRESS instance found. Starting bundled SQL Server 2019 Express installation.');
+  WizardForm.StatusLabel.Caption := 'Installing SQL Server 2019 Express...';
+  Log('SQLBOOTSTRAP: SQL is missing. Setup remains non-elevated; only SQL installer will request UAC.');
 
-  if not Exec(SqlInstaller, GetSqlInstallParameters, ExpandConstant('{app}\Prerequisites'),
-    SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-    RaiseException('Unable to start SQL Server 2019 Express installer.');
+  if not RequestSqlInstallerElevation(SqlInstaller) then
+    RaiseException('SQL Server Express installation was not authorized.');
 
-  Log(Format('SQLBOOTSTRAP: SQL installer exit code %d.', [ResultCode]));
-
-  if (ResultCode <> 0) and (ResultCode <> 3010) and (ResultCode <> 1641) then
+  if WaitForSqlReady(90) then
   begin
-    MsgBox(
-      'SQL Server 2019 Express installation failed.' + #13#10 + #13#10 +
-      'Installer exit code: ' + IntToStr(ResultCode) + #13#10 +
-      'SuvidhaPOS Setup cannot continue without a working SQLEXPRESS database engine.',
-      mbError, MB_OK);
-    RaiseException('SQL Server 2019 Express installation failed with exit code ' + IntToStr(ResultCode) + '.');
-  end;
-
-  StartSqlService;
-  if WaitForSqlReady(60) then
-  begin
-    Log('SQLBOOTSTRAP: New SQLEXPRESS instance installed and connection verified.');
+    Log('SQLBOOTSTRAP: New SQLEXPRESS installed and verified for the normal POS user.');
     SqlReadyForLaunch := True;
     exit;
   end;
 
-  if (ResultCode = 3010) or (ResultCode = 1641) then
+  if SqlServiceExists then
   begin
+    Log('SQLBOOTSTRAP: SQL service now exists but current user is not ready; running SQL-only elevated access repair.');
+    if RepairExistingSqlAccess and WaitForSqlReady(45) then
+    begin
+      SqlReadyForLaunch := True;
+      Log('SQLBOOTSTRAP: SQL user access verified after repair.');
+      exit;
+    end;
+
     SqlRestartRequired := True;
     MsgBox(
-      'SQL Server 2019 Express was installed, but Windows must be restarted before SuvidhaPOS can connect.' + #13#10 + #13#10 +
+      'SQL Server 2019 Express was installed, but Windows/SQL must be restarted before the normal SuvidhaPOS user can connect.' + #13#10 + #13#10 +
       'Restart Windows, then open SuvidhaPOS Premium.',
       mbInformation, MB_OK);
     exit;
   end;
 
   MsgBox(
-    'SQL Server 2019 Express installation completed, but Setup could not connect to .\SQLEXPRESS.' + #13#10 + #13#10 +
-    'SuvidhaPOS will not be launched because the database engine is not ready.',
+    'SQL Server 2019 Express installation did not create a working SQLEXPRESS instance.' + #13#10 + #13#10 +
+    'SuvidhaPOS Setup cannot continue without SQL Server.',
     mbError, MB_OK);
-  RaiseException('SQLEXPRESS connection verification failed after installation.');
+  RaiseException('SQL Server 2019 Express installation failed.');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

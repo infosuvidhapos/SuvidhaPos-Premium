@@ -41,7 +41,7 @@ jobs:
       - name: Validate source layout
         shell: powershell
         run: |
-          $required=@('src/SuvidhaPOS-Premium/Program.cs','src/SuvidhaPOS-Premium/SpecializedModules.cs','src/SuvidhaPOS-Premium/PremiumFeatureModules.cs','src/SuvidhaPOS-Premium/wwwroot/js/premium-masters.js','src/SuvidhaPOS-Premium/wwwroot/js/outlet-login-sync.js','src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js','src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-masters.css','src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj','src/SuvidhaPOS-Premium/Database/schema.sql','src/SuvidhaPOS-Premium/Database/specialized-schema.sql','src/SuvidhaPOS-Premium/Database/seed.sql','src/SuvidhaPOS-Premium/Database/print-schema.sql','src/SuvidhaPOS-Premium/wwwroot/index.html','src/SuvidhaPOS-Premium/wwwroot/js/app.js','src/SuvidhaPOS-Premium/wwwroot/js/login-authfix7.js','src/SuvidhaPOS-Premium/wwwroot/js/desktop-bridge.js','src/SuvidhaPOS-Premium/wwwroot/js/pos-fixes.js','src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js','src/SuvidhaPOS-Premium/wwwroot/js/backup-master.js','src/SuvidhaPOS-Premium/wwwroot/css/app.css','src/SuvidhaPOS-Premium/wwwroot/css/login-premium.css','src/SuvidhaPOS-Premium/wwwroot/css/backup-master.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-fixes.css','src/SuvidhaPOS-Premium/suvidha-pos.ico','src/SuvidhaPOS-Premium/wwwroot/img/suvidha-pos-mark.svg','installer/Generate-AppIcon.ps1','src/SuvidhaPOS.Desktop/SuvidhaPOS.Desktop.csproj','src/SuvidhaPOS.Desktop/Program.cs','src/SuvidhaPOS.Desktop/MainForm.cs','src/SuvidhaPOS.Desktop/Database.config.json','installer/SuvidhaPOS.iss'); foreach($f in $required){if(-not(Test-Path $f)){throw "Missing $f"}}
+          $required=@('src/SuvidhaPOS-Premium/Program.cs','src/SuvidhaPOS-Premium/SpecializedModules.cs','src/SuvidhaPOS-Premium/PremiumFeatureModules.cs','src/SuvidhaPOS-Premium/wwwroot/js/premium-masters.js','src/SuvidhaPOS-Premium/wwwroot/js/outlet-login-sync.js','src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js','src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-masters.css','src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj','src/SuvidhaPOS-Premium/Database/schema.sql','src/SuvidhaPOS-Premium/Database/specialized-schema.sql','src/SuvidhaPOS-Premium/Database/seed.sql','src/SuvidhaPOS-Premium/Database/print-schema.sql','src/SuvidhaPOS-Premium/wwwroot/index.html','src/SuvidhaPOS-Premium/wwwroot/js/app.js','src/SuvidhaPOS-Premium/wwwroot/js/login-authfix7.js','src/SuvidhaPOS-Premium/wwwroot/js/desktop-bridge.js','src/SuvidhaPOS-Premium/wwwroot/js/pos-fixes.js','src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js','src/SuvidhaPOS-Premium/wwwroot/js/backup-master.js','src/SuvidhaPOS-Premium/wwwroot/css/app.css','src/SuvidhaPOS-Premium/wwwroot/css/login-premium.css','src/SuvidhaPOS-Premium/wwwroot/css/backup-master.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-fixes.css','src/SuvidhaPOS-Premium/suvidha-pos.ico','src/SuvidhaPOS-Premium/wwwroot/img/suvidha-pos-mark.svg','installer/Generate-AppIcon.ps1','installer/Ensure-SqlAccess.ps1','src/SuvidhaPOS.Desktop/SuvidhaPOS.Desktop.csproj','src/SuvidhaPOS.Desktop/Program.cs','src/SuvidhaPOS.Desktop/MainForm.cs','src/SuvidhaPOS.Desktop/Database.config.json','installer/SuvidhaPOS.iss'); foreach($f in $required){if(-not(Test-Path $f)){throw "Missing $f"}}
       - name: Validate sales trigger compatibility and report master
         shell: powershell
         run: |
@@ -289,14 +289,20 @@ jobs:
           & $sqlcmd.FullName -I -S $server -E -b -Q "RESTORE HEADERONLY FROM DISK=N'$bak';"
           if($LASTEXITCODE -ne 0){throw 'Backup header validation failed'}
           Copy-Item $bak 'publish/desktop/win-x64/Database/SuvidhaPos.bak' -Force
-      - name: Validate installer SQL Express bootstrap
+      - name: Validate per-user setup and SQL-only elevation
         shell: powershell
         run: |
           $iss = Get-Content 'installer/SuvidhaPOS.iss' -Raw -Encoding UTF8
-          foreach($token in @('EnsureSqlExpress','IsSqlConnectionReady','WaitForSqlReady','SQLBOOTSTRAP:','MSSQL$SQLEXPRESS','SQL2019-SQLEXPR_x64_ENU.exe','ResultCode <> 3010','ResultCode <> 1641','CanLaunchApplication','NeedRestart')){ if(-not $iss.Contains($token)){ throw "SQL installer bootstrap missing: $token" } }
+          foreach($token in @('PrivilegesRequired=lowest','UsePreviousAppDir=no','EnsureSqlExpress','IsSqlConnectionReady','WaitForSqlReady','SQLBOOTSTRAP:','MSSQL$SQLEXPRESS','SQL2019-SQLEXPR_x64_ENU.exe','ShellExec(','RequestSqlInstallerElevation','RepairExistingSqlAccess','OriginalWindowsUser','SQLSYSADMINACCOUNTS="BUILTIN\ADMINISTRATORS"','CanLaunchApplication','NeedRestart','runasoriginaluser')){ if(-not $iss.Contains($token)){ throw "Per-user/SQL elevation policy missing: $token" } }
+          if(-not $iss.Contains("    'runas',")){ throw 'SQL prerequisite UAC verb is missing' }
+          if($iss.Contains('PrivilegesRequired=admin')){ throw 'Whole SuvidhaPOS Setup must not request Administrator mode' }
           if($iss.Contains('Check: ShouldInstallSqlExpress')){ throw 'Legacy registry-only SQL install check must not be used' }
+          if($iss.Contains('Exec(SqlInstaller')){ throw 'SQL installer must be launched through SQL-only UAC elevation' }
           if($iss -match 'SQL2019-SQLEXPR_x64_ENU\.exe.*skipifsilent'){ throw 'SQL Express must not be skipped during silent installation' }
-          if(-not $iss.Contains('SuvidhaPOS Setup cannot continue without a working SQLEXPRESS database engine.')){ throw 'SQL installation failure must stop Setup with a clear error' }
+          $helper = Get-Content 'installer/Ensure-SqlAccess.ps1' -Raw -Encoding UTF8
+          foreach($token in @('MSSQL$SQLEXPRESS','CREATE LOGIN','ALTER SERVER ROLE [sysadmin] ADD MEMBER')){ if(-not $helper.Contains($token)){ throw "SQL access helper missing: $token" } }
+          $license = Get-Content 'src/SuvidhaPOS-Premium/LicenseGuardModules.cs' -Raw -Encoding UTF8
+          foreach($token in @('SpecialFolder.LocalApplicationData','DataProtectionScope.CurrentUser')){ if(-not $license.Contains($token)){ throw "Normal-user license cache policy missing: $token" } }
       - name: Install Inno Setup
         shell: powershell
         run: choco install innosetup --yes --no-progress

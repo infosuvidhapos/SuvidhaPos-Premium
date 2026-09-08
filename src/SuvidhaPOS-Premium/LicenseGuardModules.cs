@@ -101,7 +101,7 @@ public static class LicenseGuardModules
 
     static string LicenseFolder()
     {
-        var root=Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        var root=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var path=Path.Combine(root,ProductFolder,"License");
         Directory.CreateDirectory(path);
         return path;
@@ -124,7 +124,7 @@ public static class LicenseGuardModules
             if(!File.Exists(ManagedPath()))
             {
                 var plain=Encoding.UTF8.GetBytes("SUVIDHAPOS-MANAGED-LICENSE-V1");
-                File.WriteAllBytes(ManagedPath(),ProtectedData.Protect(plain,null,DataProtectionScope.LocalMachine));
+                File.WriteAllBytes(ManagedPath(),ProtectedData.Protect(plain,null,DataProtectionScope.CurrentUser));
             }
         }catch{}
         try{Registry.SetValue(ManagedRegistry,"Managed","1",RegistryValueKind.String);}catch{}
@@ -147,7 +147,7 @@ public static class LicenseGuardModules
             {
                 var path=ClockPath();if(!File.Exists(path))return null;
                 var protectedBytes=File.ReadAllBytes(path);
-                var plain=ProtectedData.Unprotect(protectedBytes,null,DataProtectionScope.LocalMachine);
+                var plain=ProtectedData.Unprotect(protectedBytes,null,DataProtectionScope.CurrentUser);
                 var raw=Encoding.UTF8.GetString(plain);
                 return DateTime.TryParse(raw,CultureInfo.InvariantCulture,DateTimeStyles.AdjustToUniversal|DateTimeStyles.AssumeUniversal,out var dt)?dt:null;
             }
@@ -164,7 +164,7 @@ public static class LicenseGuardModules
                 var previous=ReadTrustedClock();
                 if(previous.HasValue && previous.Value>=nowUtc)return;
                 var plain=Encoding.UTF8.GetBytes(nowUtc.ToString("O",CultureInfo.InvariantCulture));
-                var protectedBytes=ProtectedData.Protect(plain,null,DataProtectionScope.LocalMachine);
+                var protectedBytes=ProtectedData.Protect(plain,null,DataProtectionScope.CurrentUser);
                 File.WriteAllBytes(ClockPath(),protectedBytes);
             }
             catch{}
