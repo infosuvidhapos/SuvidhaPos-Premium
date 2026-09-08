@@ -1,5 +1,5 @@
 #define MyAppName "SuvidhaPOS Premium"
-#define MyAppVersion "2.7.2"
+#define MyAppVersion "2.7.3"
 #define MyAppPublisher "SuvidhaPOS"
 #define MyAppExeName "SuvidhaPOS.Desktop.exe"
 [Setup]
@@ -34,8 +34,19 @@ Name: "{group}\SuvidhaPOS Premium"; Filename: "{app}\{#MyAppExeName}"; WorkingDi
 [Run]
 Filename: "{app}\Prerequisites\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft WebView2 Runtime..."; Flags: waituntilterminated skipifsilent
 Filename: "{app}\Prerequisites\SQL2019-SQLEXPR_x64_ENU.exe"; Parameters: "{code:GetSqlInstallParameters}"; StatusMsg: "Installing SQL Server 2019 Express..."; Flags: waituntilterminated skipifsilent; Check: ShouldInstallSqlExpress
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch SuvidhaPOS Premium"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch SuvidhaPOS Premium"; Flags: nowait postinstall skipifsilent runasoriginaluser
 [Code]
+function InitializeSetup(): Boolean;
+begin
+  if not IsAdminInstallMode then
+  begin
+    MsgBox('SuvidhaPOS Premium Setup requires Administrator permission. Please allow the Windows UAC prompt and run Setup again.', mbError, MB_OK);
+    Result := False;
+    exit;
+  end;
+  Result := True;
+end;
+
 function GetSqlInstallParameters(Param: String): String;
 begin
   Result := '/Q /ACTION=Install /IACCEPTSQLSERVERLICENSETERMS /FEATURES=SQLENGINE /INSTANCENAME=SQLEXPRESS /SQLSVCACCOUNT="NT AUTHORITY\SYSTEM" /SQLSYSADMINACCOUNTS="BUILTIN\ADMINISTRATORS" /TCPENABLED=1 /NPENABLED=1 /SQLSVCSTARTUPTYPE=Automatic /UPDATEENABLED=0';
