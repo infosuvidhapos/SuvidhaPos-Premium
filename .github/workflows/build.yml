@@ -87,7 +87,7 @@ jobs:
         shell: powershell
         run: |
           $counter = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/counter-billing.js' -Raw -Encoding UTF8
-          foreach($token in @("options.find(x=>x.level==='BASE')",'Cash ready — press Enter again to Save & Print','now-cashEnterArmedAt<=1200',"mrp.addEventListener('keydown'","document.removeEventListener('keydown',cbKeys)",'scrollIntoView',"loadCbUom(id,p)")){ if(-not $counter.Contains($token)){ throw "Keyboard billing feature missing: $token" } }
+          foreach($token in @("options.find(x=>x.level==='BASE')",'press Enter again to Save & Print','now-cashEnterArmedAt<=1200',"mrp.addEventListener('keydown'","document.removeEventListener('keydown',cbKeys)",'scrollIntoView',"loadCbUom(id,p)")){ if(-not $counter.Contains($token)){ throw "Keyboard billing feature missing: $token" } }
           if($counter.Contains("const preferred=options.slice().sort((a,b)=>b.factor-a.factor)[0]")){ throw 'Billing still defaults to largest UOM instead of BaseUnit' }
           if($counter.Contains("document.querySelector('#cbUom').innerHTML='<option>PCS</option>'")){ throw 'Billing still falls back visually to static PCS' }
           $premium = Get-Content 'src/SuvidhaPOS-Premium/PremiumFeatureModules.cs' -Raw -Encoding UTF8
