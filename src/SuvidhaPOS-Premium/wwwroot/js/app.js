@@ -206,6 +206,7 @@ async function boot(){
     const screen=document.querySelector('#loginScreen');
     if(screen)screen.style.setProperty('display','none','important');
     document.querySelector('#userPill').textContent=currentUser.DisplayName+' · '+currentUser.Role;
+    if(typeof window.refreshLicenseStatus==='function')await window.refreshLicenseStatus(true);
     loadDashboard();
   }catch(e){
     try{sessionStorage.removeItem('suvidha_auth_token')}catch{}

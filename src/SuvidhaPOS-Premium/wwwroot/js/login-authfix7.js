@@ -110,6 +110,12 @@
     request('POST', '/api/login', { UserName: user, Password: pass }, null, function (err, status, data, rawText) {
       if (err) return fail('LOGIN-1 failed: ' + err.message);
       if (status === 401) return fail('Invalid username or password');
+      if (status === 423) {
+        var lic=data.license||data.License||{};
+        fail(data.message||data.Message||'SuvidhaPOS license is expired or blocked.');
+        if(typeof w.showLicenseExpired==='function') w.setTimeout(function(){w.showLicenseExpired(lic);},0);
+        return false;
+      }
       if (status < 200 || status >= 300) {
         return fail('LOGIN-1 failed: HTTP ' + status + (rawText ? ' - ' + rawText.substring(0, 180) : ''));
       }
@@ -145,6 +151,10 @@
 
         var pill = el('userPill');
         if (pill) pill.textContent = userObj.DisplayName + ' \u00b7 ' + userObj.Role;
+
+        var loginLicense=data.license||data.License||null;
+        if(loginLicense&&typeof w.applyLicenseStatus==='function')w.applyLicenseStatus(loginLicense);
+        if(typeof w.refreshLicenseStatus==='function')w.setTimeout(function(){w.refreshLicenseStatus(true);},80);
 
         busy = false;
         setButton(false);

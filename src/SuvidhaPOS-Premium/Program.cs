@@ -45,6 +45,10 @@ app.MapPost("/api/login", async(HttpContext ctx,Db db, LoginRequest x) => {
     var row=await db.QuerySingleAsync("SELECT TOP 1 Id,UserName,DisplayName,PasswordHash,Role,MustChangePassword FROM Users WHERE UserName=@u AND IsActive=1",P("@u",x.UserName?.Trim()));
     if(row.Count==0 || !VerifyPassword(x.Password??"", row["PasswordHash"]?.ToString()??"")) return Results.Unauthorized();
 
+    var license=SuvidhaPOS.Premium.LicenseGuardModules.GetStatus();
+    if(!license.LoginAllowed)
+        return Results.Json(new{message=license.Message,license},statusCode:423);
+
     var token=Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
     var su=new SessionUser(Convert.ToInt32(row["Id"]),row["UserName"]?.ToString()??"",row["DisplayName"]?.ToString()??"",row["Role"]?.ToString()??"Cashier");
     sessions[token]=su;
@@ -58,7 +62,8 @@ app.MapPost("/api/login", async(HttpContext ctx,Db db, LoginRequest x) => {
 
     return Results.Ok(new {
         token,
-        user=new {su.Id,su.UserName,su.DisplayName,su.Role,MustChangePassword=Convert.ToBoolean(row["MustChangePassword"]??false)}
+        user=new {su.Id,su.UserName,su.DisplayName,su.Role,MustChangePassword=Convert.ToBoolean(row["MustChangePassword"]??false)},
+        license
     });
 });
 app.MapPost("/api/logout",(HttpContext ctx)=>{
@@ -429,6 +434,7 @@ app.MapPost("/api/ai/import/purchase/commit",async(Db db,HttpContext ctx,AiPurch
  }catch(Exception ex){await tx.RollbackAsync();return Results.BadRequest(new{message=ex.Message});}
 });
 
+SuvidhaPOS.Premium.LicenseGuardModules.Map(app);
 SuvidhaPOS.Premium.UnitMasterModules.Map(app);
 SuvidhaPOS.Premium.BackupMasterModules.Map(app);
 SuvidhaPOS.Premium.SpecializedModules.Map(app);
