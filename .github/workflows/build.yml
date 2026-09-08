@@ -90,8 +90,8 @@ jobs:
           foreach($token in @('/api/backup-master/status','/api/backup-master/google/test','InstanceDefaultBackupPath','RESTORE VERIFYONLY','External drive offline','Google Drive upload skipped','ScheduledTick','GoogleWebAuthorizationBroker','SuvidhaPOS Backups')){ if(-not $backup.Contains($token)){ throw "Backup Master backend missing: $token" } }
           $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/backup-master.js' -Raw -Encoding UTF8
           foreach($token in @('Browse JSON','CONNECT / TEST GOOGLE DRIVE','Detected External / USB Drive','Start with Windows','Every 1 Hour','backupBrowseFolder','backupBrowseJson')){ if(-not $ui.Contains($token)){ throw "Backup Master UI missing: $token" } }
-          $host = Get-Content 'src/SuvidhaPOS.Desktop/MainForm.cs' -Raw -Encoding UTF8
-          foreach($token in @('browseFolder','browseJson','backupStartup','FolderBrowserDialog','OpenFileDialog')){ if(-not $host.Contains($token)){ throw "Desktop backup bridge missing: $token" } }
+          $desktop = Get-Content 'src/SuvidhaPOS.Desktop/MainForm.cs' -Raw -Encoding UTF8
+          foreach($token in @('browseFolder','browseJson','backupStartup','FolderBrowserDialog','OpenFileDialog')){ if(-not $desktop.Contains($token)){ throw "Desktop backup bridge missing: $token" } }
           $special = Get-Content 'src/SuvidhaPOS-Premium/SpecializedModules.cs' -Raw -Encoding UTF8
           if($special.Contains('app.MapPost("/api/backup-master"')){ throw 'Legacy backup endpoint still mapped' }
       - name: Validate bidirectional UOM rate auto-calculation
