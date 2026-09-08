@@ -67,35 +67,83 @@
     <div class="uom-card"><div class="uom-title">📦 MULTI-UNIT CONVERSION — BASE STOCK RULE</div>
       <div class="uom-help">Stock is ALWAYS stored in Base Unit. For example: BOX → STRIP → TABLET. Inner Unit is optional.</div>
       <div class="formgrid">
-        <label>Base Unit (smallest)<input id="ubase" class="input" value="${esc2(u.BaseUnit||'PCS')}" placeholder="TABLET / PCS"></label>
-        <label>Inner Unit (optional)<input id="uinner" class="input" value="${esc2(inner)}" placeholder="STRIP"></label>
-        <label>1 Inner = Base Qty<input id="uinnerfactor" class="input" type="number" min="1" step="0.001" value="${innerFactor}" oninput="refreshUomPreview()"></label>
-        <label>Pack Unit<input id="upack" class="input" value="${esc2(u.PackUnit||'BOX')}" placeholder="BOX"></label>
-        <label>1 Pack = Inner/Base Qty<input id="upackfactor" class="input" type="number" min="1" step="0.001" value="${packFactor}" oninput="refreshUomPreview()"></label>
+        <label>Base Unit (smallest)<input id="ubase" class="input" value="${esc2(u.BaseUnit||'PCS')}" placeholder="TABLET / PCS" oninput="refreshUomPreview(false)"></label>
+        <label>Inner Unit (optional)<input id="uinner" class="input" value="${esc2(inner)}" placeholder="STRIP" oninput="refreshUomPreview(true)"></label>
+        <label>1 Inner = Base Qty<input id="uinnerfactor" class="input" type="number" min="1" step="0.001" value="${innerFactor}" oninput="refreshUomPreview(true)"></label>
+        <label>Pack Unit<input id="upack" class="input" value="${esc2(u.PackUnit||'BOX')}" placeholder="BOX" oninput="refreshUomPreview(false)"></label>
+        <label>1 Pack = Inner/Base Qty<input id="upackfactor" class="input" type="number" min="1" step="0.001" value="${packFactor}" oninput="refreshUomPreview(true)"></label>
         <label>Total Conversion<input id="utotalfactor" class="input" value="${tf}" readonly></label>
       </div>
       <div id="uomPreview" class="uom-help"></div>
       <div class="formgrid">
-        <label>Base Purchase ₹<input id="ubp" class="input" type="number" step="0.0001" value="${b.purchase}"></label>
-        <label>Base MRP ₹<input id="ubm" class="input" type="number" step="0.0001" value="${b.mrp}"></label>
-        <label>Base Sale ₹<input id="ubs" class="input" type="number" step="0.0001" value="${b.sale}"></label>
-        <label>Inner Purchase ₹<input id="uip" class="input" type="number" step="0.01" value="${ip}"></label>
-        <label>Inner MRP ₹<input id="uim" class="input" type="number" step="0.01" value="${im}"></label>
-        <label>Inner Sale ₹<input id="uis" class="input" type="number" step="0.01" value="${is}"></label>
-        <label>Pack Purchase ₹<input id="upp" class="input" type="number" step="0.01" value="${pp}"></label>
-        <label>Pack MRP ₹<input id="ump" class="input" type="number" step="0.01" value="${pm}"></label>
-        <label>Pack Sale ₹<input id="usp" class="input" type="number" step="0.01" value="${ps}"></label>
+        <label class="full"><input id="uautorates" type="checkbox" checked onchange="if(this.checked)recalcAllUomRates()"> Auto-calculate linked Purchase / MRP / Sale rates <span class="muted">(uncheck for manual override)</span></label>
+        <div class="uom-help full">Practical entry: Pack Purchase → Inner/Base Purchase auto; Inner MRP → Pack/Base MRP auto. You can type at Base, Inner or Pack level — the other two levels follow automatically.</div>
+        <label>Base Purchase ₹<input id="ubp" class="input" type="number" step="0.0001" value="${b.purchase}" oninput="syncUomRates('purchase','base')"></label>
+        <label>Base MRP ₹<input id="ubm" class="input" type="number" step="0.0001" value="${b.mrp}" oninput="syncUomRates('mrp','base')"></label>
+        <label>Base Sale ₹<input id="ubs" class="input" type="number" step="0.0001" value="${b.sale}" oninput="syncUomRates('sale','base')"></label>
+        <label>Inner Purchase ₹<input id="uip" class="input" type="number" step="0.01" value="${ip}" oninput="syncUomRates('purchase','inner')"></label>
+        <label>Inner MRP ₹<input id="uim" class="input" type="number" step="0.01" value="${im}" oninput="syncUomRates('mrp','inner')"></label>
+        <label>Inner Sale ₹<input id="uis" class="input" type="number" step="0.01" value="${is}" oninput="syncUomRates('sale','inner')"></label>
+        <label>Pack Purchase ₹<input id="upp" class="input" type="number" step="0.01" value="${pp}" oninput="syncUomRates('purchase','pack')"></label>
+        <label>Pack MRP ₹<input id="ump" class="input" type="number" step="0.01" value="${pm}" oninput="syncUomRates('mrp','pack')"></label>
+        <label>Pack Sale ₹<input id="usp" class="input" type="number" step="0.01" value="${ps}" oninput="syncUomRates('sale','pack')"></label>
         <label><input id="uloose" type="checkbox" ${u.AllowLoose!==false?'checked':''}> Allow Base/Loose sale</label>
       </div>
     </div>`,`<button class="btn" onclick="saveUomProduct(${id||0})">Save Item</button>`);
-    refreshUomPreview();
+    window.__uomRateSource={
+      purchase:pp>0?'pack':(ip>0?'inner':'base'),
+      mrp:im>0?'inner':(pm>0?'pack':'base'),
+      sale:is>0?'inner':(ps>0?'pack':'base')
+    };
+    refreshUomPreview(false);
   };
 
-  window.refreshUomPreview=function(){
+  function uomRateFactors(){
+    const inner=(document.querySelector('#uinner')?.value||'').trim();
+    const inf=inner?Math.max(1,Number(document.querySelector('#uinnerfactor')?.value)||1):1;
+    const pf=Math.max(1,Number(document.querySelector('#upackfactor')?.value)||1);
+    return {hasInner:!!inner,inf,pf,tf:inner?inf*pf:pf};
+  }
+  function uomRateIds(family){
+    if(family==='purchase')return {base:'ubp',inner:'uip',pack:'upp'};
+    if(family==='mrp')return {base:'ubm',inner:'uim',pack:'ump'};
+    return {base:'ubs',inner:'uis',pack:'usp'};
+  }
+  function uomRateNumber(id){return Math.max(0,Number(document.querySelector('#'+id)?.value)||0)}
+  function setUomRate(id,value,level){
+    const el=document.querySelector('#'+id);if(!el)return;
+    const decimals=level==='base'?4:2,scale=Math.pow(10,decimals);
+    const v=Math.round(Math.max(0,Number(value)||0)*scale)/scale;
+    el.value=String(v);
+  }
+  window.syncUomRates=function(family,source){
+    window.__uomRateSource=window.__uomRateSource||{};
+    window.__uomRateSource[family]=source;
+    const auto=document.querySelector('#uautorates');if(auto&&!auto.checked)return;
+    const ids=uomRateIds(family),f=uomRateFactors(),src=uomRateNumber(ids[source]);
+    let base=0,inner=0,pack=0;
+    if(source==='pack'){
+      pack=src;base=f.tf>0?pack/f.tf:0;inner=f.hasInner?(f.pf>0?pack/f.pf:0):base;
+    }else if(source==='inner'){
+      inner=src;base=f.hasInner?(f.inf>0?inner/f.inf:0):inner;pack=f.hasInner?inner*f.pf:base*f.pf;
+    }else{
+      base=src;inner=f.hasInner?base*f.inf:base;pack=base*f.tf;
+    }
+    setUomRate(ids.base,base,'base');
+    setUomRate(ids.inner,inner,'inner');
+    setUomRate(ids.pack,pack,'pack');
+  };
+  window.recalcAllUomRates=function(){
+    const src=window.__uomRateSource||{purchase:'pack',mrp:'inner',sale:'inner'};
+    ['purchase','mrp','sale'].forEach(f=>syncUomRates(f,src[f]||'base'));
+  };
+
+  window.refreshUomPreview=function(recalcRates=false){
     const base=(document.querySelector('#ubase')?.value||'PCS').trim().toUpperCase(),inner=(document.querySelector('#uinner')?.value||'').trim().toUpperCase(),pack=(document.querySelector('#upack')?.value||'PACK').trim().toUpperCase();
     const inf=Math.max(1,Number(document.querySelector('#uinnerfactor')?.value)||1),pf=Math.max(1,Number(document.querySelector('#upackfactor')?.value)||1),tf=inner?inf*pf:pf;
     const t=document.querySelector('#utotalfactor');if(t)t.value=tf;
     const p=document.querySelector('#uomPreview');if(p)p.textContent=inner?`1 ${pack} = ${pf} ${inner}; 1 ${inner} = ${inf} ${base}; therefore 1 ${pack} = ${tf} ${base}`:`1 ${pack} = ${tf} ${base}`;
+    if(recalcRates&&document.querySelector('#uautorates')?.checked)recalcAllUomRates();
   };
 
   window.saveUomProduct=async function(id){
@@ -104,9 +152,9 @@
       if(identity.duplicate){const c=identity.conflict||{};return alert('Duplicate '+(c.ConflictType==='NAME'?'Item Name':'Barcode')+': '+(c.Name||unm.value)+' already exists.')}
       const base=(ubase.value||'PCS').trim().toUpperCase(),inner=(uinner.value||'').trim().toUpperCase(),pack=(upack.value||base).trim().toUpperCase();
       const inf=inner?Math.max(1,+uinnerfactor.value||1):1,pf=Math.max(1,+upackfactor.value||1),tf=inner?inf*pf:pf;
-      const bp=+ubp.value||0,bm=+ubm.value||0,bs=+ubs.value||0;
-      const ip=+uip.value||bp*inf,im=+uim.value||bm*inf,isale=+uis.value||bs*inf;
-      const pp=+upp.value||bp*tf,pm=+ump.value||bm*tf,psale=+usp.value||bs*tf;
+      const bp=Math.max(0,+ubp.value||0),bm=Math.max(0,+ubm.value||0),bs=Math.max(0,+ubs.value||0);
+      const ip=Math.max(0,+uip.value||0),im=Math.max(0,+uim.value||0),isale=Math.max(0,+uis.value||0);
+      const pp=Math.max(0,+upp.value||0),pm=Math.max(0,+ump.value||0),psale=Math.max(0,+usp.value||0);
       const body={Name:unm.value,Barcode:ubc.value||null,Sku:usk.value||null,CategoryId:null,Category:ucat.value||'General',Unit:base,Hsn:uhsn.value||null,GstRate:+ugst.value,Mrp:bm,PurchasePrice:bp,SalePrice:bs,MinStock:5,MaxStock:0,LocationCode:uloc.value||null,RackName:urack.value||null,ShelfName:null,TrackBatch:true,TrackExpiry:true};
       const r=await api(id?'/api/products/'+id:'/api/products',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const pid=id||r.id;
       await api('/api/products/'+pid+'/uom',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({BaseUnit:base,InnerUnit:inner||null,PackUnit:pack,ConversionFactor:tf,InnerConversionFactor:inf,PackInnerFactor:pf,PackPurchaseRate:pp,PackMrp:pm,PackSalePrice:psale,InnerPurchaseRate:ip,InnerMrp:im,InnerSalePrice:isale,LooseSalePrice:bs,AllowLoose:uloose.checked})});

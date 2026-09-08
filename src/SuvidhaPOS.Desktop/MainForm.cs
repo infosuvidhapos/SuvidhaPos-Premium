@@ -37,7 +37,7 @@ public sealed class MainForm : Form
         {
             await StartBackendAsync();
             await InitializeWebViewAsync();
-            web.CoreWebView2!.Navigate(BaseUrl + "?build=671runtimefix");
+            web.CoreWebView2!.Navigate(BaseUrl + "?build=672uomrates");
         }
         catch (Exception ex)
         {

@@ -83,6 +83,12 @@ jobs:
           if(-not $special.Contains('Inner Unit (optional)')){ throw 'Three-level UOM item master missing' }
           if(-not $special.Contains('UnitPurchased:x.Unit')){ throw 'Purchase UOM audit missing' }
           if(-not $special.Contains('Batch No is mandatory for Pharmacy / Medical Store')){ throw 'Pharmacy batch validation missing' }
+      - name: Validate bidirectional UOM rate auto-calculation
+        shell: powershell
+        run: |
+          $special = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js' -Raw -Encoding UTF8
+          foreach($token in @('id="uautorates"','syncUomRates','recalcAllUomRates',"syncUomRates('purchase','pack')","syncUomRates('mrp','inner')","syncUomRates('sale','base')",'pack/f.tf','inner/f.inf','base*f.tf','uncheck for manual override')){ if(-not $special.Contains($token)){ throw "UOM auto-rate feature missing: $token" } }
+          if($special.Contains('const ip=+uip.value||bp*inf')){ throw 'Manual override is still replaced during save' }
       - name: Validate 20-style Print Master
         shell: powershell
         run: |
