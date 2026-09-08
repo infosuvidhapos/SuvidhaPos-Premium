@@ -71,3 +71,21 @@ body.jewel-suite-mode{--jgold:#e5b642;--jgold2:#bd8615;--jink:#eef3f8;--jmuted:#
 /* Light mode stays warm graphite/cream, not stark white */
 body.jewel-suite-mode[data-theme="light"]{--jink:#25282c;--jmuted:#6f747a;--jline:#cfc8bc;--jpaper:#ede9e1;background:#e9e5dc;color:#282a2d}body.jewel-suite-mode[data-theme="light"] .shell,body.jewel-suite-mode[data-theme="light"] main,body.jewel-suite-mode[data-theme="light"] #app{background:linear-gradient(145deg,#eeeae2,#e3ded4)}body.jewel-suite-mode[data-theme="light"] #sidebar{background:#e8e3da;border-color:#c9c1b4;color:#2e3134}body.jewel-suite-mode[data-theme="light"] .js-card,body.jewel-suite-mode[data-theme="light"] .js-metric,body.jewel-suite-mode[data-theme="light"] .js-analytics>div{background:linear-gradient(145deg,#f0ece5,#e6e0d6);border-color:#cbc2b4;color:#2e3134}body.jewel-suite-mode[data-theme="light"] .js-content{color:#292c2f}body.jewel-suite-mode[data-theme="light"] .js-page-head h1,body.jewel-suite-mode[data-theme="light"] .js-block-title{color:#282b2e}body.jewel-suite-mode[data-theme="light"] .js-clean-table td,body.jewel-suite-mode[data-theme="light"] .js-clean-table th{color:#44494e;border-color:#d0c7ba}
 @media(max-width:1500px){body.jewel-suite-mode #sidebar{width:245px}.jewel-suite-mode .js-content{padding:22px 24px 48px}.jewel-suite-mode .js-report-metrics{grid-template-columns:repeat(3,1fr)}}@media(max-width:1100px){.jewel-suite-mode .js-report-metrics,.jewel-suite-mode .js-report-metrics.four,.jewel-suite-mode .js-report-metrics.three{grid-template-columns:repeat(2,1fr)}.jewel-suite-mode .js-report-two{grid-template-columns:1fr}}@media(max-width:700px){.jewel-suite-mode .js-report-metrics,.jewel-suite-mode .js-report-metrics.four,.jewel-suite-mode .js-report-metrics.three{grid-template-columns:1fr}.jewel-suite-mode .js-report-filter{align-items:stretch;flex-direction:column}.jewel-suite-mode .js-composition{grid-template-columns:1fr}.jewel-suite-mode .js-brand{padding:0 12px}}
+
+/* 6.11.3 remove remaining stark-white jewellery controls */
+body.jewel-suite-mode .js-card-head button,
+body.jewel-suite-mode .js-empty button,
+body.jewel-suite-mode .js-customer-card button,
+body.jewel-suite-mode .js-pick-row,
+body.jewel-suite-mode .js-bill-tabs button.active{background:#101e2a!important;border-color:#314452!important;color:#dce6ed!important;box-shadow:none}
+body.jewel-suite-mode .js-bill-tabs{background:#0a1621;border:1px solid #263846}
+body.jewel-suite-mode .js-bill-tabs button{color:#8798a6}
+body.jewel-suite-mode .js-bill-tabs button.active{color:#f0c75e!important;border-color:#665322!important}
+body.jewel-suite-mode .js-picker{background:transparent}
+body.jewel-suite-mode .js-empty{color:#758796!important}
+body.jewel-suite-mode[data-theme="light"] .js-card-head button,
+body.jewel-suite-mode[data-theme="light"] .js-empty button,
+body.jewel-suite-mode[data-theme="light"] .js-customer-card button,
+body.jewel-suite-mode[data-theme="light"] .js-pick-row,
+body.jewel-suite-mode[data-theme="light"] .js-bill-tabs button.active{background:#ddd6ca!important;border-color:#bfb5a6!important;color:#33373b!important}
+body.jewel-suite-mode[data-theme="light"] .js-bill-tabs{background:#d6cfc3;border-color:#bdb3a5}

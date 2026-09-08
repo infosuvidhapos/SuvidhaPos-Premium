@@ -125,6 +125,11 @@ jobs:
           foreach($token in @('showLicenseWarning','Days Remaining','LICENSE EXPIRED','CHECK LICENSE','Local SQL cannot extend it','openLicenseDetails')){ if(-not $ui.Contains($token)){ throw "Premium validity UI missing: $token" } }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           if(-not $html.Contains('id="licensePill"')){ throw 'Dashboard header license pill missing' }
+      - name: Validate jewellery no-white surface polish
+        shell: powershell
+        run: |
+          $css=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
+          foreach($token in @('6.11.3 remove remaining stark-white','js-card-head button','js-pick-row','js-bill-tabs button.active')){if(-not $css.Contains($token)){throw "Jewellery control polish missing: $token"}}
       - name: Validate jewellery premium reports and internet rates
         shell: powershell
         run: |
@@ -142,7 +147,7 @@ jobs:
         shell: powershell
         run: |
           $html=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
-          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.11.2-layoutfix')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
+          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.11.3-jewelpolish')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
           $app=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           foreach($token in @('Business Command Center',"Today's completed billing",'window.scrollTo')){if(-not $app.Contains($token)){throw "Dashboard premium behavior missing: $token"}}
           if($app.Contains("'Live from SQL'")){throw 'Dashboard still shows Live from SQL'}
