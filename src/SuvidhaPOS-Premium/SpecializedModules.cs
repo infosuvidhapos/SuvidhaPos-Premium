@@ -58,9 +58,12 @@ FROM ProductUoms WHERE ProductId=@id", P("@id", id));
             if (string.IsNullOrWhiteSpace(x.BaseUnit) || string.IsNullOrWhiteSpace(x.PackUnit))
                 return Results.BadRequest(new { message="Base unit and pack unit are required" });
 
-            var baseUnit=x.BaseUnit.Trim().ToUpperInvariant();
-            var packUnit=x.PackUnit.Trim().ToUpperInvariant();
-            var innerUnit=string.IsNullOrWhiteSpace(x.InnerUnit)?null:x.InnerUnit.Trim().ToUpperInvariant();
+            var baseUnit=await UnitMasterModules.ResolveActiveNameAsync(db,x.BaseUnit);
+            var packUnit=await UnitMasterModules.ResolveActiveNameAsync(db,x.PackUnit);
+            var innerUnit=string.IsNullOrWhiteSpace(x.InnerUnit)?null:await UnitMasterModules.ResolveActiveNameAsync(db,x.InnerUnit);
+            if(baseUnit is null)return Results.BadRequest(new {message=$"Base Unit '{x.BaseUnit}' is not in active Unit Master. Select/search a predefined unit or add it in Unit Master first."});
+            if(packUnit is null)return Results.BadRequest(new {message=$"Pack Unit '{x.PackUnit}' is not in active Unit Master. Select/search a predefined unit or add it in Unit Master first."});
+            if(!string.IsNullOrWhiteSpace(x.InnerUnit)&&innerUnit is null)return Results.BadRequest(new {message=$"Inner Unit '{x.InnerUnit}' is not in active Unit Master. Select/search a predefined unit or add it in Unit Master first."});
             var innerFactor=innerUnit is null?1m:Math.Max(1m,x.InnerConversionFactor);
             var packInnerFactor=Math.Max(1m,x.PackInnerFactor);
             var totalFactor=innerUnit is null

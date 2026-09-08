@@ -1,10 +1,18 @@
 (function(){
-  const S={mode:'retail',uoms:{},spec:null,items:[],suppliers:[],purLines:[],uomCart:[],jCart:[],oldCredit:0};
+  const S={mode:'retail',uoms:{},units:null,spec:null,items:[],suppliers:[],purLines:[],uomCart:[],jCart:[],oldCredit:0};
   window.S=S;
   const esc2=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money2=x=>Number(x||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
   async function spec(){try{S.spec=await api('/api/specialization');S.mode=S.spec.IsJewellery?'jewellery':'uom';document.body.dataset.storeType=(S.spec.StoreType||'').replace(/[^a-z0-9]+/gi,'-').toLowerCase();}catch{S.mode='uom'}return S.mode}
   async function loadUom(id,force=false){if(!force&&S.uoms[id])return S.uoms[id];S.uoms[id]=await api('/api/products/'+id+'/uom');return S.uoms[id]}
+  async function loadUnits(force=false){
+    if(!force&&Array.isArray(S.units))return S.units;
+    const rows=await api('/api/unit-master');
+    S.units=rows.map(x=>({Id:Number(x.Id??x.id),UnitName:String(x.UnitName??x.unitName??'').trim().toUpperCase(),UnitCode:String(x.UnitCode??x.unitCode??'').trim().toUpperCase(),Description:String(x.Description??x.description??''),UnitCategory:String(x.UnitCategory??x.unitCategory??'CUSTOM')}));
+    return S.units;
+  }
+  function unitDatalist(id='uomUnitList'){return `<datalist id="${id}">${(S.units||[]).map(x=>`<option value="${esc2(x.UnitName)}" label="${esc2((x.UnitCode!==x.UnitName?x.UnitCode+' · ':'')+(x.Description||x.UnitCategory))}"></option>`).join('')}</datalist>`}
+  function canonicalUnit(v,optional=false){const raw=String(v||'').trim().toUpperCase();if(!raw&&optional)return '';const x=(S.units||[]).find(u=>u.UnitName===raw||u.UnitCode===raw);return x?x.UnitName:null}
   function navTitle(t,sub){title.textContent=t;document.querySelector('header p').textContent=sub}
   function totalFactor(u){const inner=String(u.InnerUnit||'').trim();const innerFactor=Math.max(1,Number(u.InnerConversionFactor)||1);const packFactor=Math.max(1,Number(u.PackInnerFactor)||1);return inner?innerFactor*packFactor:Math.max(1,Number(u.ConversionFactor)||packFactor||1)}
   function baseRates(p,u){const tf=totalFactor(u);return {
@@ -51,6 +59,7 @@
   };
 
   window.openUomProduct=async function(id){
+    await loadUnits();
     let x={Name:'',Barcode:'',Sku:'',Category:'General',Unit:'PCS',Hsn:'',GstRate:0,Mrp:0,PurchasePrice:0,SalePrice:0,MinStock:5,MaxStock:0,LocationCode:'',RackName:'',TrackBatch:true,TrackExpiry:true};
     if(id)x=await api('/api/products/'+id);
     const u=id?await loadUom(id):{BaseUnit:'PCS',InnerUnit:'',PackUnit:'BOX',ConversionFactor:1,InnerConversionFactor:1,PackInnerFactor:1,PackPurchaseRate:0,PackMrp:0,PackSalePrice:0,InnerPurchaseRate:0,InnerMrp:0,InnerSalePrice:0,LooseSalePrice:x.SalePrice||0,AllowLoose:true};
@@ -65,12 +74,13 @@
       <label>Location Code<input id="uloc" class="input" value="${esc2(x.LocationCode||'')}"></label><label>Rack Name<input id="urack" class="input" value="${esc2(x.RackName||'')}"></label>
     </div>
     <div class="uom-card"><div class="uom-title">📦 MULTI-UNIT CONVERSION — BASE STOCK RULE</div>
-      <div class="uom-help">Stock is ALWAYS stored in Base Unit. For example: BOX → STRIP → TABLET. Inner Unit is optional.</div>
+      <div class="uom-help">Stock is ALWAYS stored in Base Unit. For example: BOX → STRIP → TABLET. Type to search or select from Unit Master; arbitrary duplicate unit text cannot be saved. <button type="button" class="btn small secondary" onclick="closeModal();loadUnitMaster()">Unit Master</button></div>
+      ${unitDatalist('uomUnitList')}
       <div class="formgrid">
-        <label>Base Unit (smallest)<input id="ubase" class="input" value="${esc2(u.BaseUnit||'PCS')}" placeholder="TABLET / PCS" oninput="refreshUomPreview(false)"></label>
-        <label>Inner Unit (optional)<input id="uinner" class="input" value="${esc2(inner)}" placeholder="STRIP" oninput="refreshUomPreview(true)"></label>
+        <label>Base Unit (smallest)<input id="ubase" class="input" list="uomUnitList" autocomplete="off" value="${esc2(u.BaseUnit||'PCS')}" placeholder="Search / select unit" oninput="refreshUomPreview(false)"></label>
+        <label>Inner Unit (optional)<input id="uinner" class="input" list="uomUnitList" autocomplete="off" value="${esc2(inner)}" placeholder="Search / select unit" oninput="refreshUomPreview(true)"></label>
         <label>1 Inner = Base Qty<input id="uinnerfactor" class="input" type="number" min="1" step="0.001" value="${innerFactor}" oninput="refreshUomPreview(true)"></label>
-        <label>Pack Unit<input id="upack" class="input" value="${esc2(u.PackUnit||'BOX')}" placeholder="BOX" oninput="refreshUomPreview(false)"></label>
+        <label>Pack Unit<input id="upack" class="input" list="uomUnitList" autocomplete="off" value="${esc2(u.PackUnit||'BOX')}" placeholder="Search / select unit" oninput="refreshUomPreview(false)"></label>
         <label>1 Pack = Inner/Base Qty<input id="upackfactor" class="input" type="number" min="1" step="0.001" value="${packFactor}" oninput="refreshUomPreview(true)"></label>
         <label>Total Conversion<input id="utotalfactor" class="input" value="${tf}" readonly></label>
       </div>
@@ -150,7 +160,12 @@
     try{
       const identity=await api('/api/products/identity-check?name='+encodeURIComponent((unm.value||'').trim())+'&barcode='+encodeURIComponent((ubc.value||'').trim())+'&excludeId='+(id||0));
       if(identity.duplicate){const c=identity.conflict||{};return alert('Duplicate '+(c.ConflictType==='NAME'?'Item Name':'Barcode')+': '+(c.Name||unm.value)+' already exists.')}
-      const base=(ubase.value||'PCS').trim().toUpperCase(),inner=(uinner.value||'').trim().toUpperCase(),pack=(upack.value||base).trim().toUpperCase();
+      await loadUnits();
+      const base=canonicalUnit(ubase.value),inner=canonicalUnit(uinner.value,true),pack=canonicalUnit(upack.value);
+      if(!base)return alert("Base Unit '"+(ubase.value||'')+"' Unit Master me nahi hai. Search/select karein ya Unit Master me add karein.");
+      if(inner===null)return alert("Inner Unit '"+(uinner.value||'')+"' Unit Master me nahi hai. Search/select karein ya Unit Master me add karein.");
+      if(!pack)return alert("Pack Unit '"+(upack.value||'')+"' Unit Master me nahi hai. Search/select karein ya Unit Master me add karein.");
+      ubase.value=base;uinner.value=inner;upack.value=pack;
       const inf=inner?Math.max(1,+uinnerfactor.value||1):1,pf=Math.max(1,+upackfactor.value||1),tf=inner?inf*pf:pf;
       const bp=Math.max(0,+ubp.value||0),bm=Math.max(0,+ubm.value||0),bs=Math.max(0,+ubs.value||0);
       const ip=Math.max(0,+uip.value||0),im=Math.max(0,+uim.value||0),isale=Math.max(0,+uis.value||0);
@@ -163,14 +178,17 @@
   };
 
   window.openProductBulkEdit=async function(){
+    await loadUnits();
     const rows=await api('/api/products?size=1000');
     S.bulkRows=rows.map(x=>({...x}));
-    modal('Bulk Edit Items — Duplicate Validation',`<div class="alert">Duplicate Item Name aur Duplicate Barcode allowed nahi hai. Save se pehle poora batch validate hoga.</div><div class="tablewrap" style="max-height:62vh"><table class="table"><thead><tr><th>ITEM NAME</th><th>BARCODE</th><th>SKU</th><th>CATEGORY</th><th>UNIT</th><th>GST%</th><th>MRP</th><th>PURCHASE</th><th>SALE</th><th>RACK</th></tr></thead><tbody>${S.bulkRows.map((x,i)=>`<tr><td><input class="input" value="${esc2(x.Name)}" onchange="bulkProductSet(${i},'Name',this.value)"></td><td><input class="input" value="${esc2(x.Barcode||'')}" onchange="bulkProductSet(${i},'Barcode',this.value)"></td><td><input class="input" value="${esc2(x.Sku||'')}" onchange="bulkProductSet(${i},'Sku',this.value)"></td><td><input class="input" value="${esc2(x.Category||'')}" onchange="bulkProductSet(${i},'Category',this.value)"></td><td><input class="input" value="${esc2(x.Unit||'PCS')}" onchange="bulkProductSet(${i},'Unit',this.value)"></td><td><input class="input" type="number" value="${x.GstRate||0}" onchange="bulkProductSet(${i},'GstRate',this.value)"></td><td><input class="input" type="number" value="${x.Mrp||0}" onchange="bulkProductSet(${i},'Mrp',this.value)"></td><td><input class="input" type="number" value="${x.PurchasePrice||0}" onchange="bulkProductSet(${i},'PurchasePrice',this.value)"></td><td><input class="input" type="number" value="${x.SalePrice||0}" onchange="bulkProductSet(${i},'SalePrice',this.value)"></td><td><input class="input" value="${esc2(x.RackName||x.LocationCode||'')}" onchange="bulkProductSet(${i},'RackName',this.value)"></td></tr>`).join('')}</tbody></table></div>`,`<button class="btn" onclick="saveProductBulkEdit()">Validate & Save All</button>`);
+    modal('Bulk Edit Items — Duplicate Validation',`<div class="alert">Duplicate Item Name aur Duplicate Barcode allowed nahi hai. Save se pehle poora batch validate hoga.</div><div class="tablewrap" style="max-height:62vh"><table class="table"><thead><tr><th>ITEM NAME</th><th>BARCODE</th><th>SKU</th><th>CATEGORY</th><th>UNIT</th><th>GST%</th><th>MRP</th><th>PURCHASE</th><th>SALE</th><th>RACK</th></tr></thead><tbody>${S.bulkRows.map((x,i)=>`<tr><td><input class="input" value="${esc2(x.Name)}" onchange="bulkProductSet(${i},'Name',this.value)"></td><td><input class="input" value="${esc2(x.Barcode||'')}" onchange="bulkProductSet(${i},'Barcode',this.value)"></td><td><input class="input" value="${esc2(x.Sku||'')}" onchange="bulkProductSet(${i},'Sku',this.value)"></td><td><input class="input" value="${esc2(x.Category||'')}" onchange="bulkProductSet(${i},'Category',this.value)"></td><td><input class="input" list="bulkUnitList" autocomplete="off" value="${esc2(x.Unit||'PCS')}" onchange="bulkProductSet(${i},'Unit',this.value)"></td><td><input class="input" type="number" value="${x.GstRate||0}" onchange="bulkProductSet(${i},'GstRate',this.value)"></td><td><input class="input" type="number" value="${x.Mrp||0}" onchange="bulkProductSet(${i},'Mrp',this.value)"></td><td><input class="input" type="number" value="${x.PurchasePrice||0}" onchange="bulkProductSet(${i},'PurchasePrice',this.value)"></td><td><input class="input" type="number" value="${x.SalePrice||0}" onchange="bulkProductSet(${i},'SalePrice',this.value)"></td><td><input class="input" value="${esc2(x.RackName||x.LocationCode||'')}" onchange="bulkProductSet(${i},'RackName',this.value)"></td></tr>`).join('')}</tbody></table></div>${unitDatalist('bulkUnitList')}`,`<button class="btn" onclick="saveProductBulkEdit()">Validate & Save All</button>`);
     const mb=document.querySelector('#modal .modalbox');if(mb){mb.style.width='96vw';mb.style.maxWidth='1500px'}
   };
   window.bulkProductSet=function(i,k,v){if(!S.bulkRows?.[i])return;S.bulkRows[i][k]=['GstRate','Mrp','PurchasePrice','SalePrice','MinStock','MaxStock'].includes(k)?Number(v||0):v};
   window.saveProductBulkEdit=async function(){
     try{
+      await loadUnits();
+      for(const x of (S.bulkRows||[])){const u=canonicalUnit(x.Unit);if(!u)return alert("Unit '"+(x.Unit||'')+"' Unit Master me nahi hai for item "+x.Name);x.Unit=u}
       const rows=(S.bulkRows||[]).map(x=>({Id:x.Id,Name:(x.Name||'').trim(),Barcode:(x.Barcode||'').trim()||null,Sku:(x.Sku||'').trim()||null,Category:x.Category||'General',Unit:x.Unit||'PCS',Hsn:x.Hsn||null,GstRate:+x.GstRate||0,Mrp:+x.Mrp||0,PurchasePrice:+x.PurchasePrice||0,SalePrice:+x.SalePrice||0,MinStock:+x.MinStock||0,MaxStock:+x.MaxStock||0,LocationCode:x.LocationCode||null,RackName:x.RackName||null,ShelfName:x.ShelfName||null}));
       const r=await api('/api/products/bulk-edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Rows:rows})});
       closeModal();toast('Bulk edit saved: '+r.updated+' items');loadProducts()

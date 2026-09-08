@@ -94,6 +94,17 @@ jobs:
           foreach($token in @('browseFolder','browseJson','backupStartup','FolderBrowserDialog','OpenFileDialog')){ if(-not $desktop.Contains($token)){ throw "Desktop backup bridge missing: $token" } }
           $special = Get-Content 'src/SuvidhaPOS-Premium/SpecializedModules.cs' -Raw -Encoding UTF8
           if($special.Contains('app.MapPost("/api/backup-master"')){ throw 'Legacy backup endpoint still mapped' }
+      - name: Validate searchable Unit Master and duplicate protection
+        shell: powershell
+        run: |
+          $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/specialized-schema.sql' -Raw -Encoding UTF8
+          foreach($token in @("OBJECT_ID('dbo.UnitMaster')",'UX_UnitMaster_Name','UX_UnitMaster_Code',"('TABLET','TAB'","('STRIP','STRIP'","('BOX','BOX'","('KG','KG'","('LITRE','LTR'")){ if(-not $schema.Contains($token)){ throw "Unit Master schema/seed missing: $token" } }
+          $backend = Get-Content 'src/SuvidhaPOS-Premium/UnitMasterModules.cs' -Raw -Encoding UTF8
+          foreach($token in @('/api/unit-master','Duplicate unit blocked','ResolveActiveNameAsync','UPDATE ProductUoms SET')){ if(-not $backend.Contains($token)){ throw "Unit Master backend missing: $token" } }
+          $special = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js' -Raw -Encoding UTF8
+          foreach($token in @("list=\"uomUnitList\"",'unitDatalist','canonicalUnit','Unit Master me nahi hai',"list=\"bulkUnitList\"")){ if(-not $special.Contains($token)){ throw "Searchable unit selector missing: $token" } }
+          $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/unit-master.js' -Raw -Encoding UTF8
+          foreach($token in @('loadUnitMaster','Add Unit','Edit Unit','Duplicate Unit Name / Unit Code')){ if(-not $ui.Contains($token)){ throw "Unit Master UI missing: $token" } }
       - name: Validate bidirectional UOM rate auto-calculation
         shell: powershell
         run: |

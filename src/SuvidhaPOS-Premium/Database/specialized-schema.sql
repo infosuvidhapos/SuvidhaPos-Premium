@@ -96,3 +96,84 @@ IF COL_LENGTH('dbo.Sales','ModifiedBy') IS NULL ALTER TABLE dbo.Sales ADD Modifi
 IF COL_LENGTH('dbo.Sales','ModificationCount') IS NULL ALTER TABLE dbo.Sales ADD ModificationCount int NOT NULL CONSTRAINT DF_Sales_ModificationCount DEFAULT 0;
 IF COL_LENGTH('dbo.Sales','LastModificationType') IS NULL ALTER TABLE dbo.Sales ADD LastModificationType nvarchar(30) NULL;
 GO
+
+-- Unit Master: canonical searchable units used by Item Master / UOM conversion.
+IF OBJECT_ID('dbo.UnitMaster') IS NULL CREATE TABLE dbo.UnitMaster(
+ Id int IDENTITY PRIMARY KEY,
+ UnitName nvarchar(40) NOT NULL,
+ UnitCode nvarchar(20) NOT NULL,
+ Description nvarchar(120) NULL,
+ UnitCategory nvarchar(30) NOT NULL CONSTRAINT DF_UnitMaster_Category DEFAULT 'COUNT',
+ SortOrder int NOT NULL CONSTRAINT DF_UnitMaster_Sort DEFAULT 100,
+ IsActive bit NOT NULL CONSTRAINT DF_UnitMaster_Active DEFAULT 1,
+ IsSystem bit NOT NULL CONSTRAINT DF_UnitMaster_System DEFAULT 0,
+ CreatedAt datetime2 NOT NULL CONSTRAINT DF_UnitMaster_Created DEFAULT SYSDATETIME(),
+ UpdatedAt datetime2 NOT NULL CONSTRAINT DF_UnitMaster_Updated DEFAULT SYSDATETIME()
+);
+GO
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='UX_UnitMaster_Name') CREATE UNIQUE INDEX UX_UnitMaster_Name ON dbo.UnitMaster(UnitName);
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='UX_UnitMaster_Code') CREATE UNIQUE INDEX UX_UnitMaster_Code ON dbo.UnitMaster(UnitCode);
+GO
+;WITH U(UnitName,UnitCode,Description,UnitCategory,SortOrder) AS (
+ SELECT * FROM (VALUES
+ ('PCS','PCS','Pieces / Each','COUNT',10),
+ ('NOS','NOS','Numbers','COUNT',11),
+ ('UNIT','UNT','Unit / Each','COUNT',12),
+ ('PAIR','PAIR','Pair','COUNT',13),
+ ('SET','SET','Set','COUNT',14),
+ ('DOZEN','DOZ','Dozen (12)','COUNT',15),
+ ('TABLET','TAB','Tablet','MEDICAL',20),
+ ('CAPSULE','CAP','Capsule','MEDICAL',21),
+ ('STRIP','STRIP','Medicine strip','MEDICAL',22),
+ ('BLISTER','BLS','Blister pack','MEDICAL',23),
+ ('VIAL','VIAL','Vial','MEDICAL',24),
+ ('AMPOULE','AMP','Ampoule','MEDICAL',25),
+ ('SACHET','SAC','Sachet','PACKAGING',30),
+ ('POUCH','PCH','Pouch','PACKAGING',31),
+ ('PACKET','PKT','Packet','PACKAGING',32),
+ ('PACK','PACK','Pack','PACKAGING',33),
+ ('BOX','BOX','Box','PACKAGING',34),
+ ('CARTON','CTN','Carton','PACKAGING',35),
+ ('CASE','CASE','Case','PACKAGING',36),
+ ('BOTTLE','BTL','Bottle','PACKAGING',37),
+ ('TUBE','TUBE','Tube','PACKAGING',38),
+ ('JAR','JAR','Jar','PACKAGING',39),
+ ('CAN','CAN','Can','PACKAGING',40),
+ ('BAG','BAG','Bag','PACKAGING',41),
+ ('BUNDLE','BDL','Bundle','PACKAGING',42),
+ ('TRAY','TRAY','Tray','PACKAGING',43),
+ ('ROLL','ROLL','Roll','PACKAGING',44),
+ ('SHEET','SHT','Sheet','PACKAGING',45),
+ ('DRUM','DRM','Drum','PACKAGING',46),
+ ('BUCKET','BKT','Bucket','PACKAGING',47),
+ ('KG','KG','Kilogram','WEIGHT',60),
+ ('GRAM','GM','Gram','WEIGHT',61),
+ ('MG','MG','Milligram','WEIGHT',62),
+ ('QUINTAL','QTL','Quintal','WEIGHT',63),
+ ('TON','TON','Metric Ton','WEIGHT',64),
+ ('LITRE','LTR','Litre','VOLUME',70),
+ ('ML','ML','Millilitre','VOLUME',71),
+ ('METER','MTR','Meter','LENGTH',80),
+ ('CM','CM','Centimetre','LENGTH',81),
+ ('MM','MM','Millimetre','LENGTH',82),
+ ('FOOT','FT','Foot','LENGTH',83),
+ ('INCH','IN','Inch','LENGTH',84)
+ )v(UnitName,UnitCode,Description,UnitCategory,SortOrder)
+)
+INSERT dbo.UnitMaster(UnitName,UnitCode,Description,UnitCategory,SortOrder,IsActive,IsSystem)
+SELECT u.UnitName,u.UnitCode,u.Description,u.UnitCategory,u.SortOrder,1,1 FROM U u
+WHERE NOT EXISTS(SELECT 1 FROM dbo.UnitMaster m WHERE UPPER(LTRIM(RTRIM(m.UnitName)))=u.UnitName OR UPPER(LTRIM(RTRIM(m.UnitCode)))=u.UnitCode);
+GO
+-- Preserve any pre-existing custom unit strings by importing them once.
+;WITH Legacy(UnitName) AS (
+ SELECT DISTINCT UPPER(LTRIM(RTRIM(Unit))) FROM dbo.Products WHERE NULLIF(LTRIM(RTRIM(Unit)),'') IS NOT NULL
+ UNION SELECT DISTINCT UPPER(LTRIM(RTRIM(BaseUnit))) FROM dbo.ProductUoms WHERE NULLIF(LTRIM(RTRIM(BaseUnit)),'') IS NOT NULL
+ UNION SELECT DISTINCT UPPER(LTRIM(RTRIM(InnerUnit))) FROM dbo.ProductUoms WHERE NULLIF(LTRIM(RTRIM(InnerUnit)),'') IS NOT NULL
+ UNION SELECT DISTINCT UPPER(LTRIM(RTRIM(PackUnit))) FROM dbo.ProductUoms WHERE NULLIF(LTRIM(RTRIM(PackUnit)),'') IS NOT NULL
+)
+INSERT dbo.UnitMaster(UnitName,UnitCode,Description,UnitCategory,SortOrder,IsActive,IsSystem)
+SELECT LEFT(l.UnitName,40),LEFT(l.UnitName,20),'Imported from existing item data','CUSTOM',900,1,0
+FROM Legacy l
+WHERE l.UnitName IS NOT NULL
+AND NOT EXISTS(SELECT 1 FROM dbo.UnitMaster m WHERE UPPER(LTRIM(RTRIM(m.UnitName)))=l.UnitName OR UPPER(LTRIM(RTRIM(m.UnitCode)))=LEFT(l.UnitName,20));
+GO
