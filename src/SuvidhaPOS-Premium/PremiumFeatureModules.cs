@@ -30,17 +30,19 @@ public static class PremiumFeatureModules
                 var soldUnit=(l.UnitSold??"").Trim();
                 var u=await db.QuerySingleAsync(@"SELECT TOP 1 BaseUnit,InnerUnit,PackUnit,ConversionFactor,InnerConversionFactor FROM ProductUoms WHERE ProductId=@p",P("@p",l.ProductId));
                 decimal factor=1m;
-                if(!string.IsNullOrWhiteSpace(soldUnit) && u.Count>0)
+                if(u.Count>0)
                 {
                     var baseUnit=u.GetValueOrDefault("BaseUnit")?.ToString()??"PCS";
                     var innerUnit=u.GetValueOrDefault("InnerUnit")?.ToString();
                     var packUnit=u.GetValueOrDefault("PackUnit")?.ToString();
+                    if(string.IsNullOrWhiteSpace(soldUnit)) soldUnit=baseUnit; // no UOM selected always means smallest/base unit
                     if(soldUnit.Equals(packUnit,StringComparison.OrdinalIgnoreCase)) factor=Math.Max(1m,Convert.ToDecimal(u.GetValueOrDefault("ConversionFactor")??1m));
                     else if(!string.IsNullOrWhiteSpace(innerUnit)&&soldUnit.Equals(innerUnit,StringComparison.OrdinalIgnoreCase)) factor=Math.Max(1m,Convert.ToDecimal(u.GetValueOrDefault("InnerConversionFactor")??1m));
                     else if(soldUnit.Equals(baseUnit,StringComparison.OrdinalIgnoreCase)) factor=1m;
+                    else return Results.BadRequest(new {message=$"Unit '{soldUnit}' is not configured for product {l.ProductId}"});
                 }
                 var soldQty=l.SoldQty>0?l.SoldQty:(l.BaseQty>0?l.BaseQty/factor:l.Qty/factor);
-                var baseQty=!string.IsNullOrWhiteSpace(soldUnit)?soldQty*factor:(l.BaseQty>0?l.BaseQty:l.Qty);
+                var baseQty=soldQty*factor;
                 var soldRate=l.RatePerSoldUnit>0?l.RatePerSoldUnit:l.SalePrice*factor;
                 var baseRate=factor>0?soldRate/factor:l.SalePrice;
                 if(baseQty<=0) return Results.BadRequest(new { message="Quantity must be greater than zero" });

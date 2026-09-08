@@ -1,9 +1,9 @@
 (function(){
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=x=>Number(x||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-  let selectedProduct=-1,selectedRow=-1,suggestIndex=0,paymentMode='Cash',paymentSubtype='Cash',multiPayments=[],uomCache={},selectedUom=null;
+  let selectedProduct=-1,selectedRow=-1,suggestIndex=0,paymentMode='Cash',paymentSubtype='Cash',multiPayments=[],uomCache={},selectedUom=null,cashEnterArmedAt=0,completing=false;
   const oldLoadBilling=window.loadBilling;
-  async function loadCbUom(id){if(uomCache[id])return uomCache[id];try{uomCache[id]=await api('/api/products/'+id+'/uom')}catch{uomCache[id]={BaseUnit:'PCS',PackUnit:'PCS',ConversionFactor:1,LooseSalePrice:0,AllowLoose:true}}return uomCache[id]}
+  async function loadCbUom(id,p){if(uomCache[id])return uomCache[id];try{uomCache[id]=await api('/api/products/'+id+'/uom')}catch{const base=String(p?.Unit||'PCS').trim().toUpperCase()||'PCS';uomCache[id]={BaseUnit:base,PackUnit:base,ConversionFactor:1,LooseSalePrice:Number(p?.SalePrice||0),AllowLoose:true}}return uomCache[id]}
   function cbTotalFactor(u){const inner=String(u.InnerUnit||'').trim(),inf=Math.max(1,Number(u.InnerConversionFactor)||1),pf=Math.max(1,Number(u.PackInnerFactor)||1);return inner?inf*pf:Math.max(1,Number(u.ConversionFactor)||pf||1)}
   function cbUnitChoices(p,u){const tf=cbTotalFactor(u),base=String(u.BaseUnit||p.Unit||'PCS').toUpperCase(),baseSale=Number(u.LooseSalePrice||0)||Number(p.SalePrice||0)||((Number(u.PackSalePrice)||0)/tf),baseMrp=(Number(u.PackMrp||0)>0?Number(u.PackMrp)/tf:Number(p.Mrp||0));const a=[{unit:base,factor:1,rate:baseSale,mrp:baseMrp,level:'BASE'}];const inner=String(u.InnerUnit||'').trim().toUpperCase(),inf=Math.max(1,Number(u.InnerConversionFactor)||1);if(inner&&inner!==base&&inf>1)a.push({unit:inner,factor:inf,rate:Number(u.InnerSalePrice||0)||baseSale*inf,mrp:Number(u.InnerMrp||0)||baseMrp*inf,level:'INNER'});const pack=String(u.PackUnit||'').trim().toUpperCase();if(pack&&pack!==base&&!a.some(x=>x.unit===pack)&&tf>1)a.push({unit:pack,factor:tf,rate:Number(u.PackSalePrice||0)||baseSale*tf,mrp:Number(u.PackMrp||0)||baseMrp*tf,level:'PACK'});return a}
   function cbStockText(stock,u){let q=Math.max(0,Number(stock)||0),parts=[],tf=cbTotalFactor(u),base=String(u.BaseUnit||'PCS').toUpperCase(),pack=String(u.PackUnit||'').toUpperCase(),inner=String(u.InnerUnit||'').toUpperCase(),inf=Math.max(1,Number(u.InnerConversionFactor)||1);if(pack&&pack!==base&&tf>1){const n=Math.floor(q/tf);if(n){parts.push(n+' '+pack);q-=n*tf}}if(inner&&inner!==base&&inf>1){const n=Math.floor(q/inf);if(n){parts.push(n+' '+inner);q-=n*inf}}if(q>0||!parts.length)parts.push(Number(q.toFixed(3))+' '+base);return parts.join(', ')}
@@ -34,15 +34,15 @@
 
   async function renderCounterBilling(){
     setPage('billing');title.textContent='New Billing';document.querySelector('header p').textContent='Keyboard-first counter billing';
-    state.products=await api('/api/products?size=500');state.cart=[];selectedProduct=-1;selectedRow=-1;suggestIndex=0;paymentMode='Cash';paymentSubtype='Cash';multiPayments=[];
+    state.products=await api('/api/products?size=500');state.cart=[];selectedProduct=-1;selectedRow=-1;suggestIndex=0;paymentMode='Cash';paymentSubtype='Cash';multiPayments=[];cashEnterArmedAt=0;completing=false;
     app.innerHTML=`<div class="counter-billing">
       <div class="cb-head"><div>🧾 New Invoice (Sale)</div><div class="cb-billno">Bill No : <b id="cbBillNo">New</b></div><div class="cb-type">Counter Sale · Keyboard Ready</div></div>
-      <div class="cb-shortcuts"><span>F1 Discount</span><span>F2 Unit</span><span>F3 Customer</span><span>F4 Reset</span><span>F6 Cash</span><span>F7 Credit/UPI</span><span>F8 BTC</span><span>F9 Multi Mode</span><span>F10 Save/Print</span><span>Esc Back</span></div>
+      <div class="cb-shortcuts"><span>↑↓ Select Item</span><span>Enter Next Field</span><span>Enter×2 Cash Print</span><span>F1 Discount</span><span>F2 Unit</span><span>F3 Customer</span><span>F4 Reset</span><span>F6 Cash</span><span>F7 Credit/UPI</span><span>F8 BTC</span><span>F9 Multi Mode</span><span>F10 Save/Print</span><span>Esc Back</span></div>
       <div class="cb-inputbar">
-        <label class="cb-field">Barcode / Item Name<input id="cbSearch" autocomplete="off" placeholder="Scan barcode or type item"></label>
-        <label class="cb-field">Item Name<input id="cbItemName" readonly placeholder="Select item"></label>
+        <label class="cb-field">Barcode / Item Name<input id="cbSearch" autocomplete="off" placeholder="Type item, use ↑↓, Enter" autofocus></label>
+        <label class="cb-field">Item Name<input id="cbItemName" readonly tabindex="-1" placeholder="Select item"></label>
         <div class="cb-available">Avl Qty <b id="cbAvl">0.000</b></div>
-        <label class="cb-field">UOM<select id="cbUom"><option>PCS</option></select></label>
+        <label class="cb-field">UOM<select id="cbUom"><option value="">—</option></select></label>
         <label class="cb-field">Quantity<input id="cbQty" type="number" min="0.001" step="0.001" value="1"></label>
         <label class="cb-field">Sale Price<input id="cbRate" type="number" step="0.01" value="0"></label>
         <label class="cb-field">MRP<input id="cbMrp" type="number" step="0.01" value="0"></label>
@@ -65,19 +65,36 @@
       <div class="cb-actions"><button class="discount" onclick="cbDiscount()">Discount (F1)</button><button class="hold" onclick="document.querySelector('#cbMobile').focus()">Customer (F3)</button><button class="clear" onclick="cbReset()">Reset (F4)</button><button class="print" onclick="cbComplete()">✓ Save & Print (F10)</button><button class="back" onclick="loadDashboard()">Back (Esc)</button></div>
     </div>`;
     ensureHidden();
-    const search=document.querySelector('#cbSearch'),qty=document.querySelector('#cbQty'),rate=document.querySelector('#cbRate');
-    document.querySelector('#cbUom').addEventListener('change',cbUomChanged);
-    document.querySelector('#cbUom').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.querySelector('#cbQty').focus();document.querySelector('#cbQty').select()}});
-    search.addEventListener('input',cbSearch);
+    const search=document.querySelector('#cbSearch'),qty=document.querySelector('#cbQty'),rate=document.querySelector('#cbRate'),mrp=document.querySelector('#cbMrp'),uom=document.querySelector('#cbUom');
+    uom.addEventListener('change',()=>{cashEnterArmedAt=0;cbUomChanged()});
+    uom.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();qty.focus();qty.select()}});
+    search.addEventListener('input',()=>{cashEnterArmedAt=0;cbSearch()});
     search.addEventListener('keydown',async e=>{
-      const list=getSuggestions();
-      if(e.key==='ArrowDown'){e.preventDefault();suggestIndex=Math.min(Math.max(0,list.length-1),suggestIndex+1);renderSuggestions(list);return}
-      if(e.key==='ArrowUp'){e.preventDefault();suggestIndex=Math.max(0,suggestIndex-1);renderSuggestions(list);return}
-      if(e.key==='Enter'){e.preventDefault();const exact=list.find(x=>(x.Barcode||'').toLowerCase()===search.value.trim().toLowerCase());const p=exact||list[suggestIndex]||list[0];if(p){await cbPick(p.Id);if(exact)cbAddSelected();else document.querySelector('#cbUom')?.focus();}return}
-      if(e.key==='Escape'){cbHideSuggest()}
+      const q=search.value.trim(),list=getSuggestions();
+      if(e.key==='ArrowDown'){e.preventDefault();cashEnterArmedAt=0;if(list.length){suggestIndex=Math.min(list.length-1,suggestIndex+1);renderSuggestions(list)}return}
+      if(e.key==='ArrowUp'){e.preventDefault();cashEnterArmedAt=0;if(list.length){suggestIndex=Math.max(0,suggestIndex-1);renderSuggestions(list)}return}
+      if(e.key==='Enter'){
+        e.preventDefault();
+        if(!q){
+          if(!state.cart.length)return toast('Search and add an item first');
+          const now=Date.now();
+          if(now-cashEnterArmedAt<=1200){
+            cashEnterArmedAt=0;cbPaySelect('Cash');await cbComplete();return;
+          }
+          cashEnterArmedAt=now;cbPaySelect('Cash');toast('Cash ready — press Enter again to Save & Print');return;
+        }
+        cashEnterArmedAt=0;
+        const exact=list.find(x=>(x.Barcode||'').toLowerCase()===q.toLowerCase());
+        const p=exact||list[suggestIndex]||list[0];
+        if(p)await cbPick(p.Id);else toast('No matching item');
+        return
+      }
+      if(e.key==='Escape'){cashEnterArmedAt=0;cbHideSuggest()}
     });
     qty.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();rate.focus();rate.select()}});
-    rate.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();cbAddSelected()}});
+    rate.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();mrp.focus();mrp.select()}});
+    mrp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();cbAddSelected()}});
+    document.removeEventListener('keydown',cbKeys);
     document.addEventListener('keydown',cbKeys);
     cbRender();search.focus();
     const sales=await api('/api/sales?from=1900-01-01&to=2999-12-31').catch(()=>[]);
@@ -86,23 +103,27 @@
 
   function getSuggestions(){
     const q=(document.querySelector('#cbSearch')?.value||'').trim().toLowerCase();
-    return state.products.filter(x=>!q||(x.Name+' '+(x.Barcode||'')+' '+(x.Sku||'')+' '+(x.LocationCode||'')).toLowerCase().includes(q)).slice(0,12);
+    if(!q)return [];
+    const score=x=>{const name=String(x.Name||'').toLowerCase(),bc=String(x.Barcode||'').toLowerCase(),sku=String(x.Sku||'').toLowerCase();if(name.startsWith(q))return 0;if(bc.startsWith(q))return 1;if(sku.startsWith(q))return 2;return 3};
+    return state.products.filter(x=>(x.Name+' '+(x.Barcode||'')+' '+(x.Sku||'')+' '+(x.LocationCode||'')+' '+(x.RackName||'')).toLowerCase().includes(q)).sort((a,b)=>score(a)-score(b)||String(a.Name||'').localeCompare(String(b.Name||'')));
   }
   function renderSuggestions(list){
     const box=document.querySelector('#cbSuggest');if(!box)return;
-    box.innerHTML=list.map((x,i)=>`<div class="cb-suggestion ${i===suggestIndex?'active':''}" onclick="cbPick(${x.Id})"><div><b>${esc(x.Name)}</b><small>${esc(x.Barcode||x.Sku||'')} · Stock ${money(x.Stock)} · Rack ${esc(x.LocationCode||x.RackName||'-')} · ₹${money(x.SalePrice)}</small></div><span>Enter</span></div>`).join('');
+    if(suggestIndex>=list.length)suggestIndex=Math.max(0,list.length-1);
+    box.innerHTML=list.map((x,i)=>`<div class="cb-suggestion ${i===suggestIndex?'active':''}" onclick="cbPick(${x.Id})"><div><b>${esc(x.Name)}</b><small>${esc(x.Barcode||x.Sku||'')} · ${esc(x.Unit||'')} · Stock ${money(x.Stock)} · Rack ${esc(x.LocationCode||x.RackName||'-')} · ₹${money(x.SalePrice)}</small></div><span>Enter</span></div>`).join('');
     box.style.display=list.length?'block':'none';
+    box.querySelector('.cb-suggestion.active')?.scrollIntoView({block:'nearest'});
   }
   function cbSearch(){suggestIndex=0;renderSuggestions(getSuggestions())}
   async function cbPick(id){
     const p=state.products.find(x=>x.Id===id);if(!p)return;
-    const u=await loadCbUom(id),options=cbUnitChoices(p,u);
-    selectedProduct=id;selectedUom={product:p,uom:u,options};
+    const u=await loadCbUom(id,p),options=cbUnitChoices(p,u);
+    selectedProduct=id;selectedUom={product:p,uom:u,options};cashEnterArmedAt=0;
     document.querySelector('#cbSearch').value=p.Barcode||p.Name;
     document.querySelector('#cbItemName').value=p.Name;
-    document.querySelector('#cbUom').innerHTML=options.map(o=>`<option value="${esc(o.unit)}">${esc(o.unit)} ×${o.factor}</option>`).join('');
-    const preferred=options.slice().sort((a,b)=>b.factor-a.factor)[0];document.querySelector('#cbUom').value=preferred.unit;
-    applyCbChoice(preferred);cbHideSuggest();document.querySelector('#cbQty').focus();document.querySelector('#cbQty').select()
+    document.querySelector('#cbUom').innerHTML=options.map(o=>`<option value="${esc(o.unit)}">${esc(o.unit)} ×${o.factor}${o.level==='BASE'?' · BASE':''}</option>`).join('');
+    const baseChoice=options.find(x=>x.level==='BASE')||options[0];document.querySelector('#cbUom').value=baseChoice.unit;
+    applyCbChoice(baseChoice);cbHideSuggest();document.querySelector('#cbUom').focus()
   }
   window.cbPick=cbPick;
 
@@ -117,13 +138,13 @@
     if(c)c.Qty+=qty;
     else state.cart.push({Id:p.Id,Name:p.Name,Barcode:p.Barcode||p.Sku||p.Id,Qty:qty,Rate:rate,Gst:Number(p.GstRate||0),Mrp:mrp,Uom:choice.unit,BaseUnit:selectedUom.uom.BaseUnit||p.Unit||'PCS',Factor:factor,Stock:Number(p.Stock||0)});
     selectedRow=state.cart.findIndex(x=>x.Id===p.Id&&x.Uom===choice.unit);
-    selectedProduct=-1;selectedUom=null;document.querySelector('#cbQty').value=1;document.querySelector('#cbSearch').value='';document.querySelector('#cbItemName').value='';document.querySelector('#cbAvl').textContent='0.000';document.querySelector('#cbUom').innerHTML='<option>PCS</option>';cbRender();document.querySelector('#cbSearch').focus()
+    selectedProduct=-1;selectedUom=null;cashEnterArmedAt=0;document.querySelector('#cbQty').value=1;document.querySelector('#cbSearch').value='';document.querySelector('#cbItemName').value='';document.querySelector('#cbAvl').textContent='0.000';document.querySelector('#cbUom').innerHTML='<option value="">—</option>';document.querySelector('#cbRate').value='0';document.querySelector('#cbMrp').value='0';cbRender();document.querySelector('#cbSearch').focus()
   };
   window.cbRemoveSelected=function(){if(selectedRow>=0&&state.cart[selectedRow])state.cart.splice(selectedRow,1);else if(state.cart.length)state.cart.pop();selectedRow=Math.min(selectedRow,state.cart.length-1);cbRender()};
   window.cbSelectRow=function(i){selectedRow=i;cbRender()};
   window.cbQty=function(i,v){const c=state.cart[i];if(!c)return;const n=Math.max(.001,Number(v)||.001),used=cbBaseUsed(c.Id,i);if(used+n*c.Factor>c.Stock)return toast('Stock limit reached');c.Qty=n;cbRender()};
   window.cbEdit=async function(i){
-    selectedRow=i;const c=state.cart[i];if(!c)return;const p=state.products.find(x=>x.Id===c.Id),u=await loadCbUom(c.Id),options=cbUnitChoices(p,u);selectedProduct=c.Id;selectedUom={product:p,uom:u,options};
+    selectedRow=i;const c=state.cart[i];if(!c)return;const p=state.products.find(x=>x.Id===c.Id),u=await loadCbUom(c.Id,p),options=cbUnitChoices(p,u);selectedProduct=c.Id;selectedUom={product:p,uom:u,options};
     document.querySelector('#cbItemName').value=c.Name;document.querySelector('#cbSearch').value=c.Barcode||c.Name;document.querySelector('#cbUom').innerHTML=options.map(o=>`<option value="${esc(o.unit)}">${esc(o.unit)} ×${o.factor}</option>`).join('');document.querySelector('#cbUom').value=c.Uom;document.querySelector('#cbRate').value=c.Rate;document.querySelector('#cbMrp').value=c.Mrp;document.querySelector('#cbQty').value=c.Qty;applyCbChoice(options.find(o=>o.unit===c.Uom)||options[0]);document.querySelector('#cbRate').value=c.Rate;document.querySelector('#cbMrp').value=c.Mrp;document.querySelector('#cbRate').focus();document.querySelector('#cbRate').select();cbRender()
   };
 
@@ -145,8 +166,8 @@
   window.cbMultiRender=function(){const due=totals().total,sum=multiPayments.reduce((a,x)=>a+x.Amount,0);const rows=document.querySelector('#mpRows');if(rows)rows.innerHTML=multiPayments.map(x=>`<tr><td>${esc(x.Type)}</td><td>₹${money(x.Amount)}</td><td>${esc(x.ReferenceNo||'')}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">No allocation</td></tr>';if(document.querySelector('#mpAllocated'))document.querySelector('#mpAllocated').textContent='₹'+money(sum);if(document.querySelector('#mpBalance'))document.querySelector('#mpBalance').textContent='₹'+money(due-sum)};
   window.cbApplyMulti=function(){const due=totals().total,sum=multiPayments.reduce((a,x)=>a+x.Amount,0);if(Math.abs(due-sum)>.01)return toast('Allocate full payable amount first');paymentMode='Multi Mode';paymentSubtype='Multi Mode';closeModal();document.querySelectorAll('.cb-pay button').forEach(b=>b.classList.toggle('selected',b.dataset.mode==='Multi Mode'));cbRender();document.querySelector('#cbSearch')?.focus()};
 
-  window.cbReset=function(){state.cart=[];selectedProduct=-1;selectedRow=-1;selectedUom=null;paymentMode='Cash';paymentSubtype='Cash';multiPayments=[];ensureHidden();document.querySelector('#cbDiscountType').value='RUPEES';document.querySelector('#cbDiscountValue').value='0';cbRender();document.querySelector('#cbSearch')?.focus()};
-  window.cbComplete=async function(){if(!state.cart.length)return toast('Add item first');const d=discountInfo(),t=totals();if(paymentMode==='Multi Mode'&&Math.abs(multiPayments.reduce((a,x)=>a+x.Amount,0)-t.total)>.01)return cbOpenMulti();if(paymentMode==='Credit/UPI'&&!multiPayments.length)multiPayments=[{Mode:'Credit/UPI',Type:paymentSubtype||'UPI',Amount:t.total,ReferenceNo:null}];if(paymentMode==='Cash')multiPayments=[{Mode:'Cash',Type:'Cash',Amount:t.total,ReferenceNo:null}];if(paymentMode==='BTC')multiPayments=[{Mode:'BTC',Type:'BTC',Amount:t.total,ReferenceNo:null}];try{const customer=document.querySelector('#cbCustomer').value||'Walk-in Customer';const paid=multiPayments.filter(x=>x.Type!=='Credit').reduce((a,x)=>a+x.Amount,0);const data=await api('/api/premium/sales',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CustomerId:null,CustomerName:customer,PaymentMode:paymentMode,PaidAmount:paid,DiscountType:d.type,DiscountValue:d.value,Notes:document.querySelector('#cbRemarks').value||null,Payments:multiPayments,Lines:state.cart.map(x=>({ProductId:x.Id,Qty:x.Qty*x.Factor,SalePrice:x.Rate/x.Factor,TaxRate:x.Gst,Discount:0,UnitSold:x.Uom,SoldQty:x.Qty,BaseQty:x.Qty*x.Factor,RatePerSoldUnit:x.Rate}))})});toast('Bill completed: '+data.invoiceNo);if(typeof printLastBill==='function')printLastBill(data.id);setTimeout(renderCounterBilling,650)}catch(e){alert(e.message)}};
+  window.cbReset=function(){state.cart=[];selectedProduct=-1;selectedRow=-1;selectedUom=null;cashEnterArmedAt=0;completing=false;paymentMode='Cash';paymentSubtype='Cash';multiPayments=[];ensureHidden();document.querySelector('#cbDiscountType').value='RUPEES';document.querySelector('#cbDiscountValue').value='0';cbRender();document.querySelector('#cbSearch')?.focus()};
+  window.cbComplete=async function(){if(completing)return;if(!state.cart.length)return toast('Add item first');const d=discountInfo(),t=totals();if(paymentMode==='Multi Mode'&&Math.abs(multiPayments.reduce((a,x)=>a+x.Amount,0)-t.total)>.01)return cbOpenMulti();if(paymentMode==='Credit/UPI'&&!multiPayments.length)multiPayments=[{Mode:'Credit/UPI',Type:paymentSubtype||'UPI',Amount:t.total,ReferenceNo:null}];if(paymentMode==='Cash')multiPayments=[{Mode:'Cash',Type:'Cash',Amount:t.total,ReferenceNo:null}];if(paymentMode==='BTC')multiPayments=[{Mode:'BTC',Type:'BTC',Amount:t.total,ReferenceNo:null}];completing=true;try{const customer=document.querySelector('#cbCustomer').value||'Walk-in Customer';const paid=multiPayments.filter(x=>x.Type!=='Credit').reduce((a,x)=>a+x.Amount,0);const data=await api('/api/premium/sales',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CustomerId:null,CustomerName:customer,PaymentMode:paymentMode,PaidAmount:paid,DiscountType:d.type,DiscountValue:d.value,Notes:document.querySelector('#cbRemarks').value||null,Payments:multiPayments,Lines:state.cart.map(x=>({ProductId:x.Id,Qty:x.Qty*x.Factor,SalePrice:x.Rate/x.Factor,TaxRate:x.Gst,Discount:0,UnitSold:x.Uom,SoldQty:x.Qty,BaseQty:x.Qty*x.Factor,RatePerSoldUnit:x.Rate}))})});toast('Bill completed: '+data.invoiceNo);if(typeof printLastBill==='function')printLastBill(data.id);setTimeout(renderCounterBilling,650)}catch(e){completing=false;alert(e.message)}};
 
   function cbKeys(e){if(state.page!=='billing'||!document.querySelector('.counter-billing'))return;const tag=(document.activeElement?.tagName||'').toLowerCase();if(e.key==='F1'){e.preventDefault();cbDiscount();return}if(e.key==='F2'){e.preventDefault();cbCycleUom();return}if(e.key==='F3'){e.preventDefault();document.querySelector('#cbMobile')?.focus();return}if(e.key==='F4'){e.preventDefault();cbReset();return}if(e.key==='F6'){e.preventDefault();cbPaySelect('Cash');return}if(e.key==='F7'){e.preventDefault();cbOpenCreditUpi();return}if(e.key==='F8'){e.preventDefault();cbPaySelect('BTC');return}if(e.key==='F9'){e.preventDefault();cbOpenMulti();return}if(e.key==='F10'){e.preventDefault();cbComplete();return}if(e.key==='Escape'){e.preventDefault();loadDashboard();return}if(tag==='input'||tag==='select'||tag==='textarea')return;if(e.key==='Delete'){e.preventDefault();cbRemoveSelected();return}if((e.key==='+'||e.key==='=')&&selectedRow>=0&&state.cart[selectedRow]){e.preventDefault();const c=state.cart[selectedRow];if(cbBaseUsed(c.Id,selectedRow)+(c.Qty+1)*c.Factor<=c.Stock)c.Qty++;else toast('Stock limit reached');cbRender();return}if(e.key==='-'&&selectedRow>=0&&state.cart[selectedRow]){e.preventDefault();state.cart[selectedRow].Qty=Math.max(.001,state.cart[selectedRow].Qty-1);cbRender()}}
   function cbHideSuggest(){const b=document.querySelector('#cbSuggest');if(b)b.style.display='none'}

@@ -83,6 +83,15 @@ jobs:
           if(-not $special.Contains('Inner Unit (optional)')){ throw 'Three-level UOM item master missing' }
           if(-not $special.Contains('UnitPurchased:x.Unit')){ throw 'Purchase UOM audit missing' }
           if(-not $special.Contains('Batch No is mandatory for Pharmacy / Medical Store')){ throw 'Pharmacy batch validation missing' }
+      - name: Validate keyboard-first base-unit billing flow
+        shell: powershell
+        run: |
+          $counter = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/counter-billing.js' -Raw -Encoding UTF8
+          foreach($token in @("options.find(x=>x.level==='BASE')",'Cash ready — press Enter again to Save & Print','now-cashEnterArmedAt<=1200',"mrp.addEventListener('keydown'","document.removeEventListener('keydown',cbKeys)",'scrollIntoView',"loadCbUom(id,p)")){ if(-not $counter.Contains($token)){ throw "Keyboard billing feature missing: $token" } }
+          if($counter.Contains("const preferred=options.slice().sort((a,b)=>b.factor-a.factor)[0]")){ throw 'Billing still defaults to largest UOM instead of BaseUnit' }
+          if($counter.Contains("document.querySelector('#cbUom').innerHTML='<option>PCS</option>'")){ throw 'Billing still falls back visually to static PCS' }
+          $premium = Get-Content 'src/SuvidhaPOS-Premium/PremiumFeatureModules.cs' -Raw -Encoding UTF8
+          foreach($token in @('no UOM selected always means smallest/base unit',"soldUnit=baseUnit","Unit '{soldUnit}' is not configured")){ if(-not $premium.Contains($token)){ throw "Server-side base UOM fallback missing: $token" } }
       - name: Validate resilient SQL Backup Master
         shell: powershell
         run: |
