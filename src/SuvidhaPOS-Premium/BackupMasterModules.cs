@@ -6,6 +6,8 @@ using Google.Apis.Util.Store;
 using Microsoft.Data.SqlClient;
 using SuvidhaPOS.Premium.Data;
 using System.IO.Compression;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Text;
 
 namespace SuvidhaPOS.Premium;
@@ -100,7 +102,7 @@ public static class BackupMasterModules
 
     static async Task<BackupRunResult> Execute(Db db,BackupRunRequest x,bool scheduled)
     {
-        var warnings=new List<string>();var files=new List<string>();var externalFiles=new List<string>();var googleFiles=new List<string>();
+        var warnings=new List<string>();var files=new List<string>();var externalFiles=new List<string>();var googleFiles=new List<string>();var cleanupDeleted=0;var cleanupFailures=0;
         var dbs=(x.Databases??"SuvidhaPOS").Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if(dbs.Count==0)dbs.Add("SuvidhaPOS");
         var labels=(x.Labels??"").Split(',',StringSplitOptions.TrimEntries).ToList();
@@ -146,9 +148,17 @@ public static class BackupMasterModules
                     catch(Exception ex){warnings.Add("Google Drive upload skipped: "+FriendlyGoogleError(ex));}
                 }
 
-                if(x.AutoCleanup&&x.RetentionDays>0){
-                    Cleanup(folder,safe,x.RetentionDays);
-                    if(x.ExternalEnabled&&!string.IsNullOrWhiteSpace(x.ExternalFolder)&&DrivePathReady(x.ExternalFolder.Trim()))Cleanup(x.ExternalFolder.Trim(),safe,x.RetentionDays);
+                if(x.AutoCleanup&&x.RetentionDays>=0){
+                    var aliases=new[]{safe,SafeName(dbName)}.Where(a=>!string.IsNullOrWhiteSpace(a)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                    var localCleanup=CleanupManagedBackups(folder,output,x.RetentionDays,aliases);
+                    cleanupDeleted+=localCleanup.Deleted;cleanupFailures+=localCleanup.Failures.Count;
+                    foreach(var err in localCleanup.Failures)warnings.Add("Auto Cleanup: "+err);
+                    if(x.ExternalEnabled&&!string.IsNullOrWhiteSpace(x.ExternalFolder)&&DrivePathReady(x.ExternalFolder.Trim())){
+                        var externalCurrent=externalFiles.LastOrDefault(f=>Path.GetFileName(f).Equals(Path.GetFileName(output),StringComparison.OrdinalIgnoreCase));
+                        var extCleanup=CleanupManagedBackups(x.ExternalFolder.Trim(),externalCurrent,x.RetentionDays,aliases);
+                        cleanupDeleted+=extCleanup.Deleted;cleanupFailures+=extCleanup.Failures.Count;
+                        foreach(var err in extCleanup.Failures)warnings.Add("External Auto Cleanup: "+err);
+                    }
                 }
 
                 // If Local Backup is disabled, the file was only a staging artifact after optional copies.
@@ -169,7 +179,8 @@ public static class BackupMasterModules
             var schedule=string.IsNullOrWhiteSpace(x.Schedule)?"Manual":x.Schedule;
             if(!schedule.Equals("Manual",StringComparison.OrdinalIgnoreCase))await SaveSetting(db,"Backup.NextRun",NextRun(schedule,now).ToString("O"));
         }else await SaveSetting(db,"Backup.LastResult","Failed");
-        return new BackupRunResult(success,success?(warnings.Count==0?"Backup completed successfully":"Backup completed with warnings"):"Backup failed",files,externalFiles,googleFiles,warnings,now);
+        var cleanupText=x.AutoCleanup?(cleanupFailures>0?$" · Auto Cleanup deleted {cleanupDeleted}, {cleanupFailures} failed":$" · Auto Cleanup deleted {cleanupDeleted} old backup(s)"):"";
+        return new BackupRunResult(success,success?(warnings.Count==0?"Backup completed successfully"+cleanupText:"Backup completed with warnings"+cleanupText):"Backup failed",files,externalFiles,googleFiles,warnings,now,cleanupDeleted,cleanupFailures);
     }
 
     static async Task<string> CreateSqlBackup(Db db,string dbName,string primaryBak,List<string> warnings)
@@ -250,10 +261,59 @@ public static class BackupMasterModules
         try{var d=new DriveInfo("D:\\");if(d.IsReady)return @"D:\SuvidhaBackup";}catch{}
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"SuvidhaBackup");
     }
-    static void Cleanup(string folder,string prefix,int days)
+    static CleanupResult CleanupManagedBackups(string folder,string? currentFile,int days,IReadOnlyCollection<string> aliases)
     {
-        try{if(!Directory.Exists(folder))return;var cutoff=DateTime.Now.AddDays(-days);foreach(var f in Directory.EnumerateFiles(folder,$"{prefix}_*.*").Where(f=>f.EndsWith(".bak",StringComparison.OrdinalIgnoreCase)||f.EndsWith(".zip",StringComparison.OrdinalIgnoreCase)))try{if(File.GetLastWriteTime(f)<cutoff)File.Delete(f);}catch{}}catch{}
+        var deleted=0;var failures=new List<string>();
+        try
+        {
+            if(!Directory.Exists(folder))return new CleanupResult(0,failures);
+            var keep=string.IsNullOrWhiteSpace(currentFile)?null:Path.GetFullPath(currentFile);
+            var cutoff=DateTime.Now.AddDays(-Math.Max(0,days));
+            var files=Directory.EnumerateFiles(folder)
+                .Where(f=>f.EndsWith(".bak",StringComparison.OrdinalIgnoreCase)||f.EndsWith(".zip",StringComparison.OrdinalIgnoreCase))
+                .Select(f=>new{Path=f,Name=Path.GetFileNameWithoutExtension(f)})
+                .Where(x=>aliases.Any(a=>x.Name.StartsWith(a+"_",StringComparison.OrdinalIgnoreCase)))
+                .Select(x=>new{ x.Path, Stamp=BackupStamp(x.Name), LastWrite=SafeLastWrite(x.Path)})
+                .OrderByDescending(x=>x.Stamp??x.LastWrite).ToList();
+
+            // Always preserve the newly verified backup. If caller has no exact current path,
+            // preserve newest managed backup in that folder.
+            var preserve=keep??files.FirstOrDefault()?.Path;
+            foreach(var f in files)
+            {
+                if(!string.IsNullOrWhiteSpace(preserve)&&Path.GetFullPath(f.Path).Equals(Path.GetFullPath(preserve),StringComparison.OrdinalIgnoreCase))continue;
+                var when=f.Stamp??f.LastWrite;
+                var shouldDelete=days==0 || when<cutoff;
+                if(!shouldDelete)continue;
+                try
+                {
+                    File.SetAttributes(f.Path,FileAttributes.Normal);
+                    File.Delete(f.Path);
+                    deleted++;
+                    WriteLog($"AUTO CLEANUP DELETED — {f.Path}");
+                }
+                catch(Exception ex)
+                {
+                    var msg=$"{Path.GetFileName(f.Path)} could not be deleted: {ex.Message}";
+                    failures.Add(msg);WriteLog("AUTO CLEANUP FAILED — "+msg);
+                }
+            }
+        }
+        catch(Exception ex)
+        {
+            var msg=$"{folder}: {ex.Message}";failures.Add(msg);WriteLog("AUTO CLEANUP SCAN FAILED — "+msg);
+        }
+        return new CleanupResult(deleted,failures);
     }
+    static DateTime? BackupStamp(string name)
+    {
+        // Current format: Label_yyyyMMdd_HHmmss. Parsing filename avoids unreliable copied-file timestamps.
+        var m=Regex.Match(name,@"_(?<d>\d{8})_(?<t>\d{6})(?:\d{1,3})?$",RegexOptions.CultureInvariant);
+        if(!m.Success)return null;
+        return DateTime.TryParseExact(m.Groups["d"].Value+m.Groups["t"].Value,"yyyyMMddHHmmss",CultureInfo.InvariantCulture,DateTimeStyles.None,out var dt)?dt:null;
+    }
+    static DateTime SafeLastWrite(string path){try{return File.GetLastWriteTime(path);}catch{return DateTime.MaxValue;}}
+    public record CleanupResult(int Deleted,List<string> Failures);
     static DateTime NextRun(string schedule,DateTime from)
     {
         if(schedule.Contains("1 Hour",StringComparison.OrdinalIgnoreCase))return from.AddHours(1);
@@ -275,5 +335,5 @@ public static class BackupMasterModules
 
     public record BackupRunRequest(string? Server,string? Databases,string? Labels,string? Folder,string? Schedule,int RetentionDays,bool LocalEnabled,bool Zip,bool AutoCleanup,string? ExternalFolder,bool ExternalEnabled,string? GoogleDriveJson,bool GoogleDriveEnabled);
     public record BackupGoogleTestRequest(string? JsonPath);
-    public record BackupRunResult(bool Success,string Message,List<string> Files,List<string> ExternalFiles,List<string> GoogleFiles,List<string> Warnings,DateTime CompletedAt);
+    public record BackupRunResult(bool Success,string Message,List<string> Files,List<string> ExternalFiles,List<string> GoogleFiles,List<string> Warnings,DateTime CompletedAt,int CleanupDeleted,int CleanupFailures);
 }

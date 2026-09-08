@@ -103,6 +103,14 @@ jobs:
           foreach($token in @('browseFolder','browseJson','backupStartup','FolderBrowserDialog','OpenFileDialog')){ if(-not $desktop.Contains($token)){ throw "Desktop backup bridge missing: $token" } }
           $special = Get-Content 'src/SuvidhaPOS-Premium/SpecializedModules.cs' -Raw -Encoding UTF8
           if($special.Contains('app.MapPost("/api/backup-master"')){ throw 'Legacy backup endpoint still mapped' }
+      - name: Validate Backup Master auto cleanup retention
+        shell: powershell
+        run: |
+          $backup = Get-Content 'src/SuvidhaPOS-Premium/BackupMasterModules.cs' -Raw -Encoding UTF8
+          foreach($token in @('CleanupManagedBackups','AUTO CLEANUP DELETED','AUTO CLEANUP FAILED','BackupStamp','days==0','File.SetAttributes','cleanupDeleted','cleanupFailures')){ if(-not $backup.Contains($token)){ throw "Backup auto cleanup missing: $token" } }
+          if($backup.Contains('if(x.AutoCleanup&&x.RetentionDays>0)')){ throw 'Auto Cleanup still blocks 0-day keep-latest mode' }
+          $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/backup-master.js' -Raw -Encoding UTF8
+          foreach($token in @('min="0"','0 = keep latest successful backup only','Cleanup: ')){ if(-not $ui.Contains($token)){ throw "Backup cleanup UI missing: $token" } }
       - name: Validate searchable Unit Master and duplicate protection
         shell: powershell
         run: |
