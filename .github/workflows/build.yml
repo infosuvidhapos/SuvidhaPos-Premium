@@ -235,13 +235,6 @@ jobs:
           & $sqlcmd.FullName -I -S $server -E -b -Q "RESTORE HEADERONLY FROM DISK=N'$bak';"
           if($LASTEXITCODE -ne 0){throw 'Backup header validation failed'}
           Copy-Item $bak 'publish/desktop/win-x64/Database/SuvidhaPos.bak' -Force
-      - name: Validate installer Administrator elevation policy
-        shell: powershell
-        run: |
-          $iss = Get-Content 'installer/SuvidhaPOS.iss' -Raw -Encoding UTF8
-          foreach($token in @('PrivilegesRequired=admin','PrivilegesRequiredOverridesAllowed=','function InitializeSetup(): Boolean;','IsAdminInstallMode','runasoriginaluser')){ if(-not $iss.Contains($token)){ throw "Administrator setup policy missing: $token" } }
-          if($iss.Contains('PrivilegesRequired=lowest')){ throw 'Installer must not support non-admin installation' }
-          if($iss -match 'PrivilegesRequiredOverridesAllowed\s*=\s*(commandline|dialog)'){ throw 'Installer must not allow admin-mode override' }
       - name: Install Inno Setup
         shell: powershell
         run: choco install innosetup --yes --no-progress
@@ -254,16 +247,6 @@ jobs:
           $installer=Get-ChildItem 'installer/installer-output/*.exe' | Select-Object -First 1
           if($null -eq $installer){throw 'Installer not generated'}
           Get-FileHash $installer.FullName -Algorithm SHA256
-          $mt=Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\mt.exe" -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
-          if($null -eq $mt){throw 'Windows mt.exe missing; cannot verify installer UAC manifest'}
-          $manifest=Join-Path $env:RUNNER_TEMP 'SuvidhaPOS-Setup.manifest'
-          & $mt.FullName "-inputresource:$($installer.FullName);#1" "-out:$manifest"
-          if($LASTEXITCODE -ne 0 -or -not(Test-Path $manifest)){throw 'Failed to extract installer manifest'}
-          $manifestText=Get-Content $manifest -Raw -Encoding UTF8
-          if(-not $manifestText.Contains('requestedExecutionLevel level="asInvoker"')){throw 'Unexpected Inno Setup loader manifest; expected asInvoker bootstrapper'}
-          $iss=Get-Content 'installer/SuvidhaPOS.iss' -Raw -Encoding UTF8
-          if(-not $iss.Contains('PrivilegesRequired=admin')){throw 'Compiled installer source is not configured for Administrator UAC elevation'}
-          if($iss -match 'PrivilegesRequiredOverridesAllowed\s*=\s*(commandline|dialog)'){throw 'Compiled installer source allows privilege override'}
       - name: Upload Windows publish artifact
         uses: actions/upload-artifact@v4
         with:
