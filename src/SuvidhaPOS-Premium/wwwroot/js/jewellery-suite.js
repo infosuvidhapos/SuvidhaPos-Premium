@@ -209,7 +209,7 @@
     if(!JS.cart.length)return notify('Add jewellery item first');
     try{
       const pay=JS.payments[0]?.mode||'Cash';
-      const r=await api('/api/jewellery/sales',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CustomerName:document.getElementById('jsCust')?.value||'Walk-in Customer',CustomerId:null,CustomerPan:null,GstRate:JS.current?.gstRate||3,OldMetalCredit:JS.current?.oldCredit||0,PaidAmount:JS.payments.reduce((a,x)=>a+Number(x.amount||0),0),PaymentMode:pay,Notes:document.getElementById('jsJewelNotes')?.value||('Jewel Suite '+JS.mode+' invoice'),Lines:JS.cart.map(x=>({JewelleryItemId:x.Id,MetalRatePerGram:lineCalc(x).r,StoneValue:Number(x.StoneValue||0),MakingChargeType:x.MakingChargeType,MakingValue:Number(x.MakingValue||0)}))})});
+      const r=await api('/api/jewellery/sales',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CustomerName:document.getElementById('jsCust')?.value||'Walk-in Customer',CustomerId:null,CustomerPan:null,GstRate:JS.current?.gstRate||3,OldMetalCredit:JS.current?.oldCredit||0,PaidAmount:JS.payments.reduce((a,x)=>a+Number(x.amount||0),0),PaymentMode:pay,Notes:document.getElementById('jsJewelNotes')?.value||('SuvidhaPOS Jewellery '+JS.mode+' invoice'),Lines:JS.cart.map(x=>({JewelleryItemId:x.Id,MetalRatePerGram:lineCalc(x).r,StoneValue:Number(x.StoneValue||0),MakingChargeType:x.MakingChargeType,MakingValue:Number(x.MakingValue||0)}))})});
       notify('Jewellery bill saved: '+r.invoiceNo);setTimeout(()=>loadJewelInvoices(),500);
     }catch(e){alert(e.message)}
   };
