@@ -1,5 +1,5 @@
 #define MyAppName "SuvidhaPOS Premium"
-#define MyAppVersion "2.7.3"
+#define MyAppVersion "2.7.4"
 #define MyAppPublisher "SuvidhaPOS"
 #define MyAppExeName "SuvidhaPOS.Desktop.exe"
 [Setup]
@@ -17,6 +17,7 @@ Compression=lzma2
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
 PrivilegesRequired=admin
+PrivilegesRequiredOverridesAllowed=
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no

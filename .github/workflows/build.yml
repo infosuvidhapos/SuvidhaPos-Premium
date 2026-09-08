@@ -239,8 +239,9 @@ jobs:
         shell: powershell
         run: |
           $iss = Get-Content 'installer/SuvidhaPOS.iss' -Raw -Encoding UTF8
-          foreach($token in @('PrivilegesRequired=admin','function InitializeSetup(): Boolean;','IsAdminInstallMode','runasoriginaluser')){ if(-not $iss.Contains($token)){ throw "Administrator setup policy missing: $token" } }
+          foreach($token in @('PrivilegesRequired=admin','PrivilegesRequiredOverridesAllowed=','function InitializeSetup(): Boolean;','IsAdminInstallMode','runasoriginaluser')){ if(-not $iss.Contains($token)){ throw "Administrator setup policy missing: $token" } }
           if($iss.Contains('PrivilegesRequired=lowest')){ throw 'Installer must not support non-admin installation' }
+          if($iss -match 'PrivilegesRequiredOverridesAllowed\s*=\s*(commandline|dialog)'){ throw 'Installer must not allow admin-mode override' }
       - name: Install Inno Setup
         shell: powershell
         run: choco install innosetup --yes --no-progress
@@ -259,7 +260,10 @@ jobs:
           & $mt.FullName "-inputresource:$($installer.FullName);#1" "-out:$manifest"
           if($LASTEXITCODE -ne 0 -or -not(Test-Path $manifest)){throw 'Failed to extract installer manifest'}
           $manifestText=Get-Content $manifest -Raw -Encoding UTF8
-          if(-not $manifestText.Contains('requestedExecutionLevel level="requireAdministrator"')){throw 'Installer manifest does not require Administrator elevation'}
+          if(-not $manifestText.Contains('requestedExecutionLevel level="asInvoker"')){throw 'Unexpected Inno Setup loader manifest; expected asInvoker bootstrapper'}
+          $iss=Get-Content 'installer/SuvidhaPOS.iss' -Raw -Encoding UTF8
+          if(-not $iss.Contains('PrivilegesRequired=admin')){throw 'Compiled installer source is not configured for Administrator UAC elevation'}
+          if($iss -match 'PrivilegesRequiredOverridesAllowed\s*=\s*(commandline|dialog)'){throw 'Compiled installer source allows privilege override'}
       - name: Upload Windows publish artifact
         uses: actions/upload-artifact@v4
         with:
