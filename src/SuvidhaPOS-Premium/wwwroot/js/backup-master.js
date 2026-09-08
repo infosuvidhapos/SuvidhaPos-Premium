@@ -1,37 +1,78 @@
 (function(){
-function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-async function getSetting(k){try{const r=await fetch('/api/app-settings/'+encodeURIComponent(k));if(!r.ok)return '';const x=await r.json();return x.Value||x.value||''}catch{return ''}}
-async function setSetting(k,v){const r=await fetch('/api/app-settings/'+encodeURIComponent(k),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:v})});if(!r.ok)throw new Error((await r.text())||'Unable to save setting')}
-const id=x=>document.getElementById(x);
-function logLine(text){const box=id('bkLog');if(!box)return;box.textContent+=(box.textContent?'\n':'')+'['+new Date().toLocaleString()+'] '+text;box.scrollTop=box.scrollHeight}
+'use strict';
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let drives=[],timer=null;
+async function getSetting(k){try{const r=await api('/api/app-settings/'+encodeURIComponent(k));return r.Value??r.value??''}catch{return''}}
+async function setSetting(k,v){return api('/api/app-settings/'+encodeURIComponent(k),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:String(v??'')})})}
+function status(text,kind=''){const b=$('bkStatus');if(b)b.innerHTML='<span class="'+(kind==='ok'?'backup-ok':kind==='warn'?'backup-warn':'')+'">'+esc(text)+'</span>'}
+function fmtDate(v){if(!v)return'Not yet';const d=new Date(v);return isNaN(d)?v:d.toLocaleString('en-IN')}
+function scheduleMs(s){if(/1 Hour/i.test(s))return 3600000;if(/2 Hour/i.test(s))return 7200000;if(/4 Hour/i.test(s))return 14400000;if(/6 Hour/i.test(s))return 21600000;if(/12 Hour/i.test(s))return 43200000;return 86400000}
+function calcNext(){const s=$('bkSchedule')?.value||'Manual';if(s==='Manual')return null;const d=new Date(Date.now()+scheduleMs(s));if(s==='Daily'){d.setDate(new Date().getDate()+1);d.setHours(1,0,0,0)}return d}
+function updateNextCard(){const d=calcNext();if($('bkNext'))$('bkNext').textContent=d?d.toLocaleString('en-IN'):'Manual'}
+function driveRoot(path){const m=String(path||'').match(/^[A-Za-z]:\\/);return m?m[0].slice(0,3):''}
+function externalState(){
+ const enabled=$('bkExternalEnable')?.checked,folder=$('bkExternalFolder')?.value||'',root=driveRoot(folder),d=drives.find(x=>String(x.root).toUpperCase()===root.toUpperCase());
+ const online=enabled&&(!root||d?.ready);
+ if($('bkExternalBadge'))$('bkExternalBadge').textContent=!enabled?'EXTERNAL DRIVE DISABLED':online?'EXTERNAL DRIVE ONLINE':'EXTERNAL DRIVE OFFLINE';
+ if($('bkSystem'))$('bkSystem').textContent=!enabled?'Local Backup Ready':online?'All Destinations Ready':'External Drive Offline';
+ if($('bkExternal'))$('bkExternal').textContent=!enabled?'Disabled':online?'Online':'Offline';
+ const note=$('bkExternalNote');if(note)note.textContent=!enabled?'External backup disabled.':online?'CONNECTED • External copy will run after local backup.':'DISCONNECTED • Local backup will still complete. External copy resumes automatically when reconnected.';
+}
+function renderDriveOptions(selected){
+ const el=$('bkDrive');if(!el)return;el.innerHTML='<option value="">Detected External / USB Drive</option>'+drives.map(d=>'<option value="'+esc(d.root)+'" '+(d.root===selected?'selected':'')+'>'+esc(d.root+' '+(d.label||'')+' · '+(d.ready?d.freeGb+' GB free':'Offline'))+'</option>').join('');
+}
+window.addEventListener('suvidha:desktop-result',e=>{const d=e.detail||{};if(!d.path)return;if(d.target&&$(d.target)){$(d.target).value=d.path;if(d.target==='bkExternalFolder')externalState()}});
+window.backupBrowseFolder=function(target){const p=$(target)?.value||'';if(window.desktopBrowseFolder)window.desktopBrowseFolder(target,p);else{const v=prompt('Enter folder path:',p);if(v!==null)$(target).value=v}}
+window.backupBrowseJson=function(){const p=$('bkGoogle')?.value||'';if(window.desktopBrowseJson)window.desktopBrowseJson('bkGoogle',p);else{const v=prompt('Enter Google credentials JSON path:',p);if(v!==null)$('bkGoogle').value=v}}
+window.backupSelectDrive=function(){const root=$('bkDrive').value;if(root){$('bkExternalFolder').value=root+'SuvidhaBackup';externalState()}}
+window.backupTestGoogle=async function(){const p=$('bkGoogle').value.trim();if(!p)return status('Browse and select Google Drive credentials JSON first.','warn');status('Connecting to Google Drive…');try{const r=await api('/api/backup-master/google/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({JsonPath:p})});$('bkGoogleState').textContent='CONNECTED';status(r.message||'Google Drive connected.','ok')}catch(e){$('bkGoogleState').textContent='NOT CONNECTED';status(e.message,'warn')}}
+window.openBackupLog=async function(){try{const r=await fetch('/api/backup-master/log',{headers:{Authorization:'Bearer '+(localStorage.getItem('suvidha_token')||'')}});const t=await r.text();modal('Backup Log','<pre class="backup-log">'+esc(t)+'</pre>',`<button class="btn" onclick="closeModal()">Close</button>`)}catch(e){alert(e.message)}}
+async function refreshRuntime(){
+ try{const s=await api('/api/backup-master/status');drives=s.drives||[];renderDriveOptions(driveRoot($('bkExternalFolder')?.value||''));if($('bkLast'))$('bkLast').textContent=fmtDate(s.lastBackup);if($('bkLastResult')&&s.lastResult)$('bkLastResult').textContent=s.lastResult;if(s.nextBackup&&$('bkNext'))$('bkNext').textContent=fmtDate(s.nextBackup);externalState()}catch{}
+}
 window.loadBackupMaster=async function(){
- if(typeof setPage==='function')setPage('settings');
- id('title').textContent='Database Backup Master';
- const app=id('app');
- app.innerHTML='<div class="content backup-master">'+
- '<div class="backup-heading"><div><div class="backup-eyebrow">DATA PROTECTION</div><h2>Database Backup Master</h2><p>SQL Server backup, retention and external-drive controls.</p></div><span class="backup-badge">LOCAL SQL</span></div>'+
- '<div class="backup-hero"><div class="backup-stat"><small>LAST BACKUP</small><strong id="bkLast">Not checked</strong></div><div class="backup-stat"><small>SCHEDULE</small><strong id="bkFreq">Manual</strong></div><div class="backup-stat"><small>PRIMARY</small><strong id="bkPrimaryStatus">Ready</strong></div><div class="backup-stat"><small>EXTERNAL</small><strong id="bkExternal">Not configured</strong></div></div>'+
- '<div class="backup-grid">'+
- '<div class="backup-card"><h3>SQL SERVER / DATABASE</h3><div class="backup-field"><label>Server / Instance</label><input id="bkServer" value=".\\SQLEXPRESS" placeholder="SERVER\\INSTANCE"></div><div class="backup-field"><label>Database</label><input id="bkDb" value="SuvidhaPOS" placeholder="SuvidhaPOS"></div><div class="backup-field"><label>Primary Backup Folder</label><input id="bkFolder" value="D:\\SuvidhaBackup" placeholder="D:\\SuvidhaBackup"></div><div class="backup-field"><label>Schedule</label><select id="bkSchedule"><option>Manual</option><option>Every 1 Hour</option><option>Every 6 Hours</option><option>Daily</option></select></div><div class="backup-field"><label>Retention — days</label><input id="bkDays" type="number" min="1" max="3650" value="7"></div></div>'+ 
- '<div class="backup-card"><h3>DESTINATIONS & AUTOMATION</h3><div class="backup-checks"><label class="backup-check"><input id="bkLocal" type="checkbox" checked> Local Backup</label><label class="backup-check"><input id="bkZip" type="checkbox" checked> ZIP Compression</label><label class="backup-check"><input id="bkCleanup" type="checkbox" checked> Auto Cleanup</label><label class="backup-check"><input id="bkStart" type="checkbox"> Start with Windows</label></div><div class="backup-divider"></div><h3>EXTERNAL / USB DRIVE</h3><div class="backup-field"><label>External Backup Folder</label><input id="bkExternalFolder" value="E:\\SuvidhaBackup" placeholder="E:\\SuvidhaBackup"></div><label class="backup-check"><input id="bkExternalEnable" type="checkbox"> Enable External Drive Backup</label><div class="backup-divider"></div><h3>GOOGLE DRIVE</h3><div class="backup-field"><label>Google Drive Folder / Configuration</label><input id="bkGoogle" placeholder="Optional — Google Drive synced folder or config path"></div><div class="backup-note">If Google Drive for Desktop exposes a synced folder, Backup Master can copy the completed backup into that folder.</div></div>'+
- '</div>'+ 
- '<div class="backup-card backup-bottom"><div class="backup-actions"><button class="backup-btn primary" id="bkNow">BACKUP NOW</button><button class="backup-btn" id="bkSave">SAVE SETTINGS</button><button class="backup-btn" id="bkLogBtn">CLEAR LOG</button></div><div id="bkStatus" class="backup-status">Ready. Backup operations use the configured SQL Server endpoint.</div><div id="bkLog" class="backup-log">No backup operation in this session.</div></div></div>';
- const keys=['Backup.Server','Backup.Databases','Backup.Folder','Backup.Schedule','Backup.RetentionDays','Backup.LocalEnabled','Backup.ZipEnabled','Backup.AutoCleanup','Backup.StartWithWindows','Backup.ExternalFolder','Backup.ExternalEnabled','Backup.GoogleDriveConfig'];
- const vals=await Promise.all(keys.map(getSetting));
- if(vals[0])id('bkServer').value=vals[0];if(vals[1])id('bkDb').value=vals[1];if(vals[2])id('bkFolder').value=vals[2];if(vals[3])id('bkSchedule').value=vals[3];if(vals[4])id('bkDays').value=vals[4];if(vals[5])id('bkLocal').checked=vals[5]!=='false';if(vals[6])id('bkZip').checked=vals[6]!=='false';if(vals[7])id('bkCleanup').checked=vals[7]!=='false';if(vals[8])id('bkStart').checked=vals[8]==='true';if(vals[9])id('bkExternalFolder').value=vals[9];if(vals[10])id('bkExternalEnable').checked=vals[10]==='true';if(vals[11])id('bkGoogle').value=vals[11];
- id('bkFreq').textContent=id('bkSchedule').value;id('bkExternal').textContent=id('bkExternalEnable').checked?'Enabled':'Not configured';
- id('bkSave').onclick=window.saveBackupMaster;id('bkNow').onclick=window.backupNowMaster;id('bkLogBtn').onclick=()=>{id('bkLog').textContent='Log cleared.'};
+ if(typeof setPage==='function')setPage('settings');title.textContent='SuvidhaSqlBackup';document.querySelector('header p').textContent='SQL Backup Scheduler';
+ const st=await api('/api/backup-master/status').catch(()=>({server:'.\\SQLEXPRESS',database:'SuvidhaPOS',defaultFolder:'D:\\SuvidhaBackup',drives:[]}));
+ drives=st.drives||[];
+ const keys=['Backup.Server','Backup.Databases','Backup.Labels','Backup.Folder','Backup.Schedule','Backup.RetentionDays','Backup.LocalEnabled','Backup.ZipEnabled','Backup.AutoCleanup','Backup.StartWithWindows','Backup.ExternalFolder','Backup.ExternalEnabled','Backup.GoogleDriveJson','Backup.GoogleDriveEnabled'];
+ const v=await Promise.all(keys.map(getSetting));
+ const server=v[0]||st.server||'.\\SQLEXPRESS',dbs=v[1]||st.database||'SuvidhaPOS',labels=v[2]||'',folder=v[3]||st.defaultFolder||'D:\\SuvidhaBackup',schedule=v[4]||'Every 1 Hour',days=v[5]||'7',extFolder=v[10]||'E:\\SuvidhaBackup';
+ app.innerHTML=`<div class="content sqlbackup">
+ <div class="sqlbackup-title"><div><h2>🛩 SuvidhaSqlBackup</h2><p>SQL Backup Scheduler</p></div><div id="bkExternalBadge" class="sqlbackup-online">EXTERNAL DRIVE OFFLINE</div></div>
+ <div class="sqlbackup-stats"><div><small>Last Backup</small><b id="bkLast">${fmtDate(st.lastBackup)}</b><span id="bkLastResult">${esc(st.lastResult||'')}</span></div><div><small>Next Backup</small><b id="bkNext">${st.nextBackup?fmtDate(st.nextBackup):'Manual'}</b></div><div><small>Backup Frequency</small><b id="bkFreq">${esc(schedule)}</b></div><div><small>System Status</small><b id="bkSystem">Checking…</b></div></div>
+ <div class="sqlbackup-card sqlbackup-main">
+  <section><h3>SQL SERVER CONNECTION</h3><label>Server / Instance<input id="bkServer" value="${esc(server)}"></label><label>Database(s) • comma separated<input id="bkDb" value="${esc(dbs)}"></label><label>Backup Label(s) • same order as Database(s)<input id="bkLabels" value="${esc(labels)}" placeholder="Example: Bogo-Muzaffarpur, Besure-Patna"></label><small>Leave blank to use database name.</small></section>
+  <section><h3>BACKUP SETTINGS</h3><label>Primary Backup Folder<div class="input-button"><input id="bkFolder" value="${esc(folder)}"><button onclick="backupBrowseFolder('bkFolder')">Browse</button></div></label><label>Schedule<select id="bkSchedule" onchange="document.getElementById('bkFreq').textContent=this.value;updateBackupNext()"><option>Manual</option><option>Every 1 Hour</option><option>Every 2 Hours</option><option>Every 4 Hours</option><option>Every 6 Hours</option><option>Every 12 Hours</option><option>Daily</option></select></label></section>
+  <section><h3>EXTERNAL DRIVE</h3><label class="check"><input id="bkExternalEnable" type="checkbox" onchange="externalState()"> Enable External Drive Backup</label><label>Detected External / USB Drive<select id="bkDrive" onchange="backupSelectDrive()"></select></label><div class="input-button"><input id="bkExternalFolder" value="${esc(extFolder)}"><button onclick="backupBrowseFolder('bkExternalFolder')">Browse</button></div><small id="bkExternalNote"></small></section>
+ </div>
+ <div class="sqlbackup-lower">
+  <div class="sqlbackup-card"><h3>DESTINATIONS & RETENTION</h3><div class="checks"><label class="check"><input id="bkLocal" type="checkbox"> Local Backup</label><label class="check"><input id="bkZip" type="checkbox"> ZIP Compression</label><label class="check"><input id="bkCleanup" type="checkbox"> Auto Cleanup</label><label class="check"><input id="bkStart" type="checkbox"> Start with Windows</label></div><label class="retention">Keep backups for <input id="bkDays" type="number" min="1" max="3650" value="${esc(days)}"> days <small>• newest successful backup is kept</small></label></div>
+  <div class="sqlbackup-card"><h3>CLOUD STORAGE</h3><label class="check"><input id="bkGoogleEnable" type="checkbox"> Upload ZIP to Google Drive <span id="bkGoogleState"></span></label><div class="input-button"><input id="bkGoogle" value="${esc(v[12]||'')}" placeholder="Google OAuth / service-account JSON"><button onclick="backupBrowseJson()">Browse JSON</button></div><div class="cloud-row"><button onclick="backupTestGoogle()">CONNECT / TEST GOOGLE DRIVE</button><small>Cloud upload is optional.</small></div></div>
+ </div>
+ <div class="sqlbackup-card sqlbackup-actions"><button class="primary" id="bkNow" onclick="backupNowMaster()">BACKUP NOW</button><button onclick="saveBackupMaster()">SAVE SETTINGS</button><button onclick="openBackupLog()">OPEN LOG</button><div id="bkStatus">Automatic scheduler is running. Scheduled time and destination monitoring are active.</div></div>
+ <div class="sqlbackup-foot">SuvidhaSqlBackup | SQL Server • Local • External Drive • Google Drive</div></div>`;
+ $('bkSchedule').value=schedule;$('bkLocal').checked=v[6]===''?true:v[6]!=='false';$('bkZip').checked=v[7]===''?true:v[7]!=='false';$('bkCleanup').checked=v[8]===''?true:v[8]!=='false';$('bkStart').checked=v[9]===''?true:v[9]==='true';$('bkExternalEnable').checked=v[11]==='true';$('bkGoogleEnable').checked=v[13]==='true';
+ renderDriveOptions(driveRoot(extFolder));externalState();updateNextCard();if(timer)clearInterval(timer);timer=setInterval(refreshRuntime,30000)
 };
-window.saveBackupMaster=async function(){try{const data={
- 'Backup.Server':id('bkServer').value.trim(),'Backup.Databases':id('bkDb').value.trim(),'Backup.Folder':id('bkFolder').value.trim(),'Backup.Schedule':id('bkSchedule').value,'Backup.RetentionDays':id('bkDays').value,'Backup.LocalEnabled':String(id('bkLocal').checked),'Backup.ZipEnabled':String(id('bkZip').checked),'Backup.AutoCleanup':String(id('bkCleanup').checked),'Backup.StartWithWindows':String(id('bkStart').checked),'Backup.ExternalFolder':id('bkExternalFolder').value.trim(),'Backup.ExternalEnabled':String(id('bkExternalEnable').checked),'Backup.GoogleDriveConfig':id('bkGoogle').value.trim()};
- if(!data['Backup.Folder'])throw new Error('Primary backup folder is required');if(!data['Backup.Databases'])throw new Error('Database name is required');
- for(const k of Object.keys(data))await setSetting(k,data[k]);
- id('bkStatus').innerHTML='<span class="backup-ok">Settings saved successfully.</span>';id('bkFreq').textContent=id('bkSchedule').value;id('bkExternal').textContent=id('bkExternalEnable').checked?'Enabled':'Not configured';logLine('Settings saved.');
- }catch(e){id('bkStatus').innerHTML='<span class="backup-warn">Save failed: '+esc(e.message)+'</span>';logLine('SETTINGS FAILED — '+e.message)}};
+window.updateBackupNext=updateNextCard;
+window.saveBackupMaster=async function(){
+ try{
+  const data={'Backup.Server':$('bkServer').value.trim(),'Backup.Databases':$('bkDb').value.trim(),'Backup.Labels':$('bkLabels').value.trim(),'Backup.Folder':$('bkFolder').value.trim(),'Backup.Schedule':$('bkSchedule').value,'Backup.RetentionDays':$('bkDays').value,'Backup.LocalEnabled':$('bkLocal').checked,'Backup.ZipEnabled':$('bkZip').checked,'Backup.AutoCleanup':$('bkCleanup').checked,'Backup.StartWithWindows':$('bkStart').checked,'Backup.ExternalFolder':$('bkExternalFolder').value.trim(),'Backup.ExternalEnabled':$('bkExternalEnable').checked,'Backup.GoogleDriveJson':$('bkGoogle').value.trim(),'Backup.GoogleDriveEnabled':$('bkGoogleEnable').checked};
+  if(!data['Backup.Databases'])throw new Error('At least one database name is required');if(!data['Backup.Folder'])throw new Error('Primary backup folder is required');
+  for(const [k,val] of Object.entries(data))await setSetting(k,val);
+  const n=calcNext();if(n)await setSetting('Backup.NextRun',n.toISOString());
+  if(window.desktopBackupStartup)window.desktopBackupStartup($('bkStart').checked);
+  status('Settings saved. Scheduler updated.','ok');updateNextCard()
+ }catch(e){status('Save failed: '+e.message,'warn')}
+};
 window.backupNowMaster=async function(){
- const folder=id('bkFolder').value.trim();if(!folder){id('bkStatus').innerHTML='<span class="backup-warn">Primary backup folder is required.</span>';return}
- id('bkStatus').textContent='Creating SQL Server backup…';id('bkPrimaryStatus').textContent='Running';id('bkLog').textContent='';logLine('Starting backup for '+id('bkDb').value.trim()+' on '+id('bkServer').value.trim());
- try{const r=await fetch('/api/backup-master',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Server:id('bkServer').value.trim(),Database:id('bkDb').value.trim(),Folder:folder,Schedule:id('bkSchedule').value,RetentionDays:Number(id('bkDays').value||7),LocalEnabled:id('bkLocal').checked,Zip:id('bkZip').checked,AutoCleanup:id('bkCleanup').checked,ExternalFolder:id('bkExternalFolder').value.trim(),ExternalEnabled:id('bkExternalEnable').checked,GoogleDriveConfig:id('bkGoogle').value.trim()})});const text=await r.text();let x={};try{x=JSON.parse(text)}catch{};if(!r.ok)throw new Error(x.message||x.detail||text||'Backup API failed');id('bkStatus').innerHTML='<span class="backup-ok">Backup completed successfully.</span>';id('bkPrimaryStatus').textContent='Healthy';id('bkLast').textContent=new Date().toLocaleString();logLine('SUCCESS — '+(x.file||x.path||text));if(x.zip)logLine('ZIP — '+x.zip);if(x.cleaned!==undefined)logLine('Cleanup — '+x.cleaned+' old backup(s) removed');if(x.external)logLine('External — '+x.external);if(x.googleDrive)logLine('Google Drive — '+x.googleDrive);
- }catch(e){id('bkStatus').innerHTML='<span class="backup-warn">Backup failed: '+esc(e.message)+'</span>';id('bkPrimaryStatus').textContent='Error';logLine('FAILED — '+e.message)}
+ const btn=$('bkNow');btn.disabled=true;btn.textContent='BACKING UP…';status('Creating verified SQL Server backup…');
+ try{
+  await saveBackupMaster();
+  const body={Server:$('bkServer').value.trim(),Databases:$('bkDb').value.trim(),Labels:$('bkLabels').value.trim(),Folder:$('bkFolder').value.trim(),Schedule:$('bkSchedule').value,RetentionDays:Number($('bkDays').value||7),LocalEnabled:$('bkLocal').checked,Zip:$('bkZip').checked,AutoCleanup:$('bkCleanup').checked,ExternalFolder:$('bkExternalFolder').value.trim(),ExternalEnabled:$('bkExternalEnable').checked,GoogleDriveJson:$('bkGoogle').value.trim(),GoogleDriveEnabled:$('bkGoogleEnable').checked};
+  const r=await api('/api/backup-master',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const w=r.warnings||[];status(r.message+(w.length?' — '+w.join(' | '):''),w.length?'warn':'ok');$('bkLast').textContent=new Date(r.completedAt||Date.now()).toLocaleString('en-IN');$('bkLastResult').textContent=w.length?'Success with warnings':'Success';await refreshRuntime()
+ }catch(e){status('Backup failed: '+e.message,'warn')}finally{btn.disabled=false;btn.textContent='BACKUP NOW'}
 };
 })();

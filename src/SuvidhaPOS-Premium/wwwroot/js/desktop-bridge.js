@@ -33,6 +33,11 @@
     return false;
   };
   window.desktopMessage = send;
+  window.desktopBrowseFolder=(target,path='')=>send('browseFolder',{target,path});
+  window.desktopBrowseJson=(target,path='')=>send('browseJson',{target,path});
+  window.desktopBackupStartup=(enabled)=>send('backupStartup',{enabled:!!enabled});
+  window.desktopOpenPath=(path)=>send('openPath',{path});
+
 
   // Authentication is owned exclusively by login-authfix7.js.
   // Keep this file limited to native desktop messaging to avoid replacing

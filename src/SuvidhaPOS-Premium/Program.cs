@@ -419,6 +419,7 @@ app.MapPost("/api/ai/import/purchase/commit",async(Db db,HttpContext ctx,AiPurch
  }catch(Exception ex){await tx.RollbackAsync();return Results.BadRequest(new{message=ex.Message});}
 });
 
+SuvidhaPOS.Premium.BackupMasterModules.Map(app);
 SuvidhaPOS.Premium.SpecializedModules.Map(app);
 SuvidhaPOS.Premium.ReportTaxModules.Map(app);
 SuvidhaPOS.Premium.BillManagementModules.Map(app);

@@ -1,5 +1,5 @@
 #define MyAppName "SuvidhaPOS Premium"
-#define MyAppVersion "2.5.2"
+#define MyAppVersion "2.6.0"
 #define MyAppPublisher "SuvidhaPOS"
 #define MyAppExeName "SuvidhaPOS.Desktop.exe"
 [Setup]
@@ -31,7 +31,6 @@ Source: "Prerequisites\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{app}\Prerequi
 [Icons]
 Name: "{autodesktop}\SuvidhaPOS Premium"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\suvidha-pos.ico"
 Name: "{group}\SuvidhaPOS Premium"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\suvidha-pos.ico"
-Name: "{userstartup}\SuvidhaPOS Premium"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\suvidha-pos.ico"
 [Run]
 Filename: "{app}\Prerequisites\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft WebView2 Runtime..."; Flags: waituntilterminated skipifsilent
 Filename: "{app}\Prerequisites\SQL2019-SQLEXPR_x64_ENU.exe"; Parameters: "{code:GetSqlInstallParameters}"; StatusMsg: "Installing SQL Server 2019 Express..."; Flags: waituntilterminated skipifsilent; Check: ShouldInstallSqlExpress

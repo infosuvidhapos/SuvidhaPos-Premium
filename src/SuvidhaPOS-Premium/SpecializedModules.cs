@@ -36,68 +36,6 @@ public static class SpecializedModules
             return Results.Ok(new { OutletName = o.GetValueOrDefault("OutletName")?.ToString() ?? "Main Outlet", StoreType = type, IsJewellery = IsJewellery(type), IsUom = !IsJewellery(type) });
         });
 
-        app.MapPost("/api/backup-master", async (Db db, BackupMasterRequest x) =>
-        {
-            if (string.IsNullOrWhiteSpace(x.Folder)) return Results.BadRequest(new { message = "Primary backup folder is required" });
-            var folder = x.Folder.Trim();
-            Directory.CreateDirectory(folder);
-            var dbName = string.IsNullOrWhiteSpace(x.Database) ? "SuvidhaPOS" : x.Database.Trim();
-            var safeName = string.Concat(dbName.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
-            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var bak = Path.Combine(folder, $"{safeName}_{stamp}.bak");
-            var escapedBak = bak.Replace("'", "''");
-            var escapedDbName = dbName.Replace("]", "]]" );
-            try
-            {
-                await db.ScalarAsync($"BACKUP DATABASE [{escapedDbName}] TO DISK=N'{escapedBak}' WITH INIT,COMPRESSION,CHECKSUM");
-                var output = bak;
-                string? zip = null;
-                if (x.Zip)
-                {
-                    zip = Path.ChangeExtension(bak, ".zip");
-                    if (File.Exists(zip)) File.Delete(zip);
-                    using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create)) archive.CreateEntryFromFile(bak, Path.GetFileName(bak), CompressionLevel.Optimal);
-                    try { File.Delete(bak); } catch { }
-                    output = zip;
-                }
-                var cleaned = 0;
-                if (x.AutoCleanup && x.RetentionDays > 0)
-                {
-                    var cutoff = DateTime.Now.AddDays(-x.RetentionDays);
-                    foreach (var f in Directory.EnumerateFiles(folder).Where(f => Path.GetFileName(f).StartsWith(safeName + "_", StringComparison.OrdinalIgnoreCase) && (f.EndsWith(".bak", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))))
-                    {
-                        try { if (File.GetLastWriteTime(f) < cutoff) { File.Delete(f); cleaned++; } } catch { }
-                    }
-                }
-                string? external = null;
-                if (x.ExternalEnabled && !string.IsNullOrWhiteSpace(x.ExternalFolder))
-                {
-                    Directory.CreateDirectory(x.ExternalFolder.Trim());
-                    var target = Path.Combine(x.ExternalFolder.Trim(), Path.GetFileName(output));
-                    File.Copy(output, target, true);
-                    external = target;
-                }
-                string? googleDrive = null;
-                if (!string.IsNullOrWhiteSpace(x.GoogleDriveConfig))
-                {
-                    var config = x.GoogleDriveConfig.Trim();
-                    if (Directory.Exists(config))
-                    {
-                        var target = Path.Combine(config, Path.GetFileName(output));
-                        File.Copy(output, target, true);
-                        googleDrive = target;
-                    }
-                    else if (File.Exists(config)) googleDrive = "Configuration supplied; use Google Drive for Desktop or configured uploader to sync this path.";
-                }
-                return Results.Ok(new { file = output, zip, cleaned, external, googleDrive });
-            }
-            catch (Exception ex)
-            {
-                try { if (File.Exists(bak)) File.Delete(bak); } catch { }
-                return Results.BadRequest(new { message = ex.Message });
-            }
-        });
-
         app.MapGet("/api/products/{id:int}/uom", async (Db db, int id) =>
         {
             var r = await db.QuerySingleAsync(@"SELECT TOP 1 ProductId,BaseUnit,InnerUnit,PackUnit,ConversionFactor,
@@ -201,7 +139,6 @@ ORDER BY Id DESC",P("@f",f),P("@e",e),P("@q",term),P("@like","%"+term+"%")));
     }
     static bool IsJewellery(string t)=>CanonicalStoreType(t).Equals("Jewellery Shop",StringComparison.OrdinalIgnoreCase);
     static SqlParameter P(string n,object? v)=>new(n,v??DBNull.Value);
-    public record BackupMasterRequest(string? Server,string? Database,string? Folder,string? Schedule,int RetentionDays,bool LocalEnabled,bool Zip,bool AutoCleanup,string? ExternalFolder,bool ExternalEnabled,string? GoogleDriveConfig);
     public record UomRequest(string BaseUnit,string PackUnit,decimal ConversionFactor,decimal PackPurchaseRate,decimal PackMrp,decimal PackSalePrice,decimal LooseSalePrice,bool AllowLoose,string? InnerUnit=null,decimal InnerConversionFactor=1m,decimal PackInnerFactor=1m,decimal InnerPurchaseRate=0m,decimal InnerMrp=0m,decimal InnerSalePrice=0m);
     public record MetalRateRequest(string MetalType,string Purity,decimal RatePerGram,DateTime? EffectiveAt);
     public record JewelleryItemRequest(string TagNo,string? Barcode,string ItemName,string? Category,string MetalType,string Purity,decimal PurityPercent,string? Huid,decimal GrossWeight,decimal NetWeight,decimal StoneWeight,string? MakingChargeType,decimal MakingValue,string? Status,string? RackName);

@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using Microsoft.Win32;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
@@ -37,7 +38,7 @@ public sealed class MainForm : Form
         {
             await StartBackendAsync();
             await InitializeWebViewAsync();
-            web.CoreWebView2!.Navigate(BaseUrl + "?build=672uomrates");
+            web.CoreWebView2!.Navigate(BaseUrl + "?build=680backupmaster");
         }
         catch (Exception ex)
         {
@@ -102,7 +103,7 @@ public sealed class MainForm : Form
         web.CoreWebView2.WebMessageReceived += OnWebMessage;
     }
 
-    private void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    private async void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         try
         {
@@ -151,6 +152,36 @@ public sealed class MainForm : Form
             else if (string.Equals(type, "support", StringComparison.OrdinalIgnoreCase))
             {
                 Process.Start(new ProcessStartInfo("https://wa.me/918271718844") { UseShellExecute = true });
+            }
+            else if (string.Equals(type, "browseFolder", StringComparison.OrdinalIgnoreCase))
+            {
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                using var dlg=new FolderBrowserDialog{Description="Select SuvidhaPOS backup folder",ShowNewFolderButton=true};
+                if(!string.IsNullOrWhiteSpace(msg.Path)&&Directory.Exists(msg.Path))dlg.SelectedPath=msg.Path;
+                if(dlg.ShowDialog(this)==DialogResult.OK)await SendDesktopResultAsync("browseFolder",msg.Target,dlg.SelectedPath);
+            }
+            else if (string.Equals(type, "browseJson", StringComparison.OrdinalIgnoreCase))
+            {
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                using var dlg=new OpenFileDialog{Title="Select Google Drive credentials JSON",Filter="JSON files (*.json)|*.json|All files (*.*)|*.*",CheckFileExists=true,Multiselect=false};
+                if(!string.IsNullOrWhiteSpace(msg.Path)&&File.Exists(msg.Path))dlg.FileName=msg.Path;
+                if(dlg.ShowDialog(this)==DialogResult.OK)await SendDesktopResultAsync("browseJson",msg.Target,dlg.FileName);
+            }
+            else if (string.Equals(type, "backupStartup", StringComparison.OrdinalIgnoreCase))
+            {
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                SetBackupStartup(msg.Enabled==true);
+                await SendDesktopResultAsync("backupStartup",null,msg.Enabled==true?"enabled":"disabled");
+            }
+            else if (string.Equals(type, "openPath", StringComparison.OrdinalIgnoreCase))
+            {
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                if(!string.IsNullOrWhiteSpace(msg.Path))
+                {
+                    var p=msg.Path!;
+                    if(File.Exists(p))Process.Start(new ProcessStartInfo("explorer.exe",$"/select,\"{p}\""){UseShellExecute=true});
+                    else if(Directory.Exists(p))Process.Start(new ProcessStartInfo("explorer.exe",$"\"{p}\""){UseShellExecute=true});
+                }
             }
         }
         catch { }
@@ -227,7 +258,26 @@ public sealed class MainForm : Form
         finally { backend = null; }
     }
 
-    private sealed record DesktopMessage(string? Type, bool? Enabled = null, string? UserName = null, string? Password = null);
+    private async Task SendDesktopResultAsync(string type,string? target,string? path)
+    {
+        if(web.CoreWebView2 is null)return;
+        var detail=JsonSerializer.Serialize(new{type,target,path});
+        await web.CoreWebView2.ExecuteScriptAsync($"window.dispatchEvent(new CustomEvent('suvidha:desktop-result',{{detail:{detail}}}));");
+    }
+
+    private static void SetBackupStartup(bool enabled)
+    {
+        const string runKey=@"Software\Microsoft\Windows\CurrentVersion\Run";
+        using var key=Registry.CurrentUser.OpenSubKey(runKey,true)??Registry.CurrentUser.CreateSubKey(runKey);
+        if(enabled)key.SetValue("SuvidhaPOS Premium",$"\"{Application.ExecutablePath}\"");
+        else key.DeleteValue("SuvidhaPOS Premium",false);
+        try{
+            var legacy=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup),"SuvidhaPOS Premium.lnk");
+            if(!enabled&&File.Exists(legacy))File.Delete(legacy);
+        }catch{}
+    }
+
+    private sealed record DesktopMessage(string? Type, bool? Enabled = null, string? UserName = null, string? Password = null, string? Target = null, string? Path = null);
     private sealed class RememberedLogin { public string UserName { get; set; } = ""; public string EncryptedPassword { get; set; } = ""; }
 }
 
