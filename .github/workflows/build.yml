@@ -125,11 +125,11 @@ jobs:
           foreach($token in @('showLicenseWarning','Days Remaining','LICENSE EXPIRED','CHECK LICENSE','Local SQL cannot extend it','openLicenseDetails')){ if(-not $ui.Contains($token)){ throw "Premium validity UI missing: $token" } }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           if(-not $html.Contains('id="licensePill"')){ throw 'Dashboard header license pill missing' }
-      - name: Validate jewellery no-white surface polish
+      - name: Validate restored original jewellery design
         shell: powershell
         run: |
           $css=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
-          foreach($token in @('6.11.3 remove remaining stark-white','js-card-head button','js-pick-row','js-bill-tabs button.active')){if(-not $css.Contains($token)){throw "Jewellery control polish missing: $token"}}
+          foreach($token in @('background:#fbfaf7','background:#d9aa35','js-card-head button','js-pick-row','js-bill-tabs button.active','6.11.4 report extensions')){if(-not $css.Contains($token)){throw "Restored Jewellery design missing: $token"}}
       - name: Validate jewellery premium reports and internet rates
         shell: powershell
         run: |
@@ -142,7 +142,7 @@ jobs:
           $live=Get-Content 'src/SuvidhaPOS-Premium/JewelleryLiveRateModules.cs' -Raw -Encoding UTF8
           foreach($token in @('xaus.com/api/v1/spot?currency=INR&unit=gram','silver_usd_oz','gold*22m/24m','Saved rate fallback')){if(-not $live.Contains($token)){throw "Internet metal rate integration missing: $token"}}
           $css=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
-          foreach($token in @('js-report-metrics','js-trend-chart','jewel-suite-mode[data-theme="light"]')){if(-not $css.Contains($token)){throw "Jewellery report/theme CSS missing: $token"}}
+          foreach($token in @('js-report-metrics','js-trend-chart','js-report-filter')){if(-not $css.Contains($token)){throw "Jewellery report/theme CSS missing: $token"}}
       - name: Validate premium responsive shell
         shell: powershell
         run: |
