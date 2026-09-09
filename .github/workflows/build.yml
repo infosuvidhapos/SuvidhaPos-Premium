@@ -7,6 +7,10 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+
+concurrency:
+  group: suvidhapos-premium-windows-build
+  cancel-in-progress: true
 jobs:
   build-test-publish:
     runs-on: windows-latest
