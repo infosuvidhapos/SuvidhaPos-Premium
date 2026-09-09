@@ -36,7 +36,7 @@
   function whatsappHref(s){
     var text=reminderMessage(s)+'\nOutlet: '+(s.outletName||s.outletCode||'SuvidhaPOS')+(s.outletCode?' ('+s.outletCode+')':'');
     if(s.renewalUrl)text+='\nRenewal: '+s.renewalUrl;
-    return 'https://wa.me/?text='+encodeURIComponent(text);
+    return 'https://wa.me/918271718844?text='+encodeURIComponent(text);
   }
   function renewButton(s,label){return'<button class="license-whatsapp" id="licenseRenewBtn">💬 '+esc(label||'RENEW ON WHATSAPP')+'</button>'}
   function bindRenew(s){var b=q('licenseRenewBtn');if(b)b.onclick=function(){w.open(whatsappHref(s),'_blank','noopener')}}

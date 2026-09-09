@@ -155,7 +155,8 @@ jobs:
           node --check 'src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js'
           $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js' -Raw -Encoding UTF8
           if($ui.Contains("setInterval(function(){if(d.body.getAttribute('data-authenticated')==='true')ownershipPulse('periodic')},300000)")){ throw 'Five-minute Central outlet polling must not return' }
-          foreach($token in @("['Barcode.Template.'+C.barcodeScope]",'AI Import','Item Import Master')){ if(-not $ui.Contains($token)){ throw "Completion runtime wiring missing: $token" } }
+          foreach($token in @("['Barcode.Template.'+C.barcodeScope]",'AI Import','Item Import Master','w.loadNormalItemImportMaster=','w.loadJewelleryItemMaster=','w.openPremiumJewelleryItem=','w.loadBarcodePrintMaster=')){ if(-not $ui.Contains($token)){ throw "Completion runtime wiring missing: $token" } }
+          if($ui.Contains('w.loadAIImport=function(){return jewel()')){ throw 'AI Import must remain separate from Item Import Master' }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           foreach($token in @('data-page="aiimport"','>AI Import<','data-page="itemimport"','>Item Import Master<')){ if(-not $html.Contains($token)){ throw "Separate import menu missing: $token" } }
           $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
@@ -164,6 +165,11 @@ jobs:
           foreach($token in @("desktopMessage('exit')",'Day closed successfully')){ if(-not $app.Contains($token)){ throw "Logout/day-close desktop exit missing: $token" } }
           $logo = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/img/suvidha-pos-mark.svg' -Raw -Encoding UTF8
           if(-not $logo.Contains('viewBox="-30 -20 420 280"')){ throw 'Logo safe-area viewBox missing' }
+          $licui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/license-status.js' -Raw -Encoding UTF8
+          if(-not $licui.Contains('https://wa.me/918271718844?text=')){ throw 'Validity WhatsApp must redirect to 8271718844' }
+          $bridge = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/desktop-bridge.js' -Raw -Encoding UTF8
+          $login = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/login-authfix7.js' -Raw -Encoding UTF8
+          foreach($src in @($bridge,$login)){ if(-not $src.Contains('918271718844')){ throw 'Login/support WhatsApp must redirect to 8271718844' } }
 
       - name: Validate master visibility and license file concurrency
         shell: powershell
@@ -173,7 +179,7 @@ jobs:
           $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
           foreach($token in @('loadJewelleryItemMaster()','loadJewelleryItemImportMaster()','loadBarcodePrintMaster()','Item Master','Item Import Master','Barcode Print Master')){ if(-not $jewel.Contains($token)){ throw "Jewellery direct master missing: $token" } }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
-          foreach($token in @('data-page="itemimport"','id="barcodeMasterNav"','loadBarcodePrintMaster()','6122mastersfix')){ if(-not $html.Contains($token)){ throw "Normal direct master missing: $token" } }
+          foreach($token in @('data-page="aiimport"','data-page="itemimport"','id="barcodeMasterNav"','loadBarcodePrintMaster()','6123runtimewire')){ if(-not $html.Contains($token)){ throw "Normal direct master missing: $token" } }
           $appjs = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           foreach($token in @("itemimport:['loadNormalItemImportMaster','loadAIImport']",'loadNormalItemImportMaster()')){ if(-not $appjs.Contains($token)){ throw "Normal Item Import routing missing: $token" } }
           $jcss = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
@@ -346,7 +352,8 @@ jobs:
           $jcss = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
           foreach($token in @('main>header{display:flex!important','license-pill{display:inline-flex!important')){ if(-not $jcss.Contains($token)){ throw "Jewellery validity header missing: $token" } }
           $completion = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js' -Raw -Encoding UTF8
-          foreach($token in @('syncLicenseOwnership','/api/license/check','periodic','300000')){ if(-not $completion.Contains($token)){ throw "Automatic Central ownership refresh missing: $token" } }
+          foreach($token in @('syncLicenseOwnership','/api/license/check','startup','login')){ if(-not $completion.Contains($token)){ throw "Startup/login Central ownership refresh missing: $token" } }
+          if($completion.Contains('300000')){ throw 'Five-minute Central ownership polling must not exist' }
           $outletUi = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-master-fix.js' -Raw -Encoding UTF8
           if(-not $outletUi.Contains('lic.validTill')){ throw 'Outlet Validity must be camelCase tolerant' }
           if($outletUi.Contains('Outlet Code<input')){ throw 'Outlet Code must not appear as an extra locked Outlet Master field' }

@@ -69,3 +69,8 @@ body[data-theme="light"] aside>nav::-webkit-scrollbar-thumb,body[data-theme="lig
 body[data-theme="light"] .normal-report-intro,body[data-theme="light"] .normal-report-tile,body[data-theme="light"] .normal-report-workspace{background:linear-gradient(145deg,#f8fbfe,#eaf1f7);border-color:#c7d5e1;color:#173049}body[data-theme="light"] .normal-report-count,body[data-theme="light"] .normal-report-arrow{background:#edf4f9;border-color:#c4d3df}body[data-theme="light"] .normal-report-tile small,body[data-theme="light"] .normal-report-intro p{color:#667d90}
 @media(max-width:1180px){.normal-report-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:780px){.normal-report-intro{align-items:flex-start;flex-direction:column}.normal-report-count{width:100%;text-align:left}.normal-report-grid{grid-template-columns:1fr}.normal-report-filters{grid-template-columns:1fr}}
+
+
+/* 6.12.3 normal logo safe-area */
+.brandmark{overflow:visible!important;padding:5px!important}
+.brandmark img{display:block!important;width:88%!important;height:88%!important;max-width:88%!important;max-height:88%!important;object-fit:contain!important;object-position:center!important;margin:auto!important;clip-path:none!important}
