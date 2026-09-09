@@ -53,6 +53,13 @@ public static class LicenseGuardModules
         SaveOutletCode(payload!.OutletCode);
 
         var serverBlock = ReadServerBlock();
+        if (serverBlock is not null && string.Equals(serverBlock.Code, "EXPIRED", StringComparison.OrdinalIgnoreCase))
+        {
+            // Older builds persisted expiry as a hard server block. Expiry is now handled by signed
+            // grace/read-only policy, so migrate that legacy marker automatically.
+            ClearServerBlock();
+            serverBlock = null;
+        }
         if (serverBlock is not null)
             return LicenseStatus.ServerBlocked(serverBlock.Code, serverBlock.Message, payload, validFrom, validTill, nowUtc, WarningWindowDays);
 
