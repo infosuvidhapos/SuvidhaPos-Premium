@@ -190,7 +190,7 @@ jobs:
         shell: powershell
         run: |
           $html=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
-          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.11.5-jewelreports')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
+          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.12.0-complete')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
           $app=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           foreach($token in @('Business Command Center',"Today's completed billing",'window.scrollTo')){if(-not $app.Contains($token)){throw "Dashboard premium behavior missing: $token"}}
           if($app.Contains("'Live from SQL'")){throw 'Dashboard still shows Live from SQL'}
