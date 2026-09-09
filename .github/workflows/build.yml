@@ -130,7 +130,7 @@ jobs:
           $login = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/login-authfix7.js' -Raw -Encoding UTF8
           foreach($token in @('status === 423','showLicenseExpired','showLicenseActivation','refreshLicenseStatus(true)')){ if(-not $login.Contains($token)){ throw "Login license UI missing: $token" } }
           $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/license-status.js' -Raw -Encoding UTF8
-          foreach($token in @('showLicenseWarning','showLicenseLocked','SERVICE LOCKED','READ-ONLY','RENEW NOW','licenseRenewBtn','CHECK LICENSE','ACTIVATE','/api/license/check','/api/license/activate','openLicenseDetails','suvidhapremium.suvidhapos.in')){ if(-not $ui.Contains($token)){ throw "Premium validity UI missing: $token" } }
+          foreach($token in @('showLicenseWarning','showLicenseLocked','SERVICE LOCKED','READ-ONLY','RENEW ON WHATSAPP','REACTIVATE ON WHATSAPP','Final Reminder','expires tomorrow','grace period','licenseRenewBtn','CHECK LICENSE','ACTIVATE','/api/license/check','/api/license/activate','openLicenseDetails','suvidhapremium.suvidhapos.in')){ if(-not $ui.Contains($token)){ throw "Premium validity UI missing: $token" } }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           if(-not $html.Contains('id="licensePill"')){ throw 'Dashboard header license pill missing' }
       - name: Validate restored original jewellery design
