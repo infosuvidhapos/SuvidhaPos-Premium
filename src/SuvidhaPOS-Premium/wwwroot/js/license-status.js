@@ -141,7 +141,7 @@
       '<div class="license-actions">'+
         (expired?'<button class="license-primary" id="licenseCheckBtn">CHECK LICENSE</button><button class="license-secondary" id="licenseExitBtn">EXIT</button>':
         '<button class="license-primary" id="licenseContinueBtn">CONTINUE</button><button class="license-secondary" id="licenseWarningCheckBtn">CHECK NOW</button>')+
-      '</div><small>Validity and Store Type are controlled only by the signed SuvidhaPOS Central license.</small></div>';
+      '</div><small>Validity and Store Type are controlled only by the signed SuvidhaPremium license.</small></div>';
     d.body.appendChild(o);
 
     q('licenseContinueBtn')&&q('licenseContinueBtn').addEventListener('click',function(){o.remove()});
@@ -150,7 +150,7 @@
     async function doCheck(btn){
       if(!btn)return;
       btn.disabled=true;btn.textContent='CHECKING...';
-      var msg=q('licenseOnlineMessage');if(msg){msg.textContent='Connecting to SuvidhaPOS Central...';msg.className='license-message'}
+      var msg=q('licenseOnlineMessage');if(msg){msg.textContent='Connecting to SuvidhaPremium...';msg.className='license-message'}
       try{
         var st=await checkCentral();
         if(msg){msg.textContent=st.message||'License synchronized.';msg.className='license-message ok'}
@@ -185,7 +185,7 @@
     var o=d.createElement('div');o.className='license-overlay';
     o.innerHTML='<div class="license-dialog">'+
       '<div class="license-dialog-icon">🔐</div>'+
-      '<div class="license-dialog-kicker">SUVIDHAPOS CENTRAL ACTIVATION</div>'+
+      '<div class="license-dialog-kicker">SUVIDHAPREMIUM ACTIVATION</div>'+
       '<h2>Activate this POS</h2>'+
       '<p>Central Admin me outlet create karne par mila Outlet Code aur one-time Activation Code yahan enter karein.</p>'+
       '<div class="license-activate-form">'+
@@ -209,7 +209,7 @@
         return;
       }
       btn.disabled=true;btn.textContent='ACTIVATING...';
-      if(msg){msg.textContent='Connecting to SuvidhaPOS Central...';msg.className='license-message'}
+      if(msg){msg.textContent='Connecting to SuvidhaPremium...';msg.className='license-message'}
       try{
         var st=await w.activateCentralLicense(oc,ac);
         if(msg){msg.textContent=st.message||'Activation successful.';msg.className='license-message ok'}

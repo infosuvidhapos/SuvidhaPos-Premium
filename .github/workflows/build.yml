@@ -123,7 +123,7 @@ jobs:
           if($license.Contains('SELECT') -or $license.Contains('SqlConnection') -or $license.Contains('GetConnectionString') -or $license.Contains('CentralDb')){ throw 'Central license flow must never connect directly to SQL' }
           $settings = Get-Content 'src/SuvidhaPOS-Premium/appsettings.json' -Raw -Encoding UTF8
           if($settings -match 'CentralLicense"[\s\S]{0,500}(Server=|Data Source=|38\.247\.|192\.168\.)'){ throw 'POS CentralLicense config must contain website/API URL only, never central SQL Server/IP' }
-          foreach($token in @('http://suvidhapremium.suvidhapos.in/','SuvidhaPOS-Central','main-v1')){ if(-not $settings.Contains($token)){ throw "Central license configuration missing: $token" } }
+          foreach($token in @('http://suvidhapremium.suvidhapos.in/','SuvidhaPremium','main-v1')){ if(-not $settings.Contains($token)){ throw "Central license configuration missing: $token" } }
           $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
           foreach($token in @('LicenseGuardModules.GetStatus','statusCode:423','LicenseGuardModules.Map(app)','path.StartsWithSegments("/api/license/activate")','path.StartsWithSegments("/api/license/check")')){ if(-not $program.Contains($token)){ throw "Login/license activation enforcement missing: $token" } }
           if($program -match 'if \(!ctx\.Request\.Path\.StartsWithSegments\("/api"\).*StartsWithSegments\("/api/login"\)\)'){ throw 'License activation/check endpoints are still trapped behind login middleware' }

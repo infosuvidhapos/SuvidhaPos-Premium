@@ -311,7 +311,7 @@ public static class LicenseGuardModules
                 return false;
             }
 
-            var expectedIssuer = cfg?["CentralLicense:Issuer"] ?? "SuvidhaPOS-Central";
+            var expectedIssuer = cfg?["CentralLicense:Issuer"] ?? "SuvidhaPremium";
             if (!string.Equals(payload.Iss, expectedIssuer, StringComparison.Ordinal))
             {
                 error = "License issuer is invalid.";
