@@ -229,7 +229,7 @@ jobs:
           if($tax.Contains('stopImmediatePropagation')){ throw 'Tax Master must not intercept sidebar navigation separately' }
           if(-not $tax.Contains('window.loadTaxMaster=window.loadTaxmaster')){ throw 'Tax Master unified route alias missing' }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
-          $pages = @('dashboard','billing','products','openingstock','aiimport','purchase','sales','billmaster','customers','suppliers','expiry','returns','expenses','taxmaster','unitmaster','reports')
+          $pages = @('dashboard','billing','products','openingstock','itemimport','purchase','sales','billmaster','customers','suppliers','expiry','returns','expenses','taxmaster','unitmaster','reports')
           foreach($page in $pages){ if(-not $html.Contains('data-page="'+$page+'"')){ throw "Sidebar page missing: $page" } }
       - name: Validate keyboard-first base-unit billing flow
         shell: powershell
