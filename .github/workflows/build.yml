@@ -149,6 +149,20 @@ jobs:
           if(-not $html.Contains('runtimeInputGuard')){ throw 'Authenticated input guard missing' }
           $iss = Get-Content 'installer/SuvidhaPOS.iss' -Raw -Encoding UTF8
           if(-not $iss.Contains('runasoriginaluser')){ throw 'Post-install app must launch as normal desktop user' }
+      - name: Validate master visibility and license file concurrency
+        shell: powershell
+        run: |
+          $license = Get-Content 'src/SuvidhaPOS-Premium/LicenseGuardModules.cs' -Raw -Encoding UTF8
+          foreach($token in @('ProtectedFileMutex','WaitOne(TimeSpan.FromSeconds(3))','Thread.Sleep(35 * (attempt + 1))','Do not rewrite license-state.bin on every status read')){ if(-not $license.Contains($token)){ throw "License concurrency guard missing: $token" } }
+          $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
+          foreach($token in @('loadJewelleryItemMaster()','loadJewelleryItemImportMaster()','loadBarcodePrintMaster()','Item Master','Item Import Master','Barcode Print Master')){ if(-not $jewel.Contains($token)){ throw "Jewellery direct master missing: $token" } }
+          $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
+          foreach($token in @('data-page="itemimport"','id="barcodeMasterNav"','loadBarcodePrintMaster()','6122mastersfix')){ if(-not $html.Contains($token)){ throw "Normal direct master missing: $token" } }
+          $appjs = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
+          foreach($token in @("itemimport:['loadNormalItemImportMaster','loadAIImport']","loadNormalItemImportMaster()">)){ if(-not $appjs.Contains($token)){ throw "Normal Item Import routing missing: $token" } }
+          $jcss = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
+          foreach($token in @('6.12.2 jewellery compact logo','width:122px!important','overflow:visible!important')){ if(-not $jcss.Contains($token)){ throw "Jewellery logo fix missing: $token" } }
+
       - name: Validate signed validity and login expiry guard
         shell: powershell
         run: |

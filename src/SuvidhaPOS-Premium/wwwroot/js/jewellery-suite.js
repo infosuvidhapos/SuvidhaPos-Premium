@@ -47,6 +47,11 @@
           <button class="nav js-nav" data-page="jGirviReport" onclick="loadJewelGirviReport()">${icon('⚖')}<span>Girvi Report</span></button>
         </div>
         <div class="js-section">MASTERS</div>
+        <div data-premium-completion="1">
+          <button class="nav js-nav" data-page="jItemMaster" onclick="loadJewelleryItemMaster()">${icon('◆')}<span>Item Master</span></button>
+          <button class="nav js-nav" data-page="jItemImport" onclick="loadJewelleryItemImportMaster()">${icon('⇩')}<span>Item Import Master</span></button>
+          <button class="nav js-nav" data-page="jBarcode" onclick="loadBarcodePrintMaster()">${icon('▥')}<span>Barcode Print Master</span></button>
+        </div>
         <button class="nav js-nav" data-page="customers" onclick="loadCustomers()">${icon('♙')}<span>Customers</span></button>
         <button class="nav js-nav" onclick="loadJewelRates()">${icon('↗')}<span>Au/Ag Rates</span></button>
         <div class="js-section">SYSTEM</div>

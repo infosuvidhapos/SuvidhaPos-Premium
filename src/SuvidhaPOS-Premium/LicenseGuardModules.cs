@@ -50,8 +50,9 @@ public static class LicenseGuardModules
             return LicenseStatus.Invalid(error, nowUtc, WarningWindowDays);
 
         MarkManaged();
-        SaveOutletCode(payload!.OutletCode);
-
+        // Do not rewrite license-state.bin on every status read/API request.
+        // OutletCode is persisted only on activation/online sync, preventing parallel header/API calls
+        // from competing for the same DPAPI file.
         var serverBlock = ReadServerBlock();
         if (serverBlock is not null)
             return LicenseStatus.ServerBlocked(serverBlock.Code, serverBlock.Message, payload, validFrom, validTill, nowUtc, WarningWindowDays);
@@ -521,8 +522,11 @@ public static class LicenseGuardModules
 
     static void SaveOutletCode(string outletCode)
     {
-        if (!string.IsNullOrWhiteSpace(outletCode))
-            WriteProtectedString(StatePath(), outletCode.Trim().ToUpperInvariant());
+        if (string.IsNullOrWhiteSpace(outletCode)) return;
+        var normalized = outletCode.Trim().ToUpperInvariant();
+        var current = ReadProtectedString(StatePath());
+        if (string.Equals(current, normalized, StringComparison.OrdinalIgnoreCase)) return;
+        WriteProtectedString(StatePath(), normalized);
     }
 
     static string? LoadOutletCode() => ReadProtectedString(StatePath());
@@ -548,23 +552,84 @@ public static class LicenseGuardModules
         try { if (File.Exists(ServerBlockPath())) File.Delete(ServerBlockPath()); } catch { }
     }
 
+    static Mutex ProtectedFileMutex(string path)
+    {
+        var full = Path.GetFullPath(path).ToUpperInvariant();
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(full)));
+        return new Mutex(false, @"Local\SuvidhaPOS-License-" + hash[..24]);
+    }
+
+    static bool EnterProtectedFileMutex(Mutex mutex)
+    {
+        try { return mutex.WaitOne(TimeSpan.FromSeconds(3)); }
+        catch (AbandonedMutexException) { return true; }
+    }
+
     static void WriteProtectedString(string path, string value)
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var plain = Encoding.UTF8.GetBytes(value);
         var protectedBytes = ProtectedData.Protect(plain, null, DataProtectionScope.CurrentUser);
-        File.WriteAllBytes(path, protectedBytes);
+        using var mutex = ProtectedFileMutex(path);
+        var entered = EnterProtectedFileMutex(mutex);
+        if (!entered) throw new IOException("License state is busy. Please retry.");
+
+        try
+        {
+            IOException? last = null;
+            for (var attempt = 0; attempt < 8; attempt++)
+            {
+                try
+                {
+                    File.WriteAllBytes(path, protectedBytes);
+                    return;
+                }
+                catch (IOException ex)
+                {
+                    last = ex;
+                    Thread.Sleep(35 * (attempt + 1));
+                }
+            }
+            throw last ?? new IOException("License state could not be written.");
+        }
+        finally
+        {
+            try { mutex.ReleaseMutex(); } catch { }
+        }
     }
 
     static string? ReadProtectedString(string path)
     {
+        using var mutex = ProtectedFileMutex(path);
+        var entered = EnterProtectedFileMutex(mutex);
+        if (!entered) return null;
+
         try
         {
-            if (!File.Exists(path)) return null;
-            var protectedBytes = File.ReadAllBytes(path);
-            var plain = ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.CurrentUser);
-            return Encoding.UTF8.GetString(plain);
+            for (var attempt = 0; attempt < 8; attempt++)
+            {
+                try
+                {
+                    if (!File.Exists(path)) return null;
+                    var protectedBytes = File.ReadAllBytes(path);
+                    var plain = ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.CurrentUser);
+                    return Encoding.UTF8.GetString(plain);
+                }
+                catch (IOException) when (attempt < 7)
+                {
+                    Thread.Sleep(35 * (attempt + 1));
+                }
+                catch (CryptographicException) when (attempt < 2)
+                {
+                    Thread.Sleep(50 * (attempt + 1));
+                }
+            }
+            return null;
         }
-        catch { return null; }
+        finally
+        {
+            try { mutex.ReleaseMutex(); } catch { }
+        }
     }
 
     static byte[] Base64UrlDecode(string value)
