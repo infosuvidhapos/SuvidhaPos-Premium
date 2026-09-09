@@ -143,3 +143,17 @@ body.jewel-suite-mode .outlet-mode-standard{padding:14px 16px;border:1px solid #
 body.jewel-suite-mode .modal{background:#2c241866!important}
 @media(max-width:1250px){body.jewel-suite-mode .js-report-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:780px){body.jewel-suite-mode .js-brand{height:84px}.jewel-suite-mode .js-brand-logo{width:165px;height:66px}body.jewel-suite-mode .js-report-grid{grid-template-columns:1fr 1fr}.jewel-suite-mode .content{padding:18px}}
+
+
+/* 6.12.1 Central-owned validity/header and live StoreType switching */
+body.jewel-suite-mode main>footer{display:none}
+body.jewel-suite-mode main>header{display:flex!important;height:64px;min-height:64px;justify-content:flex-end;padding:0 24px;background:#fffdf9;border-bottom:1px solid #e3ded5;box-shadow:0 2px 8px rgba(50,40,20,.05);backdrop-filter:none;position:sticky;top:0;z-index:18}
+body.jewel-suite-mode main>header>div:nth-child(2){display:none}
+body.jewel-suite-mode main>header .headright{display:flex!important;margin-left:auto;gap:8px;align-items:center}
+body.jewel-suite-mode main>header .pill,body.jewel-suite-mode main>header .refresh,body.jewel-suite-mode main>header .theme-toggle{background:#fffaf0;border-color:#dfd5c3;color:#5b5347;box-shadow:none}
+body.jewel-suite-mode main>header .license-pill{display:inline-flex!important;align-items:center;min-height:36px}
+body.jewel-suite-mode main>header .license-active{background:#eefaf3;border-color:#acd7bd;color:#23744b}
+body.jewel-suite-mode main>header .license-warning{background:#fff6da;border-color:#e4c46b;color:#8b6514}
+body.jewel-suite-mode main>header .license-expired{background:#fff0f1;border-color:#e2aeb4;color:#a22d3d}
+body.jewel-suite-mode main>header .license-unmanaged{background:#f5f2ec;border-color:#d8d0c4;color:#756c5e}
+@media(max-width:780px){body.jewel-suite-mode main>header{padding:0 12px}body.jewel-suite-mode main>header .headright{gap:5px}body.jewel-suite-mode main>header .headright .license-pill{display:inline-flex!important;max-width:190px}body.jewel-suite-mode main>header .headright .pill{display:none}}

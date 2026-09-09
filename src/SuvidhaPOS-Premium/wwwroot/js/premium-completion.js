@@ -222,9 +222,26 @@ w.premiumPrintBarcode=async function(){
  try{await api('/api/barcode-print/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Scope:C.barcodeScope,TemplateCode:C.barcodeTemplate,ItemKey:String(x.TagNo||x.Barcode||x.Id||''),Copies:copies,PrinterName:val('bcPrinter')})});await w.premiumPrintHtml(html,'Barcode-'+C.barcodeTemplate)}catch(err){alert(err.message)}
 };
 
-async function sync(direction,reason,show){
+async function syncLicenseOwnership(reason,show){
  var ctrl=new AbortController(),tm=setTimeout(function(){ctrl.abort()},3000);
- try{var r=await fetch('/api/outlet/sync',{method:'POST',credentials:'same-origin',cache:'no-store',signal:ctrl.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({Direction:direction,Reason:reason})});var x=await r.json().catch(function(){return {}});if(show)notify(x.ok?'Outlet sync completed':(x.message||'Offline mode'));if(x.ok&&direction==='PULL'&&w.refreshLoginOutlet)w.refreshLoginOutlet(true);return x}catch(_){if(show)notify('Offline mode — billing remains local and fast');return {ok:false,offline:true}}finally{clearTimeout(tm)}
+ try{
+  var r=await fetch('/api/license/check',{method:'POST',credentials:'same-origin',cache:'no-store',signal:ctrl.signal,headers:{'Content-Type':'application/json','Accept':'application/json'},body:'{}'});
+  var x=await r.json().catch(function(){return {}});
+  var st=x.status||x.Status||null;
+  if(st&&w.applyLicenseStatus)w.applyLicenseStatus(st);
+  if(st&&w.refreshLoginOutlet)await w.refreshLoginOutlet(true);
+  if(show&&!r.ok)notify(x.message||x.Message||'License sync failed');
+  return {ok:r.ok,status:st,message:x.message||x.Message||''};
+ }catch(_){
+  if(show)notify('License sync offline — cached validity remains available');
+  return {ok:false,offline:true};
+ }finally{clearTimeout(tm)}
+}
+
+async function sync(direction,reason,show){
+ if(String(direction||'PULL').toUpperCase()==='PULL')await syncLicenseOwnership(reason||'sync',false);
+ var ctrl=new AbortController(),tm=setTimeout(function(){ctrl.abort()},3000);
+ try{var r=await fetch('/api/outlet/sync',{method:'POST',credentials:'same-origin',cache:'no-store',signal:ctrl.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({Direction:direction,Reason:reason})});var x=await r.json().catch(function(){return {}});if(show)notify(x.ok?'Outlet sync completed':(x.message||'Offline mode'));if(x.ok&&direction==='PULL'){if(w.refreshLicenseStatus)await w.refreshLicenseStatus(false);if(w.refreshLoginOutlet)await w.refreshLoginOutlet(true)}return x}catch(_){if(show)notify('Offline mode — billing remains local and fast');return {ok:false,offline:true}}finally{clearTimeout(tm)}
 }
 w.backgroundOutletSync=function(direction,reason,show){setTimeout(function(){sync(direction||'PULL',reason||'manual',!!show)},0);return true};
 w.premiumManualOutletSync=async function(){await sync('PUSH','manual',false);await sync('PULL','manual',true)};
@@ -250,9 +267,17 @@ w.saveOutlet=async function(){
  try{var saved=await api('/api/outlet',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});notify('Outlet saved locally · website sync queued');if(w.refreshLoginOutlet)w.refreshLoginOutlet(true);w.dispatchEvent(new CustomEvent('suvidha:outlet-saved',{detail:saved||o}));w.backgroundOutletSync('PUSH','save',false)}catch(err){alert(err.message)}
 };
 
-function startupSync(){if(!enabled('P-04'))return;setTimeout(async function(){try{var c=new AbortController(),tm=setTimeout(function(){c.abort()},3000);var r=await fetch('/public/outlet/profile-sync',{cache:'no-store',signal:c.signal});clearTimeout(tm);if(r.ok&&w.refreshLoginOutlet)w.refreshLoginOutlet(true)}catch(_){}},0)}
+function startupSync(){if(!enabled('P-04'))return;w.backgroundOutletSync('PULL','startup',false)}
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',function(){setTimeout(startupSync,500)});else setTimeout(startupSync,500);
-var authSeen=false;new MutationObserver(function(){var on=d.body.getAttribute('data-authenticated')==='true';if(on&&!authSeen){authSeen=true;w.backgroundOutletSync('PULL','login',false)}if(!on)authSeen=false}).observe(d.body,{attributes:true,attributeFilter:['data-authenticated']});
+var authSeen=false,lastOwnershipCheck=0;
+function ownershipPulse(reason){
+ if(!enabled('P-04'))return;
+ var now=Date.now();if(now-lastOwnershipCheck<60000)return;lastOwnershipCheck=now;
+ w.backgroundOutletSync('PULL',reason||'periodic',false);
+}
+new MutationObserver(function(){var on=d.body.getAttribute('data-authenticated')==='true';if(on&&!authSeen){authSeen=true;ownershipPulse('login')}if(!on)authSeen=false}).observe(d.body,{attributes:true,attributeFilter:['data-authenticated']});
+w.addEventListener('focus',function(){if(d.body.getAttribute('data-authenticated')==='true')ownershipPulse('focus')});
+setInterval(function(){if(d.body.getAttribute('data-authenticated')==='true')ownershipPulse('periodic')},300000);
 
 function enhancePaymentRefs(){
  var box=d.getElementById('jsPayRows');if(!box)return;[].slice.call(box.children).forEach(function(row,i){if(row.querySelector('.payment-reference'))return;var inp=d.createElement('input');inp.className='payment-reference';inp.placeholder='Reference / UTR';inp.value=(w.__jewelSuiteState&&w.__jewelSuiteState.payments[i]&&w.__jewelSuiteState.payments[i].reference)||'';inp.onchange=function(){if(w.JSuitePayment)w.JSuitePayment(i,'reference',this.value)};row.insertBefore(inp,row.lastElementChild)});

@@ -50,7 +50,7 @@
         <button class="nav js-nav" data-page="customers" onclick="loadCustomers()">${icon('♙')}<span>Customers</span></button>
         <button class="nav js-nav" onclick="loadJewelRates()">${icon('↗')}<span>Au/Ag Rates</span></button>
         <div class="js-section">SYSTEM</div>
-        <button class="nav js-nav" onclick="loadSettings()">${icon('⚙')}<span>Settings & AMC</span></button>
+        <button class="nav js-nav" onclick="loadSettings()">${icon('⚙')}<span>Settings</span></button>
       </div>
       <div class="js-side-user"><b>${esc(window.currentUser?.DisplayName||'Super Admin')}</b><small>${esc(window.currentUser?.Role||'Super Admin')}</small><button onclick="logout()">↪ &nbsp; Sign Out</button></div>`;
     const q=document.getElementById('jsQuickSearch');
@@ -250,9 +250,17 @@
       try{s=await fetch('/public/specialization?_='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}}).then(r=>r.ok?r.json():null)}catch{}
     }
     if(!isJewelleryProfile(s)){
-      // Ignore a stale/incomplete refresh after Jewellery mode is active.
-      // A real outlet-type change already reloads the application from Outlet Master.
-      if(JS.enabled||document.body.classList.contains('jewel-suite-mode'))return true;
+      const explicitType=String(prop(s,'StoreType','storeType')||'').trim();
+      // A Central website StoreType change must be authoritative even after Jewellery mode is active.
+      // Reload only for an explicit non-jewellery profile so stale/null refreshes never disrupt billing.
+      if(explicitType&&(JS.enabled||document.body.classList.contains('jewel-suite-mode'))){
+        JS.enabled=false;window.__jewelSuiteEnabled=false;
+        document.body.classList.remove('jewel-suite-mode');
+        document.body.dataset.storeType=explicitType.replace(/[^a-z0-9]+/gi,'-').toLowerCase();
+        try{sessionStorage.setItem('suvidha_storetype_switch',explicitType)}catch{}
+        setTimeout(()=>location.reload(),80);
+        return false;
+      }
       document.body.classList.remove('jewel-suite-mode');
       window.__jewelSuiteEnabled=false;JS.enabled=false;
       return false;

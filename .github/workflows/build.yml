@@ -311,6 +311,16 @@ jobs:
           if(-not $sync.Contains("read(x,'OutletName','outletName')")){ throw 'Login outlet sync is not camelCase tolerant' }
           if(-not $sync.Contains("read(x,'StoreType','storeType')")){ throw 'Login store type sync is not camelCase tolerant' }
           $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
+          if($jewel.Contains('Settings & AMC')){ throw 'Jewellery menu must show Settings only' }
+          foreach($token in @('explicitType','location.reload()')){ if(-not $jewel.Contains($token)){ throw "Jewellery live StoreType exit missing: $token" } }
+          $jcss = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
+          foreach($token in @('main>header{display:flex!important','license-pill{display:inline-flex!important')){ if(-not $jcss.Contains($token)){ throw "Jewellery validity header missing: $token" } }
+          $completion = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js' -Raw -Encoding UTF8
+          foreach($token in @('syncLicenseOwnership','/api/license/check','periodic','300000')){ if(-not $completion.Contains($token)){ throw "Automatic Central ownership refresh missing: $token" } }
+          $outletUi = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-master-fix.js' -Raw -Encoding UTF8
+          if(-not $outletUi.Contains('lic.validTill')){ throw 'Outlet Validity must be camelCase tolerant' }
+          if($outletUi.Contains('Outlet Code<input')){ throw 'Outlet Code must not appear as an extra locked Outlet Master field' }
+          $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
           if(-not $jewel.Contains("prop(s,'StoreType','storeType')")){ throw 'Jewellery mode profile is not camelCase tolerant' }
           $app = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           if($app.Contains('disabled title="Configure OpenAI API key first"')){ throw 'AI extract is still silently disabled on config status failure' }

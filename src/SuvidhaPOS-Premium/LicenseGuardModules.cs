@@ -53,13 +53,6 @@ public static class LicenseGuardModules
         SaveOutletCode(payload!.OutletCode);
 
         var serverBlock = ReadServerBlock();
-        if (serverBlock is not null && string.Equals(serverBlock.Code, "EXPIRED", StringComparison.OrdinalIgnoreCase))
-        {
-            // Older builds persisted expiry as a hard server block. Expiry is now handled by signed
-            // grace/read-only policy, so migrate that legacy marker automatically.
-            ClearServerBlock();
-            serverBlock = null;
-        }
         if (serverBlock is not null)
             return LicenseStatus.ServerBlocked(serverBlock.Code, serverBlock.Message, payload, validFrom, validTill, nowUtc, WarningWindowDays);
 
@@ -194,10 +187,24 @@ public static class LicenseGuardModules
 
             if (statusCode == "expired")
             {
-                ClearServerBlock();
+                var message = ReadMessage(body, "License grace period has ended. Billing is read-only until renewal.");
+                if (central is not null && !string.IsNullOrWhiteSpace(central.Token) &&
+                    TryValidateToken(cfg, central.Token, DateTime.UtcNow, out var expiredPayload, out _, out _, out _))
+                {
+                    WriteProtectedString(TokenPath(), central.Token);
+                    SaveOutletCode(expiredPayload!.OutletCode);
+                    await SyncCentralStoreTypeAsync(db, expiredPayload);
+                    ClearServerBlock();
+                }
+                else
+                {
+                    // Fallback for an older Central build that reports expiry without a signed replacement token.
+                    SaveServerBlock("EXPIRED", message);
+                }
+                MarkManaged();
                 return Results.Ok(new
                 {
-                    message = "License grace period has ended. Billing is read-only until renewal.",
+                    message,
                     status = GetStatus(cfg)
                 });
             }

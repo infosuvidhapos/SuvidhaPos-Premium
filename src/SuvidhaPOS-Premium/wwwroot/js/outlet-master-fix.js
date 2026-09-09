@@ -8,9 +8,11 @@
     setPage('settings');title.textContent='Settings';
     try{
       const [x,o,lic]=await Promise.all([api('/api/settings'),api('/api/outlet'),fetch('/public/license/status',{cache:'no-store'}).then(r=>r.ok?r.json():{}).catch(()=>({}))]);
-      const type=canonicalType(lic.StoreType||o.StoreType||'Retail Shop');
+      const type=canonicalType(lic.StoreType||lic.storeType||o.StoreType||o.storeType||'Retail Shop');
+      const validity=lic.ValidTill||lic.validTill||'Not linked';
+      const licensedName=lic.OutletName||lic.outletName||'';
       saveLoginOutlet({...o,StoreType:type});
-      document.querySelector('#outletPill').textContent=o.OutletName||lic.OutletName||'Main Outlet';
+      const outletPill=document.querySelector('#outletPill');if(outletPill)outletPill.textContent=o.OutletName||licensedName||'Main Outlet';
       document.body.dataset.storeType=type.replace(/[^a-z0-9]+/gi,'-').toLowerCase();
       app.innerHTML=`<div class="content">
         <div class="twocol">
@@ -24,10 +26,9 @@
           <div class="panel outlet-master-panel"><div class="panelhead"><h3>OUTLET MASTER</h3><span class="tag">WEBSITE SYNC</span></div>
             <p class="muted">Store Type aur Validity sirf suvidhapremium.suvidhapos.in se manage hote hain. POS me dono locked hain. Store Type remains managed by SuvidhaPremium. Baaki outlet details local edit ho sakti hain aur background sync queue me jaati hain.</p>
             <div class="formgrid">
-              <label>Outlet Name<input id="oname" class="input" value="${e(o.OutletName||lic.OutletName||'Main Outlet')}"></label>
+              <label>Outlet Name<input id="oname" class="input" value="${e(o.OutletName||licensedName||'Main Outlet')}"></label>
               <label>Store Type<input id="otype" class="input" value="${e(type)}" readonly disabled title="Managed from SuvidhaPremium website"><small>Website managed · POS locked</small></label>
-              <label>Validity<input id="ovalidity" class="input" value="${e(lic.ValidTill||'Not linked')}" readonly disabled title="Managed from SuvidhaPremium website"><small>Website managed · POS locked</small></label>
-              <label>Outlet Code<input class="input" value="${e(lic.OutletCode||'')}" readonly disabled></label>
+              <label>Validity<input id="ovalidity" class="input" value="${e(validity)}" readonly disabled title="Managed from SuvidhaPremium website"><small>Website managed · POS locked</small></label>
               <label>Phone<input id="ophone" class="input" value="${e(o.Phone||'')}"></label>
               <label>GSTIN<input id="ogst" class="input" value="${e(o.Gstin||'')}"></label>
               <label class="full">Address<textarea id="oaddr" class="textarea">${e(o.Address||'')}</textarea></label>
