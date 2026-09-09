@@ -14,7 +14,7 @@
   function shell(){
     const side=document.getElementById('sidebar'); if(!side)return;
     side.innerHTML=`
-      <div class="js-brand"><img src="/img/suvidha-pos-mark.svg?v=6111jewelui" alt="Suvidha POS"><div><b>SUVIDHA POS</b><small>JEWELLERY PREMIUM</small></div><button data-theme-toggle onclick="toggleSuvidhaTheme()" title="Switch theme">☀</button></div>
+      <div class="js-brand"><img class="js-brand-logo" src="/img/suvidha-pos-mark.svg?v=6115jewelreports" alt="Suvidha POS"></div>
       <div class="js-quick"><span>⌘ K</span><input id="jsQuickSearch" placeholder="Quick search"></div>
       <div class="js-side-scroll">
         <div class="js-section">OVERVIEW</div>
@@ -33,17 +33,19 @@
         <button class="nav js-nav" onclick="jewelComingSoon('Karigar Jobs')">${icon('▥')}<span>Karigar Jobs</span></button>
         <button class="nav js-nav" onclick="jewelSuiteInvoice('repair')">${icon('⌕')}<span>Repairs</span></button>
         <div class="js-section">FINANCE</div>
-        <button class="nav js-nav" onclick="jewelComingSoon('Girvi Loans')">${icon('⚖')}<span>Girvi Loans</span></button>
+        <button class="nav js-nav" onclick="loadJewelGirviReport()">${icon('⚖')}<span>Girvi Loans</span></button>
         <button class="nav js-nav" onclick="jewelComingSoon('Cr/Dr Ledger')">${icon('▭')}<span>Cr/Dr Ledger</span></button>
         <button class="nav js-nav" onclick="jewelComingSoon('Saving Schemes')">${icon('♧')}<span>Saving Schemes</span></button>
         <div class="js-section">INVENTORY</div>
         <button class="nav js-nav" data-page="products" onclick="loadProducts()">${icon('◇')}<span>Stock</span></button>
-        <div class="js-section">REPORTS</div>
-        <button class="nav js-nav" data-page="jDaybook" onclick="loadJewelDaybook()">${icon('▣')}<span>Daybook</span></button>
-        <button class="nav js-nav" data-page="jSalesReport" onclick="loadJewelSalesReport()">${icon('⌁')}<span>Sales Report</span></button>
-        <button class="nav js-nav" data-page="jGstReport" onclick="loadJewelGstReport()">${icon('%')}<span>GST Report</span></button>
-        <button class="nav js-nav" data-page="jStockReport" onclick="loadJewelStockReport()">${icon('◇')}<span>Stock Report</span></button>
-        <button class="nav js-nav" data-page="jGirviReport" onclick="loadJewelGirviReport()">${icon('⚖')}<span>Girvi Report</span></button>
+        <button class="js-section js-section-toggle" type="button" aria-expanded="false" aria-controls="jsReportsMenu" onclick="toggleJewelReports()"><span>REPORTS</span><span id="jsReportsChevron">›</span></button>
+        <div id="jsReportsMenu" class="js-report-nav">
+          <button class="nav js-nav" data-page="jDaybook" onclick="loadJewelDaybook()">${icon('▣')}<span>Daybook</span></button>
+          <button class="nav js-nav" data-page="jSalesReport" onclick="loadJewelSalesReport()">${icon('⌁')}<span>Sales Report</span></button>
+          <button class="nav js-nav" data-page="jGstReport" onclick="loadJewelGstReport()">${icon('%')}<span>GST Report</span></button>
+          <button class="nav js-nav" data-page="jStockReport" onclick="loadJewelStockReport()">${icon('◇')}<span>Stock Report</span></button>
+          <button class="nav js-nav" data-page="jGirviReport" onclick="loadJewelGirviReport()">${icon('⚖')}<span>Girvi Report</span></button>
+        </div>
         <div class="js-section">MASTERS</div>
         <button class="nav js-nav" data-page="customers" onclick="loadCustomers()">${icon('♙')}<span>Customers</span></button>
         <button class="nav js-nav" onclick="loadJewelRates()">${icon('↗')}<span>Au/Ag Rates</span></button>
@@ -55,11 +57,23 @@
     if(q)q.addEventListener('input',()=>{const t=q.value.toLowerCase();side.querySelectorAll('.js-nav').forEach(x=>x.style.display=x.textContent.toLowerCase().includes(t)?'':'none')});
   }
 
+  window.toggleJewelReports=function(force){
+    const box=document.getElementById('jsReportsMenu');
+    const button=document.querySelector('.js-section-toggle[aria-controls="jsReportsMenu"]');
+    const chevron=document.getElementById('jsReportsChevron');
+    if(!box)return false;
+    const open=typeof force==='boolean'?force:!box.classList.contains('open');
+    box.classList.toggle('open',open);
+    if(button)button.setAttribute('aria-expanded',open?'true':'false');
+    if(chevron)chevron.textContent=open?'⌄':'›';
+    return open;
+  };
+
   function activate(page){
-    // Jewellery navigation must always re-assert its mode class; stale outlet refreshes must never leave the page unstyled.
     document.body.classList.add('jewel-suite-mode');
     document.body.dataset.storeType='jewellery-shop';
     document.querySelectorAll('#sidebar .js-nav').forEach(x=>x.classList.toggle('active',x.dataset.page===page));
+    if(/^j(Daybook|SalesReport|GstReport|StockReport|GirviReport|Reports)$/.test(String(page||'')))window.toggleJewelReports(true);
     try{window.scrollTo({top:0,left:0,behavior:'instant'});document.documentElement.scrollTop=0;document.body.scrollTop=0;appBox().scrollTop=0}catch{}
   }
   function pageHeading(title,sub,actions=''){
@@ -114,7 +128,7 @@
         <button onclick="jewelComingSoon('Cr/Dr Ledger')">▭<b>Cr/Dr Ledger</b><span>Customer account ledger</span></button>
         <button onclick="jewelComingSoon('Saving Schemes')">♧<b>Saving Schemes</b><span>Gold/silver saving plans</span></button>
         <button onclick="loadProducts()">◇<b>Stocks</b><span>Jewellery stock register</span></button>
-        <button onclick="loadReports()">⌁<b>All Reports</b><span>Daybook, GST, sales & more</span></button>
+        <button onclick="loadJewelReports()">⌁<b>All Reports</b><span>Daybook, GST, sales, stock & girvi</span></button>
       </div>
       <div class="js-block-title">♙ &nbsp; CREATE PARTY</div>
       <div class="js-party-grid">
@@ -250,6 +264,7 @@
     window.loadDashboard=dashboard;
     window.loadBilling=()=>invoice('retail');
     window.loadPurchase=()=>invoice('purchase');
+    window.loadReports=()=>window.loadJewelReports?window.loadJewelReports():dashboard();
     const current=document.querySelector('#loginScreen');
     if(!current||getComputedStyle(current).display==='none'||document.body.getAttribute('data-authenticated')==='true')dashboard();
     return true;

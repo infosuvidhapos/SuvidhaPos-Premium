@@ -129,16 +129,16 @@ jobs:
         shell: powershell
         run: |
           $css=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
-          foreach($token in @('background:#fbfaf7','background:#d9aa35','js-card-head button','js-pick-row','js-bill-tabs button.active','6.11.4 report extensions')){if(-not $css.Contains($token)){throw "Restored Jewellery design missing: $token"}}
+          foreach($token in @('background:#fbfaf7','background:#d9aa35','js-card-head button','js-pick-row','js-bill-tabs button.active','6.11.5 Jewellery reports','js-brand-logo','js-report-grid','outlet-master-panel')){if(-not $css.Contains($token)){throw "Restored Jewellery design missing: $token"}}
       - name: Validate jewellery premium reports and internet rates
         shell: powershell
         run: |
           $j=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
-          foreach($token in @('SUVIDHA POS','JEWELLERY PREMIUM','loadJewelDaybook','loadJewelSalesReport','loadJewelGstReport','loadJewelStockReport','loadJewelGirviReport','jewelRefreshLiveRates')){if(-not $j.Contains($token)){throw "Jewellery premium shell missing: $token"}}
+          foreach($token in @('js-brand-logo','toggleJewelReports','loadJewelDaybook','loadJewelSalesReport','loadJewelGstReport','loadJewelStockReport','loadJewelGirviReport','jewelRefreshLiveRates','loadJewelReports')){if(-not $j.Contains($token)){throw "Jewellery premium shell missing: $token"}}
           if($j.Contains('Jewel Suite')){throw 'Legacy Jewel Suite branding remains'}
           if($j.Contains('Diamond 22K')){throw 'Fabricated/static diamond rate content remains'}
           $r=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-premium-ui.js' -Raw -Encoding UTF8
-          foreach($token in @('loadJewelDaybook','loadJewelSalesReport','loadJewelGstReport','loadJewelStockReport','loadJewelGirviReport','Girvi transactions are not enabled yet')){if(-not $r.Contains($token)){throw "Jewellery report missing: $token"}}
+          foreach($token in @('loadJewelReports','loadJewelDaybook','loadJewelSalesReport','loadJewelGstReport','loadJewelStockReport','loadJewelGirviReport','jewelExportReport','Girvi transactions are not enabled yet')){if(-not $r.Contains($token)){throw "Jewellery report missing: $token"}}
           $live=Get-Content 'src/SuvidhaPOS-Premium/JewelleryLiveRateModules.cs' -Raw -Encoding UTF8
           foreach($token in @('xaus.com/api/v1/spot?currency=INR&unit=gram','silver_usd_oz','gold*22m/24m','Saved rate fallback')){if(-not $live.Contains($token)){throw "Internet metal rate integration missing: $token"}}
           $css=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
@@ -147,7 +147,7 @@ jobs:
         shell: powershell
         run: |
           $html=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
-          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.11.4-restoredjewel')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
+          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.11.5-jewelreports')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
           $app=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           foreach($token in @('Business Command Center',"Today's completed billing",'window.scrollTo')){if(-not $app.Contains($token)){throw "Dashboard premium behavior missing: $token"}}
           if($app.Contains("'Live from SQL'")){throw 'Dashboard still shows Live from SQL'}

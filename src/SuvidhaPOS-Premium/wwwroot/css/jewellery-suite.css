@@ -5,7 +5,8 @@ body.jewel-suite-mode #sidebar{width:292px;padding:0;background:#fffdf9;border-r
 body.jewel-suite-mode main{background:#fbfaf7}
 body.jewel-suite-mode main>header,body.jewel-suite-mode main>footer{display:none}
 body.jewel-suite-mode #app{min-height:100vh;background:#fbfaf7}
-body.jewel-suite-mode .js-brand{height:68px;border-bottom:1px solid #e3ded5;display:flex;align-items:center;padding:0 24px;color:#c9941e;font:700 21px Georgia,serif;gap:7px}
+body.jewel-suite-mode .js-brand{height:96px;border-bottom:1px solid #e3ded5;display:flex;align-items:center;justify-content:center;padding:8px 18px;background:#fffdf9;overflow:hidden}
+body.jewel-suite-mode .js-brand-logo{display:block;width:188px;max-width:100%;height:78px;object-fit:contain;object-position:center;margin:0 auto}
 body.jewel-suite-mode .js-quick{display:flex;align-items:center;gap:9px;margin:17px 24px 10px;color:#8a8377}
 body.jewel-suite-mode .js-quick span{border:1px solid #e5e0d8;background:#faf9f6;border-radius:7px;padding:6px 8px;font-size:10px;white-space:nowrap}
 body.jewel-suite-mode .js-quick input{border:0;outline:0;background:transparent;color:#4e4941;width:100%;font-size:12px}
@@ -95,3 +96,50 @@ body.jewel-suite-mode .js-gold-text{color:#c28b12;font-weight:800}
 @media(max-width:1100px){.jewel-suite-mode .js-report-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.jewel-suite-mode .js-report-two{grid-template-columns:1fr}}
 @media(max-width:780px){.jewel-suite-mode .js-report-metrics,.jewel-suite-mode .js-report-metrics.four,.jewel-suite-mode .js-report-metrics.three{grid-template-columns:1fr}.jewel-suite-mode .js-report-filter{flex-wrap:wrap}}
 
+
+
+/* 6.11.5 Jewellery reports, sidebar folder and master-page cream alignment */
+body.jewel-suite-mode .js-section-toggle{width:calc(100% - 16px);margin:18px 8px 6px;padding:0 6px;border:0;background:transparent;display:flex;align-items:center;justify-content:space-between;color:#80796d;font:800 10px Inter,Segoe UI,Arial,sans-serif;letter-spacing:.8px;cursor:pointer;text-align:left}
+body.jewel-suite-mode .js-section-toggle:hover{color:#a8730e}
+body.jewel-suite-mode .js-report-nav{display:none;padding:2px 0 5px}
+body.jewel-suite-mode .js-report-nav.open{display:grid;gap:2px}
+body.jewel-suite-mode .js-report-nav .nav{margin-left:8px;width:calc(100% - 8px)}
+body.jewel-suite-mode .js-report-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;margin:14px 0 24px}
+body.jewel-suite-mode .js-report-tile{min-height:155px;padding:22px 16px;border:1px solid #e3ddd3;border-radius:14px;background:linear-gradient(145deg,#fff,#fffaf0);color:#3d3932;display:grid;place-items:center;align-content:center;gap:9px;cursor:pointer;box-shadow:0 3px 10px #58460e12}
+body.jewel-suite-mode .js-report-tile:hover{border-color:#d8aa35;transform:translateY(-1px);box-shadow:0 8px 18px #8f6c1b1a}
+body.jewel-suite-mode .js-report-tile i{font-style:normal;width:43px;height:43px;border-radius:50%;display:grid;place-items:center;background:#fff0bd;color:#b47b09;font-size:19px}
+body.jewel-suite-mode .js-report-tile b{font:700 14px Georgia,serif}
+body.jewel-suite-mode .js-report-tile span{max-width:180px;text-align:center;font-size:10px;line-height:1.45;color:#8b8479}
+body.jewel-suite-mode .js-report-table-wrap{overflow:auto;max-width:100%}
+body.jewel-suite-mode .js-report-two>.js-report-card{min-width:0}
+body.jewel-suite-mode .js-report-filter select{min-width:150px;background:#faf9f6;border:1px solid #ded9d2;color:#4c4841;border-radius:8px;padding:10px 12px}
+
+/* Standard Item Master, Outlet Master and Settings inherit the original Jewellery cream/gold workspace. */
+body.jewel-suite-mode .content{padding:28px 32px 55px;max-width:1500px;margin:auto;background:#fbfaf7;color:#292721}
+body.jewel-suite-mode .panel,body.jewel-suite-mode .modalbox,body.jewel-suite-mode .card,body.jewel-suite-mode .mini{background:#fffdf9!important;border-color:#e5e0d7!important;color:#35312b!important;box-shadow:0 2px 7px #58460e12!important}
+body.jewel-suite-mode .panelhead{border-color:#ebe6dc!important}
+body.jewel-suite-mode .panel h1,body.jewel-suite-mode .panel h2,body.jewel-suite-mode .panel h3,body.jewel-suite-mode .panelhead h1,body.jewel-suite-mode .panelhead h2,body.jewel-suite-mode .panelhead h3{color:#34302a!important}
+body.jewel-suite-mode .muted,body.jewel-suite-mode .panel p{color:#827b70!important}
+body.jewel-suite-mode .input,body.jewel-suite-mode .select,body.jewel-suite-mode .textarea,body.jewel-suite-mode .formgrid input:not([type="checkbox"]):not([type="radio"]),body.jewel-suite-mode .formgrid select,body.jewel-suite-mode .formgrid textarea{background:#faf9f6!important;border-color:#ded9d2!important;color:#4c4841!important}
+body.jewel-suite-mode .input:focus,body.jewel-suite-mode .select:focus,body.jewel-suite-mode .textarea:focus{border-color:#d6a01f!important;box-shadow:0 0 0 3px #d6a01f18!important}
+body.jewel-suite-mode .formgrid label{color:#766f64!important}
+body.jewel-suite-mode input[type="checkbox"],body.jewel-suite-mode input[type="radio"]{accent-color:#c9931c}
+body.jewel-suite-mode .table{background:#fffdf9!important;color:#45413b!important}
+body.jewel-suite-mode .table thead th{background:#f7f3eb!important;color:#716b61!important;border-color:#e2ddd5!important}
+body.jewel-suite-mode .table td{background:#fffdf9!important;color:#4a463f!important;border-color:#eee9e1!important}
+body.jewel-suite-mode .table tr:hover td{background:#fffaf0!important}
+body.jewel-suite-mode .btn{background:#d8aa35!important;border-color:#d0a12c!important;color:#fff!important;box-shadow:none!important}
+body.jewel-suite-mode .btn:hover{background:#c79520!important}
+body.jewel-suite-mode .btn.secondary{background:#fffaf0!important;border-color:#dfc77e!important;color:#9c6b0e!important}
+body.jewel-suite-mode .btn.danger{background:#fff1f4!important;border-color:#e7bbc5!important;color:#a11e3a!important}
+body.jewel-suite-mode .tag{background:#fff6d8!important;border-color:#e4c76c!important;color:#8f6511!important}
+body.jewel-suite-mode .empty{color:#90897e!important}
+body.jewel-suite-mode .toolbar{border-color:#e8e1d6!important}
+body.jewel-suite-mode .outlet-master-panel,body.jewel-suite-mode .jewellery-master .panel{background:linear-gradient(145deg,#fffdf9,#fffaf0)!important}
+body.jewel-suite-mode .outlet-mode-preview{margin-top:14px}
+body.jewel-suite-mode .outlet-mode-jewellery{padding:14px 16px;border:1px solid #e3c667;border-radius:10px;background:#fff8df;color:#6f5215;display:grid;gap:5px}
+body.jewel-suite-mode .outlet-mode-jewellery span{font-size:11px;color:#7d725f}
+body.jewel-suite-mode .outlet-mode-standard{padding:14px 16px;border:1px solid #ddd7cd;border-radius:10px;background:#faf8f3;color:#625d54;display:grid;gap:5px}
+body.jewel-suite-mode .modal{background:#2c241866!important}
+@media(max-width:1250px){body.jewel-suite-mode .js-report-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:780px){body.jewel-suite-mode .js-brand{height:84px}.jewel-suite-mode .js-brand-logo{width:165px;height:66px}body.jewel-suite-mode .js-report-grid{grid-template-columns:1fr 1fr}.jewel-suite-mode .content{padding:18px}}

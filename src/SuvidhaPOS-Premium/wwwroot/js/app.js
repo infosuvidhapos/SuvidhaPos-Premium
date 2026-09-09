@@ -232,6 +232,7 @@ if(sidebar){
   sidebar.addEventListener('click',e=>{
     const b=e.target.closest&&e.target.closest('.nav[data-page]');
     if(!b||!sidebar.contains(b))return;
+    if(document.body.classList.contains('jewel-suite-mode')&&b.classList.contains('js-nav')&&b.getAttribute('onclick'))return;
     e.preventDefault();
     navigateFromSidebar(b.dataset.page);
   });
