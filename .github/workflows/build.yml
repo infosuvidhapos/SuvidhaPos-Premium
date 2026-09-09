@@ -6,7 +6,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build-test-publish:
     runs-on: windows-latest
@@ -350,18 +350,33 @@ jobs:
           $installer=Get-ChildItem 'installer/installer-output/*.exe' | Select-Object -First 1
           if($null -eq $installer){throw 'Installer not generated'}
           Get-FileHash $installer.FullName -Algorithm SHA256
-      - name: Upload Windows publish artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SuvidhaPOS-Premium-Windows-x64
-          path: publish/desktop/win-x64
-      - name: Upload database backup
-        uses: actions/upload-artifact@v4
-        with:
-          name: SuvidhaPos-Database-Backup
-          path: database-artifact/SuvidhaPos.bak
-      - name: Upload installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: SuvidhaPOS-Premium-Windows-Installer
-          path: installer/installer-output/*.exe
+      - name: Publish rolling GitHub Release
+        if: github.event_name != 'pull_request'
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = 'latest-build'
+          $installer = Get-ChildItem 'installer/installer-output/*.exe' | Select-Object -First 1
+          if($null -eq $installer){ throw 'Installer not generated for release publishing' }
+          $backup = Get-Item 'database-artifact/SuvidhaPos.bak' -ErrorAction Stop
+
+          gh release view $tag --repo "${{ github.repository }}" *> $null
+          if($LASTEXITCODE -eq 0){
+            gh release delete $tag --repo "${{ github.repository }}" --cleanup-tag --yes
+            if($LASTEXITCODE -ne 0){ throw 'Unable to replace previous latest-build release' }
+          }
+
+          gh release create $tag --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "SuvidhaPOS Premium Build #${{ github.run_number }}" --notes "Automated Windows installer and SQL Server 2019 compatible backup for commit ${{ github.sha }}." --prerelease
+          if($LASTEXITCODE -ne 0){ throw 'Unable to create latest-build release' }
+
+          gh release upload $tag $installer.FullName $backup.FullName --repo "${{ github.repository }}" --clobber
+          if($LASTEXITCODE -ne 0){ throw 'Unable to upload installer/database backup to latest-build release' }
+
+      - name: Validate release publishing policy
+        shell: powershell
+        run: |
+          $wf = Get-Content '.github/workflows/build.yml' -Raw -Encoding UTF8
+          if($wf.Contains('actions/upload-artifact@v4')){ throw 'Actions artifact storage must not be used by this workflow' }
+          foreach($token in @('contents: write','Publish rolling GitHub Release','latest-build','gh release create','gh release upload')){ if(-not $wf.Contains($token)){ throw "Release publishing policy missing: $token" } }
