@@ -30,12 +30,59 @@
  const raw=v=>v===null||v===undefined?'':String(v);
  const format=(k,v)=>{if(v===null||v===undefined)return '-';if(/percent|rate|gst/i.test(k)&&typeof v==='number')return esc(v)+'%';if(typeof v==='number'){if(/amount|value|price|total|tax|paid|cost|sales|expense|profit|credit|debit|discount|mrp|balance|collected/i.test(k))return '₹'+money(v);return money(v)}if(/date|time|created/i.test(k)){const d=new Date(v);if(!isNaN(d))return esc(d.toLocaleString('en-IN'))}return esc(v)};
 
- window.loadReports=async function(){setPage('reports');title.textContent='Report Master';document.querySelector('header p').textContent='From/To date reports with Excel and PDF export';const today=iso(new Date()),from=iso(new Date(Date.now()-29*86400000));app.innerHTML=`<div class="content">
- <div class="panel report-toolbar"><div class="formgrid"><label>Report<select id="reportType" class="select" data-no-tax-enhance="1" data-report-master="1">${defs.map(x=>`<option value="${x[0]}">${esc(x[1])}</option>`).join('')}</select></label><label>From Date<input id="reportFrom" class="input" type="date" value="${from}"></label><label>To Date<input id="reportTo" class="input" type="date" value="${today}"></label><label>Search<input id="reportQ" class="input" placeholder="Bill, item, customer, supplier, user..."></label></div><div class="toolbar"><button class="btn" onclick="runReport()">Generate Report</button><button class="btn secondary" onclick="exportReportExcel()">⬇ Export Excel</button><button class="btn secondary" onclick="exportReportPdf()">⬇ Export PDF</button></div></div>
- <div id="reportMeta" class="muted" style="margin:8px 0"></div><div class="panel"><div class="tablewrap"><table class="table" id="reportTable"><thead></thead><tbody><tr><td class="empty">Select report and generate</td></tr></tbody></table></div></div></div>`;
- document.querySelector('#reportType').addEventListener('change',runReport);document.querySelector('#reportMeta').textContent='19 report masters loaded';await runReport()};
+ window.loadReports=async function(){
+  setPage('reports');title.textContent='Report Master';document.querySelector('header p').textContent='19 premium business reports with filters and export';
+  currentRows=[];currentDef=null;
+  const meta={
+   'account-report':['▣','Accounts','Ledger / account view','blue'],
+   'daily-sale-bill-wise':['▥','Sales','Daily bill-wise performance','orange'],
+   'cashier-report':['♙','Sales','Cashier collection summary','cyan'],
+   'date-wise-summary':['▤','Sales','Date-wise business summary','purple'],
+   'bill-modification':['✎','Audit','Bill edit / modification audit','red'],
+   'utility-report':['⚙','Utility','Operational utility report','teal'],
+   'item-wise-report':['◇','Inventory','Item-wise sales analysis','indigo'],
+   'profit-loss':['₹','Finance','Profit and loss summary','green'],
+   'date-wise-sale-summary':['⌁','Sales','Date-wise sale totals','orange'],
+   'bill-customer-report':['♙','Customers','Bill and customer analysis','blue'],
+   'category-wise-sale':['◈','Sales','Category performance','purple'],
+   'category-wise-monthly-sale':['▦','Sales','Monthly category comparison','indigo'],
+   'hsn-wise-sale':['%','Tax','HSN-wise taxable sales','teal'],
+   'purchase-register':['🛒','Purchase','Purchase register and totals','orange'],
+   'bill-detail':['▤','Sales','Detailed invoice report','blue'],
+   'qty-wise-report':['#','Inventory','Quantity-wise movement','cyan'],
+   'product-expiry':['◷','Inventory','Expiry and batch watch','red'],
+   'gstr1':['GST','Tax','GSTR-1 outward supply summary','green'],
+   'current-stock-report':['▦','Inventory','Current stock and valuation','indigo']
+  };
+  app.innerHTML=`<div class="content normal-report-master">
+   <div class="normal-report-intro">
+    <div><span class="normal-report-kicker">ANALYTICS & REPORTING</span><h2>Business Reports</h2><p>Choose a report tile to open filters, live data, Excel export and PDF print.</p></div>
+    <div class="normal-report-count"><b>19</b><span>Reports Ready</span></div>
+   </div>
+   <select id="reportType" data-no-tax-enhance="1" data-report-master="1" hidden>${defs.map(x=>`<option value="${x[0]}">${esc(x[1])}</option>`).join('')}</select>
+   <div class="normal-report-grid">${defs.map(x=>{const m=meta[x[0]]||['▤','Report','Open business report','blue'];return `<button class="normal-report-tile tone-${m[3]}" onclick="openNormalReport('${x[0]}')"><div class="normal-report-tile-top"><span class="normal-report-icon">${m[0]}</span><span class="normal-report-arrow">↗</span></div><span class="normal-report-category">${esc(m[1])}</span><b>${esc(x[1])}</b><small>${esc(m[2])}</small></button>`}).join('')}</div>
+   <div id="normalReportWorkspace"></div>
+  </div>`;
+ };
 
- window.runReport=async function(){const type=document.querySelector('#reportType')?.value;if(!type)return;currentDef=defs.find(x=>x[0]===type)||defs[0];const from=document.querySelector('#reportFrom').value,to=document.querySelector('#reportTo').value,q=encodeURIComponent(document.querySelector('#reportQ').value||'');try{currentRows=await api(`/api/premium-reports/${type}?from=${from}&to=${to}&q=${q}`);render()}catch(e){document.querySelector('#reportTable').innerHTML=`<tbody><tr><td class="alert">${esc(e.message)}</td></tr></tbody>`}};
+ window.openNormalReport=async function(type){
+  currentDef=defs.find(x=>x[0]===type)||defs[0];
+  const sel=document.querySelector('#reportType');if(sel)sel.value=currentDef[0];
+  const today=iso(new Date()),from=iso(new Date(Date.now()-29*86400000));
+  const box=document.querySelector('#normalReportWorkspace');if(!box)return;
+  box.innerHTML=`<div class="panel normal-report-workspace">
+   <div class="normal-report-workspace-head"><div><span class="normal-report-kicker">OPEN REPORT</span><h3>${esc(currentDef[1])}</h3></div><button class="btn small secondary" onclick="closeNormalReport()">✕ Close</button></div>
+   <div class="normal-report-filters"><label>From Date<input id="reportFrom" class="input" type="date" value="${from}"></label><label>To Date<input id="reportTo" class="input" type="date" value="${today}"></label><label>Search<input id="reportQ" class="input" placeholder="Bill, item, customer, supplier, user..."></label></div>
+   <div class="toolbar"><button class="btn" onclick="runReport()">Generate Report</button><button class="btn secondary" onclick="exportReportExcel()">⬇ Export Excel</button><button class="btn secondary" onclick="exportReportPdf()">⬇ Export PDF</button></div>
+   <div id="reportMeta" class="muted normal-report-meta">Loading report…</div>
+   <div class="normal-report-table-shell"><div class="tablewrap"><table class="table" id="reportTable"><thead></thead><tbody><tr><td class="empty">Generating report…</td></tr></tbody></table></div></div>
+  </div>`;
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+  await runReport();
+ };
+ window.closeNormalReport=function(){currentRows=[];currentDef=null;const box=document.querySelector('#normalReportWorkspace');if(box)box.innerHTML='';};
+
+ window.runReport=async function(){const type=currentDef?.[0]||document.querySelector('#reportType')?.value;if(!type)return;currentDef=defs.find(x=>x[0]===type)||defs[0];const from=document.querySelector('#reportFrom')?.value||iso(new Date(Date.now()-29*86400000)),to=document.querySelector('#reportTo')?.value||iso(new Date()),q=encodeURIComponent(document.querySelector('#reportQ')?.value||'');try{currentRows=await api(`/api/premium-reports/${type}?from=${from}&to=${to}&q=${q}`);render()}catch(e){const table=document.querySelector('#reportTable');if(table)table.innerHTML=`<tbody><tr><td class="alert">${esc(e.message)}</td></tr></tbody>`}};
 
  function render(){const table=document.querySelector('#reportTable'),rows=currentRows||[];if(!rows.length){table.querySelector('thead').innerHTML='';table.querySelector('tbody').innerHTML='<tr><td class="empty">No records found</td></tr>';document.querySelector('#reportMeta').textContent=(currentDef?.[1]||'Report')+' · 0 records';return}const keys=Object.keys(rows[0]);table.querySelector('thead').innerHTML='<tr>'+keys.map(k=>`<th>${esc(pretty(k))}</th>`).join('')+'</tr>';table.querySelector('tbody').innerHTML=rows.map(r=>'<tr>'+keys.map(k=>`<td>${format(k,r[k])}</td>`).join('')+'</tr>').join('');document.querySelector('#reportMeta').textContent=`${currentDef?.[1]} · ${rows.length} records · ${document.querySelector('#reportFrom').value} to ${document.querySelector('#reportTo').value}`}
 

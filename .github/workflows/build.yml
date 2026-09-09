@@ -72,13 +72,15 @@ jobs:
           if(-not $special.Contains('LicenseGuardModules.GetStatus().StoreType')){ throw 'Specialization does not prefer signed central Store Type' }
           $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/specialized-schema.sql' -Raw -Encoding UTF8
           if(-not $schema.Contains("StoreType IN ('Gold & Diamond Jewellery','Silver Jewellery')")){ throw 'Legacy jewellery type normalization migration missing' }
-      - name: Validate report dropdown and outlet mode switching
+      - name: Validate 19-report tile master and outlet mode switching
         shell: powershell
         run: |
           $reports = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/reports-suite.js' -Raw -Encoding UTF8
-          if(-not $reports.Contains('data-no-tax-enhance="1"')){ throw 'Report dropdown is not protected from tax enhancer' }
+          foreach($token in @('normal-report-grid','normal-report-tile','openNormalReport','Business Reports','19 premium business reports','data-no-tax-enhance="1"')){ if(-not $reports.Contains($token)){ throw "Premium report tile master missing: $token" } }
+          $defs = ([regex]::Matches($reports,"\['[^']+','[^']+'\]")).Count
+          if($defs -lt 19){ throw "Expected all 19 normal reports, found $defs" }
           $tax = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/tax-master.js' -Raw -Encoding UTF8
-          if(-not $tax.Contains("el.id==='reportType'")){ throw 'Tax Master reportType exclusion missing' }
+          if(-not $tax.Contains("el.id==='reportType'")){ throw 'Hidden report selector tax exclusion missing' }
           $outlet = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-master-fix.js' -Raw -Encoding UTF8
           if(-not $outlet.Contains("location.replace('/?outlet='")){ throw 'Outlet save does not force workspace reload' }
           $sync = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-login-sync.js' -Raw -Encoding UTF8
