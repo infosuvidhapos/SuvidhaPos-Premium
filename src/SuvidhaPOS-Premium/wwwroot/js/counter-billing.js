@@ -14,18 +14,24 @@
   window.cbCycleUom=function(){if(!selectedUom)return toast('Select item first');const sel=document.querySelector('#cbUom');if(!sel||sel.options.length<2)return;sel.selectedIndex=(sel.selectedIndex+1)%sel.options.length;cbUomChanged();sel.focus()};
 
 
+  function lineTaxParts(x){
+    const gross=Number(x.Qty||0)*Number(x.Rate||0),rate=Math.max(0,Number(x.Gst||0)),inclusive=String(x.TaxMode||'EXCLUSIVE').toUpperCase()==='INCLUSIVE';
+    const tax=rate<=0?0:(inclusive?gross*rate/(100+rate):gross*rate/100);
+    const taxable=inclusive?gross-tax:gross;
+    return {taxable,tax,gross:inclusive?gross:gross+tax};
+  }
   function discountInfo(){
     const type=document.querySelector('#cbDiscountType')?.value||'RUPEES';
     const value=Math.max(0,Number(document.querySelector('#cbDiscountValue')?.value)||0);
-    const sub=(state.cart||[]).reduce((a,x)=>a+x.Qty*x.Rate,0);
-    const amount=type==='PERCENT'?sub*Math.min(100,value)/100:value;
-    return {type,value,amount:Math.min(amount,sub)};
+    const gross=(state.cart||[]).reduce((a,x)=>a+lineTaxParts(x).gross,0);
+    const amount=type==='PERCENT'?gross*Math.min(100,value)/100:value;
+    return {type,value,amount:Math.min(amount,gross)};
   }
   function totals(){
-    const sub=(state.cart||[]).reduce((a,x)=>a+x.Qty*x.Rate,0);
-    const tax=(state.cart||[]).reduce((a,x)=>a+x.Qty*x.Rate*x.Gst/100,0);
+    const parts=(state.cart||[]).map(lineTaxParts);
+    const sub=parts.reduce((a,x)=>a+x.taxable,0),tax=parts.reduce((a,x)=>a+x.tax,0),gross=parts.reduce((a,x)=>a+x.gross,0);
     const d=discountInfo();
-    return {sub,tax,discount:d.amount,total:Math.max(0,sub-d.amount+tax)};
+    return {sub,tax,discount:d.amount,total:Math.max(0,gross-d.amount)};
   }
   function ensureHidden(){
     const root=document.querySelector('.counter-billing');if(!root)return;
@@ -136,7 +142,7 @@
     const rate=Math.max(0,Number(document.querySelector('#cbRate').value)||choice.rate||0),mrp=Math.max(0,Number(document.querySelector('#cbMrp').value)||choice.mrp||0);
     let c=state.cart.find(x=>x.Id===selectedProduct&&x.Uom===choice.unit);
     if(c)c.Qty+=qty;
-    else state.cart.push({Id:p.Id,Name:p.Name,Barcode:p.Barcode||p.Sku||p.Id,Qty:qty,Rate:rate,Gst:Number(p.GstRate||0),Mrp:mrp,Uom:choice.unit,BaseUnit:selectedUom.uom.BaseUnit||p.Unit||'PCS',Factor:factor,Stock:Number(p.Stock||0)});
+    else state.cart.push({Id:p.Id,Name:p.Name,Barcode:p.Barcode||p.Sku||p.Id,Qty:qty,Rate:rate,Gst:Number(p.GstRate||0),TaxMode:String(p.TaxMode||'EXCLUSIVE').toUpperCase(),Mrp:mrp,Uom:choice.unit,BaseUnit:selectedUom.uom.BaseUnit||p.Unit||'PCS',Factor:factor,Stock:Number(p.Stock||0)});
     selectedRow=state.cart.findIndex(x=>x.Id===p.Id&&x.Uom===choice.unit);
     selectedProduct=-1;selectedUom=null;cashEnterArmedAt=0;document.querySelector('#cbQty').value=1;document.querySelector('#cbSearch').value='';document.querySelector('#cbItemName').value='';document.querySelector('#cbAvl').textContent='0.000';document.querySelector('#cbUom').innerHTML='<option value="">—</option>';document.querySelector('#cbRate').value='0';document.querySelector('#cbMrp').value='0';cbRender();document.querySelector('#cbSearch').focus()
   };
@@ -167,7 +173,7 @@
   window.cbApplyMulti=function(){const due=totals().total,sum=multiPayments.reduce((a,x)=>a+x.Amount,0);if(Math.abs(due-sum)>.01)return toast('Allocate full payable amount first');paymentMode='Multi Mode';paymentSubtype='Multi Mode';closeModal();document.querySelectorAll('.cb-pay button').forEach(b=>b.classList.toggle('selected',b.dataset.mode==='Multi Mode'));cbRender();document.querySelector('#cbSearch')?.focus()};
 
   window.cbReset=function(){state.cart=[];selectedProduct=-1;selectedRow=-1;selectedUom=null;cashEnterArmedAt=0;completing=false;paymentMode='Cash';paymentSubtype='Cash';multiPayments=[];ensureHidden();document.querySelector('#cbDiscountType').value='RUPEES';document.querySelector('#cbDiscountValue').value='0';cbRender();document.querySelector('#cbSearch')?.focus()};
-  window.cbComplete=async function(){if(completing)return;if(!state.cart.length)return toast('Add item first');const d=discountInfo(),t=totals();if(paymentMode==='Multi Mode'&&Math.abs(multiPayments.reduce((a,x)=>a+x.Amount,0)-t.total)>.01)return cbOpenMulti();if(paymentMode==='Credit/UPI'&&!multiPayments.length)multiPayments=[{Mode:'Credit/UPI',Type:paymentSubtype||'UPI',Amount:t.total,ReferenceNo:null}];if(paymentMode==='Cash')multiPayments=[{Mode:'Cash',Type:'Cash',Amount:t.total,ReferenceNo:null}];if(paymentMode==='BTC')multiPayments=[{Mode:'BTC',Type:'BTC',Amount:t.total,ReferenceNo:null}];completing=true;try{const customer=document.querySelector('#cbCustomer').value||'Walk-in Customer';const paid=multiPayments.filter(x=>x.Type!=='Credit').reduce((a,x)=>a+x.Amount,0);const data=await api('/api/premium/sales',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CustomerId:null,CustomerName:customer,PaymentMode:paymentMode,PaidAmount:paid,DiscountType:d.type,DiscountValue:d.value,Notes:document.querySelector('#cbRemarks').value||null,Payments:multiPayments,Lines:state.cart.map(x=>({ProductId:x.Id,Qty:x.Qty*x.Factor,SalePrice:x.Rate/x.Factor,TaxRate:x.Gst,Discount:0,UnitSold:x.Uom,SoldQty:x.Qty,BaseQty:x.Qty*x.Factor,RatePerSoldUnit:x.Rate}))})});toast('Bill completed: '+data.invoiceNo);if(typeof printLastBill==='function')printLastBill(data.id);setTimeout(renderCounterBilling,650)}catch(e){completing=false;alert(e.message)}};
+  window.cbComplete=async function(){if(completing)return;if(!state.cart.length)return toast('Add item first');const d=discountInfo(),t=totals();if(paymentMode==='Multi Mode'&&Math.abs(multiPayments.reduce((a,x)=>a+x.Amount,0)-t.total)>.01)return cbOpenMulti();if(paymentMode==='Credit/UPI'&&!multiPayments.length)multiPayments=[{Mode:'Credit/UPI',Type:paymentSubtype||'UPI',Amount:t.total,ReferenceNo:null}];if(paymentMode==='Cash')multiPayments=[{Mode:'Cash',Type:'Cash',Amount:t.total,ReferenceNo:null}];if(paymentMode==='BTC')multiPayments=[{Mode:'BTC',Type:'BTC',Amount:t.total,ReferenceNo:null}];completing=true;try{const customer=document.querySelector('#cbCustomer').value||'Walk-in Customer';const paid=multiPayments.filter(x=>x.Type!=='Credit').reduce((a,x)=>a+x.Amount,0);const data=await api('/api/premium/sales',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CustomerId:null,CustomerName:customer,PaymentMode:paymentMode,PaidAmount:paid,DiscountType:d.type,DiscountValue:d.value,Notes:document.querySelector('#cbRemarks').value||null,Payments:multiPayments,Lines:state.cart.map(x=>({ProductId:x.Id,Qty:x.Qty*x.Factor,SalePrice:x.Rate/x.Factor,TaxRate:x.Gst,TaxMode:x.TaxMode||'EXCLUSIVE',Discount:0,UnitSold:x.Uom,SoldQty:x.Qty,BaseQty:x.Qty*x.Factor,RatePerSoldUnit:x.Rate}))})});toast('Bill completed: '+data.invoiceNo);if(typeof printLastBill==='function')printLastBill(data.id);setTimeout(renderCounterBilling,650)}catch(e){completing=false;alert(e.message)}};
 
   function cbKeys(e){if(state.page!=='billing'||!document.querySelector('.counter-billing'))return;const tag=(document.activeElement?.tagName||'').toLowerCase();if(e.key==='F1'){e.preventDefault();cbDiscount();return}if(e.key==='F2'){e.preventDefault();cbCycleUom();return}if(e.key==='F3'){e.preventDefault();document.querySelector('#cbMobile')?.focus();return}if(e.key==='F4'){e.preventDefault();cbReset();return}if(e.key==='F6'){e.preventDefault();cbPaySelect('Cash');return}if(e.key==='F7'){e.preventDefault();cbOpenCreditUpi();return}if(e.key==='F8'){e.preventDefault();cbPaySelect('BTC');return}if(e.key==='F9'){e.preventDefault();cbOpenMulti();return}if(e.key==='F10'){e.preventDefault();cbComplete();return}if(e.key==='Escape'){e.preventDefault();loadDashboard();return}if(tag==='input'||tag==='select'||tag==='textarea')return;if(e.key==='Delete'){e.preventDefault();cbRemoveSelected();return}if((e.key==='+'||e.key==='=')&&selectedRow>=0&&state.cart[selectedRow]){e.preventDefault();const c=state.cart[selectedRow];if(cbBaseUsed(c.Id,selectedRow)+(c.Qty+1)*c.Factor<=c.Stock)c.Qty++;else toast('Stock limit reached');cbRender();return}if(e.key==='-'&&selectedRow>=0&&state.cart[selectedRow]){e.preventDefault();state.cart[selectedRow].Qty=Math.max(.001,state.cart[selectedRow].Qty-1);cbRender()}}
   function cbHideSuggest(){const b=document.querySelector('#cbSuggest');if(b)b.style.display='none'}

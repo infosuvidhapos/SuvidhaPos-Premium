@@ -149,10 +149,11 @@ ${styleCss(template,thermal)}
     toast('Print Master saved');
    }catch(e){alert(e.message)}
  };
- window.printMasterTest=function(){
+ window.printMasterTest=async function(){
+   const html=buildHtml(sample(),state.mode,state.template,state.width,false);
+   if(window.premiumPrintHtml)return window.premiumPrintHtml(html,'SuvidhaPOS-Print-Test');
    const w=window.open('','_blank',state.mode==='Thermal'?'width=460,height=760':'width=950,height=760');
-   if(!w)return toast('Popup blocked');
-   w.document.write(buildHtml(sample(),state.mode,state.template,state.width,true));w.document.close()
+   if(!w)return toast('Popup blocked');w.document.write(html);w.document.close();w.print()
  };
  window.loadPrintSettings=async function(){
    setPage('settings');title.textContent='Print Master';document.querySelector('header p').textContent='10 Thermal + 10 A4 bill styles with live preview';
@@ -167,7 +168,9 @@ ${styleCss(template,thermal)}
    cards();preview()
  };
  async function currentPrintConfig(){
-   await loadState();return {mode:state.mode,width:state.width,template:state.template}
+   await loadState();let action='PREVIEW';
+   try{const x=await api('/api/app-settings/'+encodeURIComponent('Print.ActionMode'));action=String(x.Value||x.value||'PREVIEW').toUpperCase()}catch{}
+   return {mode:state.mode,width:state.width,template:state.template,action}
  }
  async function saleData(id){
    const [h,l,c,o]=await Promise.all([api('/api/sales/'+id),api('/api/sales/'+id+'/lines'),api('/api/settings').catch(()=>({})),api('/api/outlet').catch(()=>({}))]);
@@ -182,9 +185,10 @@ ${styleCss(template,thermal)}
  }
  window.printInvoice=async function(id){
    try{
-    const x=await saleData(id),w=window.open('','_blank',x.cfg.mode==='Thermal'?'width=460,height=760':'width=1000,height=800');
-    if(!w)return toast('Popup blocked');
-    w.document.write(buildHtml(x.d,x.cfg.mode,x.cfg.template,x.cfg.width,true));w.document.close()
+    const x=await saleData(id),html=buildHtml(x.d,x.cfg.mode,x.cfg.template,x.cfg.width,false);
+    if(window.premiumPrintHtml)return window.premiumPrintHtml(html,x.d.h?.InvoiceNo||('Bill-'+id));
+    const w=window.open('','_blank',x.cfg.mode==='Thermal'?'width=460,height=760':'width=1000,height=800');
+    if(!w)return toast('Popup blocked');w.document.write(html);w.document.close();w.print()
    }catch(e){alert('Print failed: '+e.message)}
  };
  window.printLastBill=window.printInvoice;

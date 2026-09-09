@@ -37,6 +37,7 @@
   window.desktopBrowseJson=(target,path='')=>send('browseJson',{target,path});
   window.desktopBackupStartup=(enabled)=>send('backupStartup',{enabled:!!enabled});
   window.desktopOpenPath=(path)=>send('openPath',{path});
+  window.desktopPrintHtml=(html,mode='PREVIEW',fileName='SuvidhaPOS-Bill')=>send('printHtml',{html,mode,fileName});
 
 
   // Authentication is owned exclusively by login-authfix7.js.

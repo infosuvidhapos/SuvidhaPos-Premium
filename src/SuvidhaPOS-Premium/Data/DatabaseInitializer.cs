@@ -12,6 +12,8 @@ public sealed class DatabaseInitializer
   await RunScriptAsync(Path.Combine(AppContext.BaseDirectory,"Database","specialized-schema.sql"));
   var printSchema=Path.Combine(AppContext.BaseDirectory,"Database","print-schema.sql");
   if(File.Exists(printSchema)) await RunScriptAsync(printSchema);
+  var completionSchema=Path.Combine(AppContext.BaseDirectory,"Database","completion-schema.sql");
+  if(File.Exists(completionSchema)) await RunScriptAsync(completionSchema);
   await RunScriptAsync(Path.Combine(AppContext.BaseDirectory,"Database","seed.sql"));
   await EnsureDefaultAdminAsync();
  }

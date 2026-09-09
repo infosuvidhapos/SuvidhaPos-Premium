@@ -183,6 +183,11 @@ public sealed class MainForm : Form
                     else if(Directory.Exists(p))Process.Start(new ProcessStartInfo("explorer.exe",$"\"{p}\""){UseShellExecute=true});
                 }
             }
+            else if (string.Equals(type, "printHtml", StringComparison.OrdinalIgnoreCase))
+            {
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                await HandlePrintHtmlAsync(msg);
+            }
         }
         catch { }
     }
@@ -277,7 +282,7 @@ public sealed class MainForm : Form
         }catch{}
     }
 
-    private sealed record DesktopMessage(string? Type, bool? Enabled = null, string? UserName = null, string? Password = null, string? Target = null, string? Path = null);
+    private sealed record DesktopMessage(string? Type, bool? Enabled = null, string? UserName = null, string? Password = null, string? Target = null, string? Path = null, string? Html = null, string? Mode = null, string? FileName = null);
     private sealed class RememberedLogin { public string UserName { get; set; } = ""; public string EncryptedPassword { get; set; } = ""; }
 }
 

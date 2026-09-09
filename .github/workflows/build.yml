@@ -45,7 +45,7 @@ jobs:
       - name: Validate source layout
         shell: powershell
         run: |
-          $required=@('src/SuvidhaPOS-Premium/Program.cs','src/SuvidhaPOS-Premium/SpecializedModules.cs','src/SuvidhaPOS-Premium/PremiumFeatureModules.cs','src/SuvidhaPOS-Premium/wwwroot/js/premium-masters.js','src/SuvidhaPOS-Premium/wwwroot/js/outlet-login-sync.js','src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js','src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-masters.css','src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj','src/SuvidhaPOS-Premium/Database/schema.sql','src/SuvidhaPOS-Premium/Database/specialized-schema.sql','src/SuvidhaPOS-Premium/Database/seed.sql','src/SuvidhaPOS-Premium/Database/print-schema.sql','src/SuvidhaPOS-Premium/wwwroot/index.html','src/SuvidhaPOS-Premium/wwwroot/js/app.js','src/SuvidhaPOS-Premium/wwwroot/js/login-authfix7.js','src/SuvidhaPOS-Premium/wwwroot/js/desktop-bridge.js','src/SuvidhaPOS-Premium/wwwroot/js/pos-fixes.js','src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js','src/SuvidhaPOS-Premium/wwwroot/js/backup-master.js','src/SuvidhaPOS-Premium/wwwroot/css/app.css','src/SuvidhaPOS-Premium/wwwroot/css/login-premium.css','src/SuvidhaPOS-Premium/wwwroot/css/backup-master.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-fixes.css','src/SuvidhaPOS-Premium/suvidha-pos.ico','src/SuvidhaPOS-Premium/wwwroot/img/suvidha-pos-mark.svg','installer/Generate-AppIcon.ps1','installer/Ensure-SqlAccess.ps1','src/SuvidhaPOS.Desktop/SuvidhaPOS.Desktop.csproj','src/SuvidhaPOS.Desktop/Program.cs','src/SuvidhaPOS.Desktop/MainForm.cs','src/SuvidhaPOS.Desktop/Database.config.json','installer/SuvidhaPOS.iss'); foreach($f in $required){if(-not(Test-Path $f)){throw "Missing $f"}}
+          $required=@('src/SuvidhaPOS-Premium/Program.cs','src/SuvidhaPOS-Premium/SpecializedModules.cs','src/SuvidhaPOS-Premium/PremiumFeatureModules.cs','src/SuvidhaPOS-Premium/PremiumCompletionModules.cs','src/SuvidhaPOS-Premium/wwwroot/js/premium-masters.js','src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js','src/SuvidhaPOS-Premium/wwwroot/css/premium-completion.css','src/SuvidhaPOS-Premium/Database/completion-schema.sql','src/SuvidhaPOS-Premium/wwwroot/js/outlet-login-sync.js','src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js','src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-masters.css','src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj','src/SuvidhaPOS-Premium/Database/schema.sql','src/SuvidhaPOS-Premium/Database/specialized-schema.sql','src/SuvidhaPOS-Premium/Database/seed.sql','src/SuvidhaPOS-Premium/Database/print-schema.sql','src/SuvidhaPOS-Premium/wwwroot/index.html','src/SuvidhaPOS-Premium/wwwroot/js/app.js','src/SuvidhaPOS-Premium/wwwroot/js/login-authfix7.js','src/SuvidhaPOS-Premium/wwwroot/js/desktop-bridge.js','src/SuvidhaPOS-Premium/wwwroot/js/pos-fixes.js','src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js','src/SuvidhaPOS-Premium/wwwroot/js/backup-master.js','src/SuvidhaPOS-Premium/wwwroot/css/app.css','src/SuvidhaPOS-Premium/wwwroot/css/login-premium.css','src/SuvidhaPOS-Premium/wwwroot/css/backup-master.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-fixes.css','src/SuvidhaPOS-Premium/suvidha-pos.ico','src/SuvidhaPOS-Premium/wwwroot/img/suvidha-pos-mark.svg','installer/Generate-AppIcon.ps1','installer/Ensure-SqlAccess.ps1','src/SuvidhaPOS.Desktop/SuvidhaPOS.Desktop.csproj','src/SuvidhaPOS.Desktop/Program.cs','src/SuvidhaPOS.Desktop/MainForm.cs','src/SuvidhaPOS.Desktop/Database.config.json','installer/SuvidhaPOS.iss'); foreach($f in $required){if(-not(Test-Path $f)){throw "Missing $f"}}
       - name: Validate sales trigger compatibility and report master
         shell: powershell
         run: |
@@ -88,6 +88,39 @@ jobs:
           $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
           if(-not $jewel.Contains("suvidha:outlet-synced")){ throw 'Jewellery mode outlet sync listener missing' }
           if(-not $jewel.Contains("window.loadBilling=()=>invoice('retail')")){ throw 'Jewellery billing override missing' }
+      - name: Validate P-01 through P-20 completion
+        shell: powershell
+        run: |
+          $backend = Get-Content 'src/SuvidhaPOS-Premium/PremiumCompletionModules.cs' -Raw -Encoding UTF8
+          $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js' -Raw -Encoding UTF8
+          $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/completion-schema.sql' -Raw -Encoding UTF8
+          $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
+          $counter = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/counter-billing.js' -Raw -Encoding UTF8
+          $premium = Get-Content 'src/SuvidhaPOS-Premium/PremiumFeatureModules.cs' -Raw -Encoding UTF8
+          $print = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/print-settings.js' -Raw -Encoding UTF8
+          $bridge = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/desktop-bridge.js' -Raw -Encoding UTF8
+          $desktop = Get-Content 'src/SuvidhaPOS.Desktop/MainForm.cs' -Raw -Encoding UTF8
+          $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
+
+          1..20 | ForEach-Object {
+            $code = 'P-' + $_.ToString('00')
+            if(-not $schema.Contains("('$code'")){ throw "Feature flag seed missing: $code" }
+          }
+          foreach($token in @('/api/jewellery/item-master','PremiumJewelleryItemRequest','FineWeight','WastagePercent','HallmarkStatus','JewelleryItemStones','CertificateNo')){ if(-not $backend.Contains($token)){ throw "P-01/P-08 backend missing: $token" } }
+          foreach($token in @('/api/jewellery/sales/complete','/api/jewellery/vouchers','JewellerySalePayments','JewelleryOldMetalEntries','PremiumOverrideAudit')){ if(-not $backend.Contains($token)){ throw "P-02/P-13/P-14/P-16 backend missing: $token" } }
+          foreach($token in @('N20','J10','Barcode Print Master','Code39','barcode-print/log','Barcode.PrinterName')){ if(-not $ui.Contains($token)){ throw "P-03/P-17 barcode master missing: $token" } }
+          foreach($token in @('/api/outlet/sync','/public/outlet/profile-sync','2500','OutletSyncLog','premiumManualOutletSync','startup','login','save')){ if(-not ($backend+$ui).Contains($token)){ throw "P-04/P-10 outlet sync missing: $token" } }
+          foreach($token in @('Normal Item Import Master','Jewellery Item Import Master','downloadNormalItemSample','downloadJewelleryItemSample','916','22K','INCLUSIVE','EXCLUSIVE','SKIP','UPDATE','CREATE','ItemImportJobs','ItemImportConflicts')){ if(-not ($backend+$ui+$schema).Contains($token)){ throw "P-05/P-06/P-07/P-18/P-19 import feature missing: $token" } }
+          foreach($token in @('PremiumFeatureFlags','/api/premium/features','Feature Control')){ if(-not ($backend+$ui+$schema).Contains($token)){ throw "P-20 feature control missing: $token" } }
+          foreach($token in @('TaxMode','INCLUSIVE','beforeDiscount')){ if(-not ($counter+$premium+$program).Contains($token)){ throw "Inclusive/exclusive normal billing missing: $token" } }
+          foreach($token in @('Print.ActionMode','Direct Print','Save to PDF','Preview & Print')){ if(-not ($ui+$print).Contains($token)){ throw "Three bill print actions missing: $token" } }
+          foreach($token in @('desktopPrintHtml','printHtml')){ if(-not ($bridge+$desktop).Contains($token)){ throw "Desktop print bridge missing: $token" } }
+          foreach($token in @('PrintAsync(null)','PrintToPdfAsync','ShowPrintUI')){ if(-not $desktop.Contains($token)){ throw "Native print action missing: $token" } }
+          foreach($token in @('premium-completion.js','premium-completion.css','Version 6.12.0-complete')){ if(-not $html.Contains($token)){ throw "Completion runtime asset missing: $token" } }
+          if(-not $program.Contains('PremiumCompletionModules.Map(app)')){ throw 'PremiumCompletionModules is not mapped' }
+          if(-not $program.Contains('mode=="jewellery-items"')){ throw 'Jewellery import extraction mode missing' }
+          if(-not $program.Contains('p.TaxMode')){ throw 'Normal product TaxMode is not exposed' }
+          if(-not $premium.Contains("sl.TaxMode='INCLUSIVE'")){ throw 'GST reports are not inclusive-tax aware' }
       - name: Validate base-unit multi-unit inventory
         shell: powershell
         run: |

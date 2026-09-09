@@ -46,7 +46,8 @@ public static class PremiumFeatureModules
                 var soldRate=l.RatePerSoldUnit>0?l.RatePerSoldUnit:l.SalePrice*factor;
                 var baseRate=factor>0?soldRate/factor:l.SalePrice;
                 if(baseQty<=0) return Results.BadRequest(new { message="Quantity must be greater than zero" });
-                resolved.Add(new ResolvedPremiumSaleLine(l.ProductId,baseQty,baseRate,l.TaxRate,l.Discount,string.IsNullOrWhiteSpace(soldUnit)?null:soldUnit,soldQty,soldRate,factor));
+                var taxMode=string.Equals(l.TaxMode,"INCLUSIVE",StringComparison.OrdinalIgnoreCase)?"INCLUSIVE":"EXCLUSIVE";
+                resolved.Add(new ResolvedPremiumSaleLine(l.ProductId,baseQty,baseRate,l.TaxRate,l.Discount,string.IsNullOrWhiteSpace(soldUnit)?null:soldUnit,soldQty,soldRate,factor,taxMode));
             }
 
             using var c = db.CreateConnection();
@@ -62,11 +63,18 @@ public static class PremiumFeatureModules
                         return Results.BadRequest(new { message = "Insufficient saleable base-unit stock for product " + l.ProductId });
                 }
 
-                decimal sub = resolved.Sum(a => a.BaseQty * a.BaseRate);
-                decimal tax = resolved.Sum(a => a.BaseQty * a.BaseRate * a.TaxRate / 100m);
-                decimal discount = discountType == "PERCENT" ? sub * Math.Min(100m, discountValue) / 100m : discountValue;
-                discount = Math.Min(discount, sub + tax);
-                decimal total = Math.Max(0, sub - discount + tax);
+                decimal sub = resolved.Sum(a => {
+                    var amount=a.BaseQty*a.BaseRate;
+                    return a.TaxMode=="INCLUSIVE" && a.TaxRate>0 ? amount*100m/(100m+a.TaxRate) : amount;
+                });
+                decimal tax = resolved.Sum(a => {
+                    var amount=a.BaseQty*a.BaseRate;
+                    return a.TaxRate<=0?0m:(a.TaxMode=="INCLUSIVE"?amount*a.TaxRate/(100m+a.TaxRate):amount*a.TaxRate/100m);
+                });
+                decimal beforeDiscount=sub+tax;
+                decimal discount = discountType == "PERCENT" ? beforeDiscount * Math.Min(100m, discountValue) / 100m : discountValue;
+                discount = Math.Min(discount, beforeDiscount);
+                decimal total = Math.Max(0, beforeDiscount - discount);
                 decimal cost = 0;
 
                 var payments = x.Payments ?? new List<PremiumPaymentRequest>();
@@ -104,13 +112,13 @@ SELECT CAST(SCOPE_IDENTITY() AS int);", c, tx);
                         decimal soldTake=l.Factor>0?take/l.Factor:take;
 
                         cmd = new SqlCommand(@"UPDATE ProductBatches SET Quantity=Quantity-@q WHERE Id=@b;
-INSERT SaleLines(SaleId,ProductId,BatchId,Quantity,SalePrice,CostPrice,TaxRate,Discount,UnitSold,SoldQuantity,TotalBaseQtyDeducted,RatePerSoldUnit)
-VALUES(@s,@p,@b,@q,@sp,@cp,@tr,@di,@us,@sq,@tb,@rsu);
+INSERT SaleLines(SaleId,ProductId,BatchId,Quantity,SalePrice,CostPrice,TaxRate,TaxMode,Discount,UnitSold,SoldQuantity,TotalBaseQtyDeducted,RatePerSoldUnit)
+VALUES(@s,@p,@b,@q,@sp,@cp,@tr,@tm,@di,@us,@sq,@tb,@rsu);
 INSERT StockLedger(ProductId,BatchId,MovementType,Quantity,ReferenceType,ReferenceId,Notes)
 VALUES(@p,@b,'SALE',-@q,'SALE',@s,@note)", c, tx);
                         cmd.Parameters.AddRange(new[] {
                             P("@q",take),P("@b",bid),P("@s",sid),P("@p",l.ProductId),
-                            P("@sp",l.BaseRate),P("@cp",cp),P("@tr",l.TaxRate),P("@di",l.Discount),
+                            P("@sp",l.BaseRate),P("@cp",cp),P("@tr",l.TaxRate),P("@tm",l.TaxMode),P("@di",l.Discount),
                             P("@us",l.UnitSold),P("@sq",soldTake),P("@tb",take),P("@rsu",l.SoldRate),
                             P("@note",string.IsNullOrWhiteSpace(l.UnitSold)?"Base-unit sale":$"{soldTake:0.###} {l.UnitSold} = {take:0.###} base units")
                         });
@@ -220,7 +228,7 @@ FROM Sales s WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e GRO
                 case "utility-report":
                     sql=@"SELECT CreatedAt,UserName,Action,Entity,EntityId,Details FROM AuditLogs WHERE CreatedAt>=@f AND CreatedAt<@e AND (Entity IS NULL OR Entity<>'Sale') AND (@q='' OR ISNULL(UserName,'') LIKE @like OR Action LIKE @like OR ISNULL(Entity,'') LIKE @like OR ISNULL(Details,'') LIKE @like) ORDER BY CreatedAt DESC"; break;
                 case "item-wise-report":
-                    sql=@"SELECT p.Name,p.Barcode,p.Category,p.Hsn,CAST(SUM(sl.Quantity) AS decimal(18,3)) Qty,CAST(SUM(sl.Quantity*sl.SalePrice) AS decimal(18,2)) Sales,CAST(SUM(sl.Discount) AS decimal(18,2)) LineDiscount,CAST(SUM(sl.Quantity*sl.SalePrice*sl.TaxRate/100) AS decimal(18,2)) Tax,CAST(SUM(sl.Quantity*(sl.SalePrice-sl.CostPrice)) AS decimal(18,2)) GrossProfit
+                    sql=@"SELECT p.Name,p.Barcode,p.Category,p.Hsn,CAST(SUM(sl.Quantity) AS decimal(18,3)) Qty,CAST(SUM(sl.Quantity*sl.SalePrice) AS decimal(18,2)) Sales,CAST(SUM(sl.Discount) AS decimal(18,2)) LineDiscount,CAST(SUM(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*sl.TaxRate/(100+sl.TaxRate) ELSE sl.Quantity*sl.SalePrice*sl.TaxRate/100 END) AS decimal(18,2)) Tax,CAST(SUM(sl.Quantity*(sl.SalePrice-sl.CostPrice)) AS decimal(18,2)) GrossProfit
 FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId JOIN Products p ON p.Id=sl.ProductId WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e AND (@q='' OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like) GROUP BY p.Name,p.Barcode,p.Category,p.Hsn ORDER BY Sales DESC"; break;
                 case "profit-loss":
                     sql=@"SELECT Sales,CostOfSales,SalesReturns,Expenses,CAST(Sales-CostOfSales AS decimal(18,2)) GrossProfit,CAST(Sales-CostOfSales-SalesReturns-Expenses AS decimal(18,2)) NetProfit FROM (
@@ -238,13 +246,13 @@ FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId JOIN Products p ON p.Id=sl.Prod
                     sql=@"SELECT CONVERT(char(7),s.BillDate,120) [Month],ISNULL(NULLIF(p.Category,''),'Uncategorised') Category,CAST(SUM(sl.Quantity) AS decimal(18,3)) Qty,CAST(SUM(sl.Quantity*sl.SalePrice) AS decimal(18,2)) Sales
 FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId JOIN Products p ON p.Id=sl.ProductId WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e GROUP BY CONVERT(char(7),s.BillDate,120),ISNULL(NULLIF(p.Category,''),'Uncategorised') ORDER BY [Month] DESC,Sales DESC"; break;
                 case "hsn-wise-sale":
-                    sql=@"SELECT ISNULL(NULLIF(p.Hsn,''),'NO-HSN') HSN,sl.TaxRate GSTPercent,CAST(SUM(sl.Quantity) AS decimal(18,3)) Qty,CAST(SUM(sl.Quantity*sl.SalePrice-sl.Discount) AS decimal(18,2)) TaxableValue,CAST(SUM((sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100) AS decimal(18,2)) GSTAmount
+                    sql=@"SELECT ISNULL(NULLIF(p.Hsn,''),'NO-HSN') HSN,sl.TaxRate GSTPercent,CAST(SUM(sl.Quantity) AS decimal(18,3)) Qty,CAST(SUM(CASE WHEN sl.TaxMode='INCLUSIVE' THEN (sl.Quantity*sl.SalePrice)*100/(100+sl.TaxRate)-sl.Discount ELSE sl.Quantity*sl.SalePrice-sl.Discount END) AS decimal(18,2)) TaxableValue,CAST(SUM(CASE WHEN sl.TaxMode='INCLUSIVE' THEN (sl.Quantity*sl.SalePrice)*sl.TaxRate/(100+sl.TaxRate) ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100 END) AS decimal(18,2)) GSTAmount
 FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId JOIN Products p ON p.Id=sl.ProductId WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e GROUP BY ISNULL(NULLIF(p.Hsn,''),'NO-HSN'),sl.TaxRate ORDER BY HSN,sl.TaxRate"; break;
                 case "purchase-register":
                     sql=@"SELECT p.PurchaseDate,p.InvoiceNo,p.SupplierName,p.PaymentMode,p.SubTotal,p.Discount,p.Tax,p.GrandTotal,p.PaidAmount,CAST(p.GrandTotal-p.PaidAmount AS decimal(18,2)) Balance
 FROM Purchases p WHERE p.PurchaseDate>=@f AND p.PurchaseDate<@e AND (@q='' OR p.InvoiceNo LIKE @like OR p.SupplierName LIKE @like) ORDER BY p.PurchaseDate DESC"; break;
                 case "bill-detail":
-                    sql=@"SELECT s.BillDate,s.InvoiceNo,s.CustomerName,p.Name ItemName,p.Barcode,p.Hsn,p.Category,sl.Quantity,sl.SalePrice,sl.Discount LineDiscount,sl.TaxRate,CAST(sl.Quantity*sl.SalePrice-sl.Discount AS decimal(18,2)) TaxableValue,CAST((sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100 AS decimal(18,2)) TaxAmount
+                    sql=@"SELECT s.BillDate,s.InvoiceNo,s.CustomerName,p.Name ItemName,p.Barcode,p.Hsn,p.Category,sl.Quantity,sl.SalePrice,sl.Discount LineDiscount,sl.TaxRate,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*100/(100+sl.TaxRate)-sl.Discount ELSE sl.Quantity*sl.SalePrice-sl.Discount END AS decimal(18,2)) TaxableValue,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*sl.TaxRate/(100+sl.TaxRate) ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100 END AS decimal(18,2)) TaxAmount
 FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId JOIN Products p ON p.Id=sl.ProductId WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e AND (@q='' OR s.InvoiceNo LIKE @like OR s.CustomerName LIKE @like OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like) ORDER BY s.BillDate DESC,s.InvoiceNo,p.Name"; break;
                 case "qty-wise-report":
                     sql=@"SELECT p.Name,p.Barcode,p.Category,CAST(ISNULL(SUM(CASE WHEN s.BillDate>=@f AND s.BillDate<@e AND s.Status='Completed' THEN sl.Quantity ELSE 0 END),0) AS decimal(18,3)) SoldQty,CAST(ISNULL((SELECT SUM(b.Quantity) FROM ProductBatches b WHERE b.ProductId=p.Id),0) AS decimal(18,3)) CurrentStock,p.Unit
@@ -253,7 +261,7 @@ FROM Products p LEFT JOIN SaleLines sl ON sl.ProductId=p.Id LEFT JOIN Sales s ON
                     sql=@"SELECT p.Name,p.Barcode,p.Category,b.BatchNo,b.Quantity,b.CostPrice,b.Mrp,b.ExpiryDate,DATEDIFF(day,CAST(GETDATE() AS date),b.ExpiryDate) DaysLeft,p.LocationCode,p.RackName
 FROM ProductBatches b JOIN Products p ON p.Id=b.ProductId WHERE b.Quantity>0 AND (@q='' OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like OR ISNULL(b.BatchNo,'') LIKE @like) ORDER BY b.ExpiryDate,p.Name"; break;
                 case "gstr1":
-                    sql=@"SELECT s.BillDate,s.InvoiceNo,s.CustomerName,ISNULL(c.GstIn,'') CustomerGSTIN,ISNULL(p.Hsn,'') HSN,sl.TaxRate GSTPercent,CAST(sl.Quantity*sl.SalePrice-sl.Discount AS decimal(18,2)) TaxableValue,CAST((sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/2/100 AS decimal(18,2)) CGST,CAST((sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/2/100 AS decimal(18,2)) SGST,CAST((sl.Quantity*sl.SalePrice-sl.Discount)*(1+sl.TaxRate/100) AS decimal(18,2)) InvoiceLineValue
+                    sql=@"SELECT s.BillDate,s.InvoiceNo,s.CustomerName,ISNULL(c.GstIn,'') CustomerGSTIN,ISNULL(p.Hsn,'') HSN,sl.TaxRate GSTPercent,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*100/(100+sl.TaxRate)-sl.Discount ELSE sl.Quantity*sl.SalePrice-sl.Discount END AS decimal(18,2)) TaxableValue,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*sl.TaxRate/(100+sl.TaxRate)/2 ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/200 END AS decimal(18,2)) CGST,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*sl.TaxRate/(100+sl.TaxRate)/2 ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/200 END AS decimal(18,2)) SGST,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice-sl.Discount ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*(1+sl.TaxRate/100) END AS decimal(18,2)) InvoiceLineValue
 FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId JOIN Products p ON p.Id=sl.ProductId LEFT JOIN Customers c ON c.Id=s.CustomerId WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e AND (@q='' OR s.InvoiceNo LIKE @like OR s.CustomerName LIKE @like OR ISNULL(c.GstIn,'') LIKE @like) ORDER BY s.BillDate DESC,s.InvoiceNo"; break;
                 case "current-stock-report":
                     sql=@"SELECT
@@ -287,8 +295,8 @@ ORDER BY p.Name"; break;
         });
     }
 
-    public record PremiumSaleLine(int ProductId, decimal Qty, decimal SalePrice, decimal TaxRate, decimal Discount, string? UnitSold=null, decimal SoldQty=0m, decimal BaseQty=0m, decimal RatePerSoldUnit=0m);
-    public record ResolvedPremiumSaleLine(int ProductId,decimal BaseQty,decimal BaseRate,decimal TaxRate,decimal Discount,string? UnitSold,decimal SoldQty,decimal SoldRate,decimal Factor);
+    public record PremiumSaleLine(int ProductId, decimal Qty, decimal SalePrice, decimal TaxRate, decimal Discount, string? UnitSold=null, decimal SoldQty=0m, decimal BaseQty=0m, decimal RatePerSoldUnit=0m, string? TaxMode="EXCLUSIVE");
+    public record ResolvedPremiumSaleLine(int ProductId,decimal BaseQty,decimal BaseRate,decimal TaxRate,decimal Discount,string? UnitSold,decimal SoldQty,decimal SoldRate,decimal Factor,string TaxMode);
     public record PremiumPaymentRequest(string Mode, string? Type, decimal Amount, string? ReferenceNo);
     public record PremiumSaleRequest(int? CustomerId,string? CustomerName,string? PaymentMode,decimal PaidAmount,string? DiscountType,decimal DiscountValue,string? Notes,List<PremiumSaleLine> Lines,List<PremiumPaymentRequest>? Payments);
     public record OpeningStockLine(int ProductId,string? BatchNo,decimal Quantity,decimal CostPrice,decimal SalePrice,decimal Mrp,DateTime? ExpiryDate);

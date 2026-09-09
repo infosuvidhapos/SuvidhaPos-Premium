@@ -132,7 +132,7 @@ CAST(ISNULL(SUM(CASE WHEN CAST(BillDate AS date)=CAST(GETDATE() AS date) AND Sta
 (SELECT COUNT(*) FROM Suppliers WHERE IsActive=1) Suppliers FROM Sales")));
 app.MapGet("/api/dashboard/chart",async(Db db,int days=7)=>Results.Ok(await db.QueryAsync(@"SELECT CONVERT(varchar(10),CAST(BillDate AS date),23) [Date],CAST(ISNULL(SUM(GrandTotal),0) AS decimal(18,2)) Sales,COUNT(*) Bills FROM Sales WHERE Status='Completed' AND BillDate>=DATEADD(day,-@days+1,CAST(GETDATE() AS date)) GROUP BY CAST(BillDate AS date) ORDER BY [Date]",new SqlParameter("@days",days))));
 
-app.MapGet("/api/products",async(Db db,string? q,int page=1,int size=200)=>{q??="";page=Math.Max(1,page);return Results.Ok(await db.QueryAsync(@"SELECT p.Id,p.Name,p.Barcode,p.Sku,p.Category,p.Unit,p.Hsn,p.GstRate,p.Mrp,p.PurchasePrice,p.SalePrice,p.MinStock,p.MaxStock,p.LocationCode,p.RackName,p.ShelfName,p.TrackBatch,p.TrackExpiry,CAST(ISNULL((SELECT SUM(b.Quantity) FROM ProductBatches b WHERE b.ProductId=p.Id),0) AS decimal(18,3)) Stock FROM Products p WHERE p.IsActive=1 AND (@q='' OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like OR ISNULL(p.Sku,'') LIKE @like OR ISNULL(p.Category,'') LIKE @like) ORDER BY p.Name OFFSET @off ROWS FETCH NEXT @size ROWS ONLY",new SqlParameter("@q",q),new SqlParameter("@like","%"+q+"%"),new SqlParameter("@off",(page-1)*size),new SqlParameter("@size",size)));});
+app.MapGet("/api/products",async(Db db,string? q,int page=1,int size=200)=>{q??="";page=Math.Max(1,page);return Results.Ok(await db.QueryAsync(@"SELECT p.Id,p.Name,p.Barcode,p.Sku,p.Category,p.Unit,p.Hsn,p.GstRate,p.TaxMode,p.Mrp,p.PurchasePrice,p.SalePrice,p.MinStock,p.MaxStock,p.LocationCode,p.RackName,p.ShelfName,p.TrackBatch,p.TrackExpiry,CAST(ISNULL((SELECT SUM(b.Quantity) FROM ProductBatches b WHERE b.ProductId=p.Id),0) AS decimal(18,3)) Stock FROM Products p WHERE p.IsActive=1 AND (@q='' OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like OR ISNULL(p.Sku,'') LIKE @like OR ISNULL(p.Category,'') LIKE @like) ORDER BY p.Name OFFSET @off ROWS FETCH NEXT @size ROWS ONLY",new SqlParameter("@q",q),new SqlParameter("@like","%"+q+"%"),new SqlParameter("@off",(page-1)*size),new SqlParameter("@size",size)));});
 app.MapGet("/api/products/{id:int}",async(Db db,int id)=>Results.Ok(await db.QuerySingleAsync("SELECT * FROM Products WHERE Id=@id",new SqlParameter("@id",id))));
 app.MapGet("/api/products/identity-check",async(Db db,string? name,string? barcode,int excludeId=0)=>{
  var n=(name??"").Trim(); var b=(barcode??"").Trim();
@@ -157,10 +157,10 @@ app.MapPost("/api/products",async(Db db,ProductRequest x)=>{
  P("@n",name),P("@b",barcode??""));
  if(dup.Count>0)return Results.BadRequest(new{message=$"Duplicate {dup["ConflictType"]}: existing item '{dup["Name"]}' already uses this value.",duplicate=true,conflict=dup});
  try{
-  var id=await db.ScalarAsync(@"INSERT Products(Name,Barcode,Sku,CategoryId,Category,Unit,Hsn,GstRate,Mrp,PurchasePrice,SalePrice,MinStock,MaxStock,LocationCode,RackName,ShelfName,TrackBatch,TrackExpiry)
- VALUES(@n,@b,@s,@cid,@cat,@u,@h,@g,@m,@pp,@sp,@min,@max,@loc,@rack,@shelf,@tb,@te);
+  var id=await db.ScalarAsync(@"INSERT Products(Name,Barcode,Sku,CategoryId,Category,Unit,Hsn,GstRate,TaxMode,Mrp,PurchasePrice,SalePrice,MinStock,MaxStock,LocationCode,RackName,ShelfName,TrackBatch,TrackExpiry)
+ VALUES(@n,@b,@s,@cid,@cat,@u,@h,@g,@tm,@m,@pp,@sp,@min,@max,@loc,@rack,@shelf,@tb,@te);
  SELECT CAST(SCOPE_IDENTITY() AS int)",
- P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",unitName),P("@h",x.Hsn),P("@g",x.GstRate),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry));
+ P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",unitName),P("@h",x.Hsn),P("@g",x.GstRate),P("@tm",string.Equals(x.TaxMode,"INCLUSIVE",StringComparison.OrdinalIgnoreCase)?"INCLUSIVE":"EXCLUSIVE"),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry));
   return Results.Ok(new{id});
  }catch(SqlException e)when(e.Number==2601||e.Number==2627){return Results.BadRequest(new{message="Duplicate barcode is not allowed",duplicate=true});}
 });
@@ -177,8 +177,8 @@ app.MapPut("/api/products/{id:int}",async(Db db,int id,ProductRequest x)=>{
  P("@n",name),P("@b",barcode??""),P("@id",id));
  if(dup.Count>0)return Results.BadRequest(new{message=$"Duplicate {dup["ConflictType"]}: existing item '{dup["Name"]}' already uses this value.",duplicate=true,conflict=dup});
  try{
-  await db.ScalarAsync(@"UPDATE Products SET Name=@n,Barcode=@b,Sku=@s,CategoryId=@cid,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,MaxStock=@max,LocationCode=@loc,RackName=@rack,ShelfName=@shelf,TrackBatch=@tb,TrackExpiry=@te WHERE Id=@id",
-  P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",unitName),P("@h",x.Hsn),P("@g",x.GstRate),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry),P("@id",id));
+  await db.ScalarAsync(@"UPDATE Products SET Name=@n,Barcode=@b,Sku=@s,CategoryId=@cid,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,TaxMode=@tm,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,MaxStock=@max,LocationCode=@loc,RackName=@rack,ShelfName=@shelf,TrackBatch=@tb,TrackExpiry=@te WHERE Id=@id",
+  P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",unitName),P("@h",x.Hsn),P("@g",x.GstRate),P("@tm",string.Equals(x.TaxMode,"INCLUSIVE",StringComparison.OrdinalIgnoreCase)?"INCLUSIVE":"EXCLUSIVE"),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry),P("@id",id));
   return Results.Ok(new{updated=true});
  }catch(SqlException e)when(e.Number==2601||e.Number==2627){return Results.BadRequest(new{message="Duplicate barcode is not allowed",duplicate=true});}
 });
@@ -370,7 +370,9 @@ app.MapPost("/api/ai/import",async(HttpRequest req,Db db,HttpContext ctx)=>{
  }
  if(file is null && string.IsNullOrWhiteSpace(message)) return Results.BadRequest(new{message="Choose a file or enter a message/notes first"});
 
- var prompt = "You are an inventory data extraction assistant for a billing/POS system. Convert the supplied source into clean JSON only. Mode: " + mode + ". Store data may contain product master rows or a purchase invoice. Extract as many rows as confidently possible. Never invent barcode, batch, expiry, price, quantity or GST; use null/0 when missing. Preserve exact rack/location codes. For medicines preserve batch and expiry exactly when visible. Return a JSON object with a rows array. Each row should contain name, barcode, sku, category, unit, hsn, gstRate, mrp, purchasePrice, salePrice, minStock, locationCode, rackName, shelfName, batchNo, manufactureDate, expiryDate, quantity, freeQuantity, confidence and notes. Dates must be YYYY-MM-DD. JSON only, no markdown.\nUser message: " + message + "\nExtracted spreadsheet/text content: " + extracted;
+ var prompt = mode=="jewellery-items"
+  ? "You are a jewellery inventory extraction assistant. Convert the supplied source into clean JSON only. Never invent Tag No, barcode, HUID, weights, rates, tax or purity. Normalize obvious purity aliases only when visible: 916/22K, 750/18K, 585/14K, 999/24K, 925 silver. Return a JSON object with rows. Each row should contain tagNo, barcode, itemName, category, designCode, metalType, purity, purityPercent, huid, grossWeight, lessWeight, netWeight, fineWeight, wastagePercent, stoneWeight, stoneType, stonePieces, stoneCarat, stoneValue, makingChargeType, makingValue, hsnCode, gstMode, gstRate, purchasePrice, salePrice, rackName, notes and resolution. Weight is grams. gstMode is EXCLUSIVE or INCLUSIVE when stated; otherwise EXCLUSIVE. Use 0/null when missing. JSON only, no markdown.\nUser message: " + message + "\nExtracted spreadsheet/text content: " + extracted
+  : "You are an inventory data extraction assistant for a billing/POS system. Convert the supplied source into clean JSON only. Mode: " + mode + ". Store data may contain product master rows or a purchase invoice. Extract as many rows as confidently possible. Never invent barcode, batch, expiry, price, quantity or GST; use null/0 when missing. Preserve exact rack/location codes. For medicines preserve batch and expiry exactly when visible. Return a JSON object with a rows array. Each row should contain name, barcode, sku, category, unit, hsn, gstRate, mrp, purchasePrice, salePrice, minStock, locationCode, rackName, shelfName, batchNo, manufactureDate, expiryDate, quantity, freeQuantity, confidence, notes and resolution. Dates must be YYYY-MM-DD. JSON only, no markdown.\nUser message: " + message + "\nExtracted spreadsheet/text content: " + extracted;
 
  using var http=new HttpClient{Timeout=TimeSpan.FromMinutes(3)};
  http.DefaultRequestHeaders.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",apiKey);
@@ -417,11 +419,15 @@ app.MapPost("/api/ai/import",async(HttpRequest req,Db db,HttpContext ctx)=>{
    var json=CleanJson(output);
    using var rowsDoc=JsonDocument.Parse(json);
    if(!rowsDoc.RootElement.TryGetProperty("rows",out var rows)||rows.ValueKind!=JsonValueKind.Array) return Results.BadRequest(new{message="AI response did not contain a rows array"});
-   var list=JsonSerializer.Deserialize<List<AiImportRow>>(rows.GetRawText(),new JsonSerializerOptions{PropertyNameCaseInsensitive=true})??new();
-
    var u=(SessionUser)ctx.Items["User"]!;
-   await db.ScalarAsync("INSERT AIImportLogs(ImportType,FileName,RowsFound,RowsAccepted,UserName,Notes) VALUES(@t,@f,@rf,@ra,@u,@n)",P("@t",mode),P("@f",filename),P("@rf",list.Count),P("@ra",list.Count),P("@u",u.UserName),P("@n","AI extraction preview; not auto-posted"));
-   return Results.Ok(new{mode,fileName=filename,rows=list,model,warning="Review every row before posting. AI extraction is a draft and must not be treated as authoritative for medicines, prices, batch or expiry."});
+   if(mode=="jewellery-items"){
+     var jewelleryRows=JsonSerializer.Deserialize<List<SuvidhaPOS.Premium.JewelleryImportRow>>(rows.GetRawText(),new JsonSerializerOptions{PropertyNameCaseInsensitive=true})??new();
+     await db.ScalarAsync("INSERT AIImportLogs(ImportType,FileName,RowsFound,RowsAccepted,UserName,Notes) VALUES(@t,@f,@rf,@ra,@u,@n)",P("@t",mode),P("@f",filename),P("@rf",jewelleryRows.Count),P("@ra",jewelleryRows.Count),P("@u",u.UserName),P("@n","Jewellery Item Import preview; not auto-posted"));
+     return Results.Ok(new{mode,fileName=filename,rows=jewelleryRows,model,warning="Review Tag, HUID, purity, gross/less/net/fine weight, making, wastage and GST before posting."});
+   }
+   var list=JsonSerializer.Deserialize<List<AiImportRow>>(rows.GetRawText(),new JsonSerializerOptions{PropertyNameCaseInsensitive=true})??new();
+   await db.ScalarAsync("INSERT AIImportLogs(ImportType,FileName,RowsFound,RowsAccepted,UserName,Notes) VALUES(@t,@f,@rf,@ra,@u,@n)",P("@t",mode),P("@f",filename),P("@rf",list.Count),P("@ra",list.Count),P("@u",u.UserName),P("@n","Normal Item Import preview; not auto-posted"));
+   return Results.Ok(new{mode,fileName=filename,rows=list,model,warning="Review every row before posting. AI extraction is a draft and must not be treated as authoritative for prices, batch or expiry."});
  }catch(JsonException ex){return Results.BadRequest(new{message="AI returned invalid JSON: "+ex.Message});}
  catch(TaskCanceledException){return Results.BadRequest(new{message="AI extraction timed out. Try a smaller PDF/image or check internet connection."});}
  catch(HttpRequestException ex){return Results.BadRequest(new{message="Cannot reach OpenAI API: "+ex.Message});}
@@ -486,6 +492,7 @@ SuvidhaPOS.Premium.JewelleryLiveRateModules.Map(app);
 SuvidhaPOS.Premium.ReportTaxModules.Map(app);
 SuvidhaPOS.Premium.BillManagementModules.Map(app);
 SuvidhaPOS.Premium.PremiumFeatureModules.Map(app);
+SuvidhaPOS.Premium.PremiumCompletionModules.Map(app);
 
 app.Run();
 
@@ -537,7 +544,7 @@ record PartyPaymentRequest(decimal Amount,string PaymentMode,string? ReferenceNo
 record DayClosingRequest(decimal OpeningCash,decimal CashSales,decimal CashIn,decimal CashOut,decimal ClosingCash,string? Notes);
 record CreateUserRequest(string UserName,string? DisplayName,string Password,string? Role);
 record SettingRequest(string? Value);
-record ProductRequest(string Name,string? Barcode,string? Sku,int? CategoryId,string? Category,string? Unit,string? Hsn,decimal GstRate,decimal Mrp,decimal PurchasePrice,decimal SalePrice,decimal MinStock,decimal MaxStock,string? LocationCode=null,string? RackName=null,string? ShelfName=null,bool TrackBatch=true,bool TrackExpiry=true);
+record ProductRequest(string Name,string? Barcode,string? Sku,int? CategoryId,string? Category,string? Unit,string? Hsn,decimal GstRate,decimal Mrp,decimal PurchasePrice,decimal SalePrice,decimal MinStock,decimal MaxStock,string? LocationCode=null,string? RackName=null,string? ShelfName=null,bool TrackBatch=true,bool TrackExpiry=true,string? TaxMode="EXCLUSIVE");
 record ProductBulkEditRow(int Id,string Name,string? Barcode,string? Sku,string? Category,string? Unit,string? Hsn,decimal GstRate,decimal Mrp,decimal PurchasePrice,decimal SalePrice,decimal MinStock,decimal MaxStock,string? LocationCode,string? RackName,string? ShelfName);
 record ProductBulkEditRequest(List<ProductBulkEditRow> Rows);
 record OutletRequest(string OutletName,string StoreType,string? Address,string? Phone,string? Gstin,bool RequireBatch,bool RequireExpiry,string? DefaultUnit);

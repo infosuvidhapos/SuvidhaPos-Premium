@@ -44,19 +44,19 @@
   }
   w.refreshLoginOutlet=refresh;
   w.addEventListener('suvidha:outlet-changed',()=>refresh(true));
-  w.addEventListener('suvidha:outlet-saved',()=>refresh(true));
+  w.addEventListener('suvidha:outlet-saved',()=>setTimeout(()=>refresh(false),0));
   w.addEventListener('focus',()=>refresh(false));
   d.addEventListener('visibilitychange',()=>{if(!d.hidden)refresh(false)});
   function start(){
-    restore();refresh(true);
+    restore();setTimeout(()=>refresh(false),0);
     if(timer)clearInterval(timer);
     timer=setInterval(()=>{
       var login=d.getElementById('loginScreen');
       if(login&&getComputedStyle(login).display!=='none')refresh(false);
-    },2000);
+    },30000);
     var login=d.getElementById('loginScreen');
     if(login){
-      new MutationObserver(()=>{if(getComputedStyle(login).display!=='none')refresh(true)})
+      new MutationObserver(()=>{if(getComputedStyle(login).display!=='none')setTimeout(()=>refresh(false),0)})
         .observe(login,{attributes:true,attributeFilter:['style','class']});
     }
   }
