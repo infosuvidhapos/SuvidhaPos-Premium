@@ -38,7 +38,7 @@ public sealed class MainForm : Form
         {
             await StartBackendAsync();
             await InitializeWebViewAsync();
-            web.CoreWebView2!.Navigate(BaseUrl + "?build=6115jewelreports");
+            web.CoreWebView2!.Navigate(BaseUrl + "?build=6120complete");
         }
         catch (Exception ex)
         {
@@ -107,9 +107,6 @@ public sealed class MainForm : Form
     {
         try
         {
-            // Accept both the normal JSON-object WebView2 message and a plain
-            // string message so the Exit command remains robust across WebView2
-            // versions/hosts.
             var type = string.Empty;
             try
             {
@@ -141,8 +138,6 @@ public sealed class MainForm : Form
             }
             else if (string.Equals(type, "exit", StringComparison.OrdinalIgnoreCase))
             {
-                // Close on the WinForms UI thread after WebView2 finishes the
-                // message callback. FormClosing then stops the local backend.
                 if (!IsDisposed && IsHandleCreated)
                     BeginInvoke(new Action(() =>
                     {
@@ -189,7 +184,84 @@ public sealed class MainForm : Form
                 await HandlePrintHtmlAsync(msg);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "Desktop action failed:\n" + ex.Message, "SuvidhaPOS Premium", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private async Task HandlePrintHtmlAsync(DesktopMessage msg)
+    {
+        if (string.IsNullOrWhiteSpace(msg.Html)) return;
+        var mode = (msg.Mode ?? "PREVIEW").Trim().ToUpperInvariant();
+        if (mode is not ("DIRECT" or "PDF" or "PREVIEW")) mode = "PREVIEW";
+
+        using var host = new Form
+        {
+            Text = "SuvidhaPOS Bill Preview",
+            Width = 1050,
+            Height = 820,
+            StartPosition = FormStartPosition.CenterParent,
+            ShowInTaskbar = mode == "PREVIEW",
+            BackColor = Color.White
+        };
+        using var viewer = new WebView2 { Dock = DockStyle.Fill };
+        host.Controls.Add(viewer);
+        if (mode != "PREVIEW")
+        {
+            host.StartPosition = FormStartPosition.Manual;
+            host.Location = new Point(-32000, -32000);
+            host.ShowInTaskbar = false;
+        }
+
+        host.Show(this);
+        await viewer.EnsureCoreWebView2Async();
+        viewer.CoreWebView2!.Settings.AreDefaultContextMenusEnabled = false;
+        viewer.CoreWebView2.Settings.AreDevToolsEnabled = false;
+        viewer.CoreWebView2.Settings.IsStatusBarEnabled = false;
+
+        var loaded = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        void NavigationDone(object? _, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            viewer.CoreWebView2.NavigationCompleted -= NavigationDone;
+            loaded.TrySetResult(args.IsSuccess);
+        }
+        viewer.CoreWebView2.NavigationCompleted += NavigationDone;
+        viewer.NavigateToString(msg.Html);
+        if (!await loaded.Task.WaitAsync(TimeSpan.FromSeconds(10)))
+            throw new InvalidOperationException("Bill HTML could not be rendered.");
+
+        if (mode == "DIRECT")
+        {
+            var result = await viewer.CoreWebView2.PrintAsync(null);
+            if (result != CoreWebView2PrintStatus.Succeeded)
+                throw new InvalidOperationException("Direct print failed: " + result);
+            return;
+        }
+
+        if (mode == "PDF")
+        {
+            var safe = string.IsNullOrWhiteSpace(msg.FileName) ? "SuvidhaPOS-Bill" : msg.FileName!;
+            foreach (var ch in Path.GetInvalidFileNameChars()) safe = safe.Replace(ch, '_');
+            using var dlg = new SaveFileDialog
+            {
+                Title = "Save SuvidhaPOS Bill as PDF",
+                Filter = "PDF files (*.pdf)|*.pdf",
+                DefaultExt = "pdf",
+                AddExtension = true,
+                FileName = safe.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? safe : safe + ".pdf"
+            };
+            if (dlg.ShowDialog(this) != DialogResult.OK) return;
+            if (!await viewer.CoreWebView2.PrintToPdfAsync(dlg.FileName))
+                throw new InvalidOperationException("PDF could not be created.");
+            MessageBox.Show(this, "PDF saved successfully:\n" + dlg.FileName, "SuvidhaPOS Print", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        viewer.CoreWebView2.ShowPrintUI(CoreWebView2PrintDialogKind.System);
+        var closed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        host.FormClosed += (_, _) => closed.TrySetResult(true);
+        await closed.Task;
     }
 
     private void SaveRememberedLogin(DesktopMessage msg)
@@ -299,171 +371,123 @@ public sealed class DatabaseConfig
         try
         {
             if (File.Exists(path))
-                return JsonSerializer.Deserialize<DatabaseConfig>(File.ReadAllText(path)) ?? new();
+            {
+                var cfg = JsonSerializer.Deserialize<DatabaseConfig>(File.ReadAllText(path));
+                if (cfg is not null) return cfg;
+            }
         }
         catch { }
-        return new();
+        return new DatabaseConfig();
     }
 
-    public string Password
+    public void Save(string path)
     {
-        get
-        {
-            if (string.IsNullOrWhiteSpace(EncryptedPassword)) return "";
-            try
-            {
-                var raw = ProtectedData.Unprotect(Convert.FromBase64String(EncryptedPassword), null, DataProtectionScope.LocalMachine);
-                return Encoding.UTF8.GetString(raw);
-            }
-            catch { return ""; }
-        }
-        set
-        {
-            var raw = ProtectedData.Protect(Encoding.UTF8.GetBytes(value ?? ""), null, DataProtectionScope.LocalMachine);
-            EncryptedPassword = Convert.ToBase64String(raw);
-        }
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
     }
 
     public string BuildConnectionString()
     {
         var b = new SqlConnectionStringBuilder
         {
-            DataSource = Server.Trim(),
-            InitialCatalog = Database.Trim(),
+            DataSource = string.IsNullOrWhiteSpace(Server) ? @".\SQLEXPRESS" : Server.Trim(),
+            InitialCatalog = string.IsNullOrWhiteSpace(Database) ? "SuvidhaPOS" : Database.Trim(),
             TrustServerCertificate = true,
+            Encrypt = false,
             MultipleActiveResultSets = true,
-            ConnectTimeout = 5
+            ConnectTimeout = 8
         };
         if (UseSqlAuthentication)
         {
             b.IntegratedSecurity = false;
-            b.UserID = UserName.Trim();
-            b.Password = Password;
+            b.UserID = UserName ?? "";
+            b.Password = string.IsNullOrWhiteSpace(EncryptedPassword) ? "" : Unprotect(EncryptedPassword);
         }
-        else
-        {
-            b.IntegratedSecurity = true;
-        }
+        else b.IntegratedSecurity = true;
         return b.ConnectionString;
     }
 
-    public void Save(string path)
+    private static string Unprotect(string value)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(path, json);
+        try
+        {
+            var raw = ProtectedData.Unprotect(Convert.FromBase64String(value), null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(raw);
+        }
+        catch { return ""; }
     }
 }
 
 public sealed class DatabaseSettingsForm : Form
 {
-    private readonly TextBox server = new();
-    private readonly TextBox database = new();
-    private readonly ComboBox auth = new();
-    private readonly TextBox user = new();
-    private readonly TextBox password = new() { UseSystemPasswordChar = true };
-    private readonly Label hint = new();
-    public DatabaseConfig Config { get; }
+    private readonly TextBox server = new() { Dock = DockStyle.Fill };
+    private readonly TextBox db = new() { Dock = DockStyle.Fill };
+    private readonly CheckBox sql = new() { Text = "Use SQL Server authentication", AutoSize = true };
+    private readonly TextBox user = new() { Dock = DockStyle.Fill };
+    private readonly TextBox pass = new() { Dock = DockStyle.Fill, UseSystemPasswordChar = true };
+    public DatabaseConfig Config { get; private set; }
 
-    public DatabaseSettingsForm(DatabaseConfig config)
+    public DatabaseSettingsForm(DatabaseConfig cfg)
     {
-        Config = config;
-        Text = "SuvidhaPOS - Database Configuration";
-        Icon = File.Exists(Path.Combine(AppContext.BaseDirectory, "suvidha-pos.ico")) ? new Icon(Path.Combine(AppContext.BaseDirectory, "suvidha-pos.ico")) : SystemIcons.Application;
+        Config = cfg;
+        Text = "SuvidhaPOS Database Settings";
+        Width = 520;
+        Height = 410;
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false; MinimizeBox = false;
-        ClientSize = new Size(520, 390);
-        BackColor = Color.FromArgb(10, 25, 41);
-        ForeColor = Color.White;
+        MaximizeBox = false;
+        MinimizeBox = false;
 
-        server.Text = config.Server;
-        database.Text = config.Database;
-        auth.Items.AddRange(new object[] { "Windows Authentication", "SQL Server Authentication" });
-        auth.SelectedIndex = config.UseSqlAuthentication ? 1 : 0;
-        user.Text = config.UserName;
-        password.Text = config.Password;
+        server.Text = cfg.Server;
+        db.Text = cfg.Database;
+        sql.Checked = cfg.UseSqlAuthentication;
+        user.Text = cfg.UserName;
+        try { pass.Text = string.IsNullOrWhiteSpace(cfg.EncryptedPassword) ? "" : Unprotect(cfg.EncryptedPassword); } catch { }
 
-        var title = new Label { Text = "Database Connection", Font = new Font("Segoe UI", 18, FontStyle.Bold), AutoSize = true, Location = new Point(28, 22) };
-        var sub = new Label { Text = "Configure this PC for your local/shared SQL Server.", AutoSize = true, ForeColor = Color.LightSteelBlue, Location = new Point(30, 58) };
-        AddLabel("SQL Server / Instance", 30, 92);
-        Style(server, 30, 114, 460);
-        AddLabel("Database Name", 30, 150);
-        Style(database, 30, 172, 460);
-        AddLabel("Authentication", 30, 208);
-        Style(auth, 30, 230, 460);
-        AddLabel("SQL User", 30, 266);
-        Style(user, 30, 288, 220);
-        AddLabel("SQL Password", 270, 266);
-        Style(password, 270, 288, 220);
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20), ColumnCount = 2, RowCount = 8 };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.Controls.Add(new Label { Text = "SQL Server", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
+        layout.Controls.Add(server, 1, 0);
+        layout.Controls.Add(new Label { Text = "Database", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
+        layout.Controls.Add(db, 1, 1);
+        layout.Controls.Add(sql, 1, 2);
+        layout.Controls.Add(new Label { Text = "User name", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 3);
+        layout.Controls.Add(user, 1, 3);
+        layout.Controls.Add(new Label { Text = "Password", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 4);
+        layout.Controls.Add(pass, 1, 4);
 
-        hint.Text = "Example: SERVER\\SQLEXPRESS   |   Database: SuvidhaPOS";
-        hint.AutoSize = true; hint.ForeColor = Color.FromArgb(150, 180, 205); hint.Location = new Point(30, 326);
+        var test = new Button { Text = "Test Connection", AutoSize = true };
+        var save = new Button { Text = "Save and Restart", AutoSize = true };
+        var cancel = new Button { Text = "Cancel", AutoSize = true };
+        var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
+        buttons.Controls.Add(test); buttons.Controls.Add(save); buttons.Controls.Add(cancel);
+        layout.Controls.Add(buttons, 1, 6);
+        Controls.Add(layout);
 
-        var test = Button("Test Connection", 30, 350, 145);
-        var save = Button("Save & Restart", 345, 350, 145);
-        var cancel = Button("Cancel", 190, 350, 140);
-        test.Click += async (_, _) => await TestAsync();
-        save.Click += (_, _) => { if (ValidateAndCopy()) DialogResult = DialogResult.OK; };
-        cancel.Click += (_, _) => DialogResult = DialogResult.Cancel;
-
-        Controls.AddRange(new Control[] { title, sub, server, database, auth, user, password, hint, test, cancel, save });
-        auth.SelectedIndexChanged += (_, _) => ToggleSqlFields();
-        ToggleSqlFields();
-    }
-
-    private void AddLabel(string text, int x, int y)
-    {
-        Controls.Add(new Label { Text = text, AutoSize = true, Location = new Point(x, y), ForeColor = Color.Gainsboro });
-    }
-
-    private void Style(Control c, int x, int y, int w)
-    {
-        c.Location = new Point(x, y); c.Width = w; c.Height = 28;
-        c.BackColor = Color.FromArgb(18, 43, 66); c.ForeColor = Color.White;
-    }
-
-    private Button Button(string text, int x, int y, int w) =>
-        new() { Text = text, Location = new Point(x, y), Width = w, Height = 30, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(24, 112, 220), ForeColor = Color.White };
-
-    private void ToggleSqlFields()
-    {
-        var sql = auth.SelectedIndex == 1;
-        user.Enabled = password.Enabled = sql;
-    }
-
-    private bool ValidateAndCopy()
-    {
-        if (string.IsNullOrWhiteSpace(server.Text) || string.IsNullOrWhiteSpace(database.Text))
+        test.Click += async (_, _) =>
         {
-            MessageBox.Show(this, "SQL Server and Database Name are required.", "Database configuration", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return false;
-        }
-        if (auth.SelectedIndex == 1 && string.IsNullOrWhiteSpace(user.Text))
-        {
-            MessageBox.Show(this, "SQL User is required for SQL Server Authentication.", "Database configuration", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return false;
-        }
-        Config.Server = server.Text.Trim();
-        Config.Database = database.Text.Trim();
-        Config.UseSqlAuthentication = auth.SelectedIndex == 1;
-        Config.UserName = user.Text.Trim();
-        Config.Password = password.Text;
-        return true;
+            try
+            {
+                var temp = Current();
+                using var c = new SqlConnection(temp.BuildConnectionString());
+                await c.OpenAsync();
+                MessageBox.Show(this, "Connection successful.", "Database", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Connection failed", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        };
+        save.Click += (_, _) => { Config = Current(); DialogResult = DialogResult.OK; Close(); };
+        cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
     }
 
-    private async Task TestAsync()
+    private DatabaseConfig Current()
     {
-        if (!ValidateAndCopy()) return;
-        try
+        var cfg = new DatabaseConfig { Server = server.Text.Trim(), Database = db.Text.Trim(), UseSqlAuthentication = sql.Checked, UserName = user.Text.Trim() };
+        if (sql.Checked && !string.IsNullOrWhiteSpace(pass.Text))
         {
-            await using var c = new SqlConnection(Config.BuildConnectionString());
-            await c.OpenAsync();
-            MessageBox.Show(this, $"Connection successful.\n\nServer: {c.DataSource}\nDatabase: {c.Database}", "Database connection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            var raw = ProtectedData.Protect(Encoding.UTF8.GetBytes(pass.Text), null, DataProtectionScope.CurrentUser);
+            cfg.EncryptedPassword = Convert.ToBase64String(raw);
         }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, "Database connection failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
+        return cfg;
     }
 }
