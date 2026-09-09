@@ -115,14 +115,16 @@ jobs:
         shell: powershell
         run: |
           $license = Get-Content 'src/SuvidhaPOS-Premium/LicenseGuardModules.cs' -Raw -Encoding UTF8
-          foreach($token in @('/public/license/status','RSA.Create','VerifyData','license.token.json','ProtectedData.Unprotect','CLOCK_ROLLBACK','WarningWindowDays = 10','days<0','EXPIRES IN','There is deliberately NO SQL fallback')){ if(-not $license.Contains($token)){ throw "License guard missing: $token" } }
-          if($license.Contains('SELECT') -or $license.Contains('AppSettings')){ throw 'License validity must not read local SQL/AppSettings' }
+          foreach($token in @('/public/license/status','/api/license/activate','/api/license/check','RSA.Create','RSASignaturePadding.Pss','license-token.bin','ProtectedData.Unprotect','CLOCK_ROLLBACK','WarningWindowDays = 10','days < 0','EXPIRES IN','CentralLicense:BaseUrl','api/pos/activate','api/pos/check','SaveServerBlock')){ if(-not $license.Contains($token)){ throw "License guard missing: $token" } }
+          if($license.Contains('SELECT')){ throw 'License validity must not read local SQL' }
+          $settings = Get-Content 'src/SuvidhaPOS-Premium/appsettings.json' -Raw -Encoding UTF8
+          foreach($token in @('http://suvidhapremium.suvidhapos.in/','SuvidhaPOS-Central','main-v1')){ if(-not $settings.Contains($token)){ throw "Central license configuration missing: $token" } }
           $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
           foreach($token in @('LicenseGuardModules.GetStatus','statusCode:423','LicenseGuardModules.Map(app)')){ if(-not $program.Contains($token)){ throw "Login expiry enforcement missing: $token" } }
           $login = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/login-authfix7.js' -Raw -Encoding UTF8
-          foreach($token in @('status === 423','showLicenseExpired','refreshLicenseStatus(true)')){ if(-not $login.Contains($token)){ throw "Login license UI missing: $token" } }
+          foreach($token in @('status === 423','showLicenseExpired','showLicenseActivation','refreshLicenseStatus(true)')){ if(-not $login.Contains($token)){ throw "Login license UI missing: $token" } }
           $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/license-status.js' -Raw -Encoding UTF8
-          foreach($token in @('showLicenseWarning','Days Remaining','LICENSE EXPIRED','CHECK LICENSE','Local SQL cannot extend it','openLicenseDetails')){ if(-not $ui.Contains($token)){ throw "Premium validity UI missing: $token" } }
+          foreach($token in @('showLicenseWarning','LICENSE EXPIRED','CHECK LICENSE','ACTIVATE','/api/license/check','/api/license/activate','openLicenseDetails','suvidhapremium.suvidhapos.in')){ if(-not $ui.Contains($token)){ throw "Premium validity UI missing: $token" } }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           if(-not $html.Contains('id="licensePill"')){ throw 'Dashboard header license pill missing' }
       - name: Validate restored original jewellery design
