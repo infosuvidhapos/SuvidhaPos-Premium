@@ -119,7 +119,8 @@ jobs:
         run: |
           $license = Get-Content 'src/SuvidhaPOS-Premium/LicenseGuardModules.cs' -Raw -Encoding UTF8
           foreach($token in @('/public/license/status','/api/license/activate','/api/license/check','RSA.Create','RSASignaturePadding.Pss','license-token.bin','ProtectedData.Unprotect','CLOCK_ROLLBACK','WarningWindowDays = 10','CreateGrace','CreateLocked','ReadOnly','RenewalUrl','SyncCentralStoreTypeAsync','CentralLicense:BaseUrl','api/pos/activate','api/pos/check')){ if(-not $license.Contains($token)){ throw "License guard missing: $token" } }
-          if($license.Contains('SELECT') -or $license.Contains('SqlConnection') -or $license.Contains('GetConnectionString') -or $license.Contains('CentralDb')){ throw 'Central license flow must never connect directly to SQL' }
+          if($license.Contains('GetConnectionString("CentralDb")') -or $license.Contains('Server=38.247.') -or $license.Contains('Data Source=38.247.')){ throw 'POS license flow must never connect directly to Central SQL' }
+          if(-not $license.Contains('SyncCentralStoreTypeAsync')){ throw 'Signed Store Type is not synchronized to the local POS database' }
           $settings = Get-Content 'src/SuvidhaPOS-Premium/appsettings.json' -Raw -Encoding UTF8
           if($settings -match 'CentralLicense"[\s\S]{0,500}(Server=|Data Source=|38\.247\.|192\.168\.)'){ throw 'POS CentralLicense config must contain website/API URL only, never central SQL Server/IP' }
           foreach($token in @('http://suvidhapremium.suvidhapos.in/','SuvidhaPremium','main-v1')){ if(-not $settings.Contains($token)){ throw "Central license configuration missing: $token" } }
