@@ -60,17 +60,16 @@ jobs:
           if($optionCount -ne 19){ throw "Expected 19 premium report options, found $optionCount" }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           if($html.Contains('legacy-report-suite.js') -or $html.Contains('legacy-report-boot.js')){ throw 'Legacy report override is still loaded' }
-      - name: Validate jewellery outlet type normalization
+      - name: Validate central-only Store Type and jewellery normalization
         shell: powershell
         run: |
           $outlet = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-master-fix.js' -Raw -Encoding UTF8
-          $typesMatch = [regex]::Match($outlet, 'const\s+TYPES\s*=\s*\[(?<body>[\s\S]*?)\];')
-          if(-not $typesMatch.Success){ throw 'Outlet TYPES array not found' }
-          $typesBody = $typesMatch.Groups['body'].Value
-          if($typesBody.Contains('Gold & Diamond Jewellery')){ throw 'Duplicate Gold & Diamond Jewellery option still present in TYPES' }
-          if($typesBody.Contains('Silver Jewellery')){ throw 'Duplicate Silver Jewellery option still present in TYPES' }
-          $count = ([regex]::Matches($typesBody, "'Jewellery Shop'")).Count
-          if($count -ne 1){ throw "Expected exactly one Jewellery Shop option in TYPES, found $count" }
+          if($outlet.Contains('const TYPES=')){ throw 'POS must not keep an editable Store Type master' }
+          foreach($token in @('id="otype"','readonly','Managed from SuvidhaPremium website','Store Type remains managed by SuvidhaPremium')){ if(-not $outlet.Contains($token)){ throw "Central-only Store Type UI missing: $token" } }
+          $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
+          foreach($token in @('LicenseGuardModules.GetStatus().StoreType','storeTypeManagedBy="SuvidhaPremium"','app.MapGet("/api/outlet-types"')){ if(-not $program.Contains($token)){ throw "Central-only Store Type backend missing: $token" } }
+          $special = Get-Content 'src/SuvidhaPOS-Premium/SpecializedModules.cs' -Raw -Encoding UTF8
+          if(-not $special.Contains('LicenseGuardModules.GetStatus().StoreType')){ throw 'Specialization does not prefer signed central Store Type' }
           $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/specialized-schema.sql' -Raw -Encoding UTF8
           if(-not $schema.Contains("StoreType IN ('Gold & Diamond Jewellery','Silver Jewellery')")){ throw 'Legacy jewellery type normalization migration missing' }
       - name: Validate report dropdown and outlet mode switching
