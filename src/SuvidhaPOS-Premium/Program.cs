@@ -42,6 +42,20 @@ app.Use(async (ctx,next) => {
     }
 
     ctx.Items["User"] = user;
+
+    var licenseState = SuvidhaPOS.Premium.LicenseGuardModules.GetStatus();
+    if (licenseState.ReadOnly &&
+        !HttpMethods.IsGet(ctx.Request.Method) &&
+        !HttpMethods.IsHead(ctx.Request.Method) &&
+        !HttpMethods.IsOptions(ctx.Request.Method) &&
+        !ctx.Request.Path.StartsWithSegments("/api/logout") &&
+        !ctx.Request.Path.StartsWithSegments("/api/license"))
+    {
+        ctx.Response.StatusCode = 423;
+        await ctx.Response.WriteAsJsonAsync(new { message = licenseState.Message, license = licenseState });
+        return;
+    }
+
     if (ctx.Request.Path.StartsWithSegments("/api/users") && user.Role != "Admin") { ctx.Response.StatusCode=403; await ctx.Response.WriteAsJsonAsync(new {message="Admin permission required"}); return; }
     if (ctx.Request.Path.StartsWithSegments("/api/sales") && ctx.Request.Path.Value?.EndsWith("/void") == true && user.Role == "Cashier") { ctx.Response.StatusCode=403; await ctx.Response.WriteAsJsonAsync(new {message="Manager permission required"}); return; }
     await next();
@@ -211,7 +225,9 @@ app.MapPost("/api/suppliers",async(Db db,PartyRequest x)=>Results.Ok(new{id=awai
 
 app.MapPost("/api/purchases",async(Db db,PurchaseRequest x)=>{if(x.Lines.Count==0)return Results.BadRequest(new{message="Add purchase items"});
 var outletProfile=await db.QuerySingleAsync("SELECT TOP 1 StoreType,RequireBatch,RequireExpiry FROM OutletMaster ORDER BY Id");
-var purchaseStoreType=outletProfile.GetValueOrDefault("StoreType")?.ToString()??"Retail Shop";
+var purchaseStoreType=SuvidhaPOS.Premium.LicenseGuardModules.GetStatus().StoreType
+    ?? outletProfile.GetValueOrDefault("StoreType")?.ToString()
+    ?? "Retail Shop";
 var pharma=purchaseStoreType.Contains("Pharmacy",StringComparison.OrdinalIgnoreCase)||purchaseStoreType.Contains("Medical",StringComparison.OrdinalIgnoreCase);
 var requireBatch=pharma||Convert.ToBoolean(outletProfile.GetValueOrDefault("RequireBatch")??false);
 if(requireBatch&&x.Lines.Any(l=>string.IsNullOrWhiteSpace(l.BatchNo)))return Results.BadRequest(new{message="Batch No is mandatory for this outlet"});using var c=db.CreateConnection();await c.OpenAsync();using var tx=c.BeginTransaction();try{decimal sub=x.Lines.Sum(a=>a.Qty*a.Cost);decimal tax=x.Lines.Sum(a=>a.Qty*a.Cost*a.TaxRate/100);decimal total=Math.Max(0,sub-x.Discount+tax);var cmd=new SqlCommand("INSERT Purchases(InvoiceNo,SupplierId,SupplierName,PurchaseDate,SubTotal,Discount,Tax,GrandTotal,PaymentMode,PaidAmount,Notes) OUTPUT INSERTED.Id VALUES(@i,@sid,@sn,GETDATE(),@sub,@d,@t,@g,@pm,@paid,@notes)",c,tx);cmd.Parameters.AddRange(new[]{P("@i",x.InvoiceNo??("PUR-"+DateTime.Now.ToString("yyyyMMddHHmmss"))),P("@sid",x.SupplierId),P("@sn",x.SupplierName??"Walk-in Supplier"),P("@sub",sub),P("@d",x.Discount),P("@t",tax),P("@g",total),P("@pm",x.PaymentMode??"Credit"),P("@paid",x.PaidAmount),P("@notes",x.Notes)});int pid=(int)await cmd.ExecuteScalarAsync();foreach(var l in x.Lines){int bid;cmd=new SqlCommand("INSERT ProductBatches(ProductId,BatchNo,Quantity,CostPrice,SellingPrice,Mrp,ManufactureDate,ExpiryDate) OUTPUT INSERTED.Id VALUES(@p,@b,@q,@c,@s,@m,@md,@ed)",c,tx);cmd.Parameters.AddRange(new[]{P("@p",l.ProductId),P("@b",l.BatchNo??("B-"+Guid.NewGuid().ToString("N")[..10])),P("@q",l.Qty+l.FreeQuantity),P("@c",l.Cost),P("@s",l.SalePrice),P("@m",l.Mrp),P("@md",l.ManufactureDate),P("@ed",l.ExpiryDate)});bid=(int)await cmd.ExecuteScalarAsync();cmd=new SqlCommand("INSERT PurchaseLines(PurchaseId,ProductId,BatchId,Quantity,FreeQuantity,CostPrice,Mrp,SalePrice,TaxRate,TaxAmount,UnitPurchased,PurchasedQty,TotalBaseQty,RatePerPurchasedUnit) VALUES(@i,@p,@b,@q,@f,@c,@m,@s,@r,@t,@up,@pq,@tb,@rpu);INSERT StockLedger(ProductId,BatchId,MovementType,Quantity,ReferenceType,ReferenceId) VALUES(@p,@b,'PURCHASE',@stockQty,'PURCHASE',@i)",c,tx);cmd.Parameters.AddRange(new[]{P("@i",pid),P("@p",l.ProductId),P("@b",bid),P("@q",l.Qty),P("@f",l.FreeQuantity),P("@c",l.Cost),P("@m",l.Mrp),P("@s",l.SalePrice),P("@r",l.TaxRate),P("@t",l.Qty*l.Cost*l.TaxRate/100),P("@up",l.UnitPurchased),P("@pq",l.PurchasedQty>0?l.PurchasedQty:l.Qty),P("@tb",l.TotalBaseQty>0?l.TotalBaseQty:l.Qty),P("@rpu",l.RatePerPurchasedUnit>0?l.RatePerPurchasedUnit:l.Cost),P("@stockQty",l.Qty+l.FreeQuantity)});await cmd.ExecuteNonQueryAsync();}await tx.CommitAsync();return Results.Ok(new{id=pid,total});}catch{await tx.RollbackAsync();throw;}});
@@ -259,14 +275,20 @@ app.MapGet("/api/reports/stock-movement",async(Db db,string? from,string? to)=>R
 app.MapGet("/api/reports/gst",async(Db db,string? from,string? to)=>Results.Ok(await db.QueryAsync(@"SELECT CAST(BillDate AS date) Date,CAST(SUM(SubTotal) AS decimal(18,2)) Taxable,CAST(SUM(Tax) AS decimal(18,2)) Tax,CAST(SUM(GrandTotal) AS decimal(18,2)) Total FROM Sales WHERE Status='Completed' AND (@f='' OR BillDate>=CAST(@f AS date)) AND (@t='' OR BillDate<DATEADD(day,1,CAST(@t AS date))) GROUP BY CAST(BillDate AS date) ORDER BY Date DESC",P("@f",from??""),P("@t",to??""))));
 
 
-app.MapGet("/api/outlet",async(Db db)=>Results.Ok(await db.QuerySingleAsync("SELECT TOP 1 * FROM OutletMaster ORDER BY Id")));
+app.MapGet("/api/outlet",async(Db db)=>{
+ var o=await db.QuerySingleAsync("SELECT TOP 1 * FROM OutletMaster ORDER BY Id");
+ var centralType=SuvidhaPOS.Premium.LicenseGuardModules.GetStatus().StoreType;
+ if(!string.IsNullOrWhiteSpace(centralType)) o["StoreType"]=centralType;
+ return Results.Ok(o);
+});
 app.MapPut("/api/outlet",async(Db db,OutletRequest x)=>{
- var storeType=(x.StoreType??"").Trim();
- if(storeType.Equals("Gold & Diamond Jewellery",StringComparison.OrdinalIgnoreCase)||storeType.Equals("Silver Jewellery",StringComparison.OrdinalIgnoreCase)) storeType="Jewellery Shop";
- if(string.IsNullOrWhiteSpace(storeType)) storeType="Retail Shop";
- var row=await db.QuerySingleAsync("SELECT TOP 1 Id FROM OutletMaster ORDER BY Id");
- if(row.Count==0) return Results.Ok(new{id=await db.ScalarAsync("INSERT OutletMaster(OutletName,StoreType,Address,Phone,Gstin,RequireBatch,RequireExpiry,DefaultUnit) VALUES(@n,@t,@a,@p,@g,@b,@e,@u);SELECT CAST(SCOPE_IDENTITY() AS int)",P("@n",x.OutletName),P("@t",storeType),P("@a",x.Address),P("@p",x.Phone),P("@g",x.Gstin),P("@b",x.RequireBatch),P("@e",x.RequireExpiry),P("@u",x.DefaultUnit??"PCS"))});
- var id=Convert.ToInt32(row["Id"]); await db.ScalarAsync("UPDATE OutletMaster SET OutletName=@n,StoreType=@t,Address=@a,Phone=@p,Gstin=@g,RequireBatch=@b,RequireExpiry=@e,DefaultUnit=@u,UpdatedAt=SYSDATETIME() WHERE Id=@id",P("@n",x.OutletName),P("@t",storeType),P("@a",x.Address),P("@p",x.Phone),P("@g",x.Gstin),P("@b",x.RequireBatch),P("@e",x.RequireExpiry),P("@u",x.DefaultUnit??"PCS"),P("@id",id)); return Results.Ok(new{saved=true,id});
+ var licenseType=SuvidhaPOS.Premium.LicenseGuardModules.GetStatus().StoreType;
+ var existing=await db.QuerySingleAsync("SELECT TOP 1 Id,StoreType FROM OutletMaster ORDER BY Id");
+ var storeType=!string.IsNullOrWhiteSpace(licenseType)
+     ? licenseType.Trim()
+     : existing.GetValueOrDefault("StoreType")?.ToString()??"Retail Shop";
+ if(existing.Count==0) return Results.Ok(new{id=await db.ScalarAsync("INSERT OutletMaster(OutletName,StoreType,Address,Phone,Gstin,RequireBatch,RequireExpiry,DefaultUnit) VALUES(@n,@t,@a,@p,@g,@b,@e,@u);SELECT CAST(SCOPE_IDENTITY() AS int)",P("@n",x.OutletName),P("@t",storeType),P("@a",x.Address),P("@p",x.Phone),P("@g",x.Gstin),P("@b",x.RequireBatch),P("@e",x.RequireExpiry),P("@u",x.DefaultUnit??"PCS"))});
+ var id=Convert.ToInt32(existing["Id"]); await db.ScalarAsync("UPDATE OutletMaster SET OutletName=@n,StoreType=@t,Address=@a,Phone=@p,Gstin=@g,RequireBatch=@b,RequireExpiry=@e,DefaultUnit=@u,UpdatedAt=SYSDATETIME() WHERE Id=@id",P("@n",x.OutletName),P("@t",storeType),P("@a",x.Address),P("@p",x.Phone),P("@g",x.Gstin),P("@b",x.RequireBatch),P("@e",x.RequireExpiry),P("@u",x.DefaultUnit??"PCS"),P("@id",id)); return Results.Ok(new{saved=true,id,storeType,storeTypeManagedBy="SuvidhaPremium"});
 });
 app.MapGet("/api/outlet-types",()=>Results.Ok(new[]{
  "Retail Shop","Pharmacy / Medical Store","Agriculture Product Store","Seeds & Fertilizer Store","Pesticide / Crop Care Store","General Store","Grocery Store","Supermarket","Wholesale Store","Distributor","FMCG Store","Cosmetics & Beauty Store","Personal Care Store","Stationery Store","Hardware Store","Electrical Store","Electronics Store","Mobile & Accessories Store","Garments Store","Footwear Store","Hardware & Sanitary Store","Auto Parts Store","Pet / Veterinary Store","Dairy Store","Bakery","Restaurant / Cafe","Sweet Shop","Department Store","Jewellery Shop","Other"

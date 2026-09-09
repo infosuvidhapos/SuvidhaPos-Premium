@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Win32;
+using Microsoft.Data.SqlClient;
+using SuvidhaPOS.Premium.Data;
 
 namespace SuvidhaPOS.Premium;
 
@@ -13,23 +15,25 @@ public static class LicenseGuardModules
     const string ProductFolder = "SuvidhaPOS Premium";
     const string ManagedRegistry = @"HKEY_CURRENT_USER\Software\SuvidhaPOS Premium\License";
     static readonly object ClockSync = new();
+    static IConfiguration? RuntimeConfig;
     static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public static void Map(WebApplication app)
     {
         var cfg = app.Configuration;
+        RuntimeConfig = cfg;
 
         app.MapGet("/public/license/status", () => Results.Ok(GetStatus(cfg)));
         app.MapGet("/api/license/status", () => Results.Ok(GetStatus(cfg)));
 
-        app.MapPost("/api/license/activate", async (LicenseActivateRequest request, CancellationToken ct) =>
-            await ActivateOnlineAsync(cfg, request, ct));
+        app.MapPost("/api/license/activate", async (Db db, LicenseActivateRequest request, CancellationToken ct) =>
+            await ActivateOnlineAsync(cfg, db, request, ct));
 
-        app.MapPost("/api/license/check", async (CancellationToken ct) =>
-            await CheckOnlineAsync(cfg, ct));
+        app.MapPost("/api/license/check", async (Db db, CancellationToken ct) =>
+            await CheckOnlineAsync(cfg, db, ct));
     }
 
-    public static LicenseStatus GetStatus() => GetStatus(null);
+    public static LicenseStatus GetStatus() => GetStatus(RuntimeConfig);
 
     public static LicenseStatus GetStatus(IConfiguration? cfg)
     {
@@ -66,14 +70,20 @@ public static class LicenseGuardModules
                 payload, validFrom, validTill, nowUtc, WarningWindowDays, "NOT_STARTED");
 
         var days = tillDate.DayNumber - today.DayNumber;
+        var graceDays = Math.Clamp(payload.GraceDays ?? 3, 0, 7);
+        if (days < -graceDays)
+            return LicenseStatus.CreateLocked(payload, validFrom, validTill, days, graceDays, nowUtc, WarningWindowDays);
         if (days < 0)
-            return LicenseStatus.CreateExpired(payload, validFrom, validTill, nowUtc, WarningWindowDays);
+        {
+            PersistTrustedClock(nowUtc);
+            return LicenseStatus.CreateGrace(payload, validFrom, validTill, -days, graceDays, nowUtc, WarningWindowDays);
+        }
 
         PersistTrustedClock(nowUtc);
-        return LicenseStatus.CreateActive(payload, validFrom, validTill, days, nowUtc, WarningWindowDays);
+        return LicenseStatus.CreateActive(payload, validFrom, validTill, days, graceDays, nowUtc, WarningWindowDays);
     }
 
-    static async Task<IResult> ActivateOnlineAsync(IConfiguration cfg, LicenseActivateRequest request, CancellationToken ct)
+    static async Task<IResult> ActivateOnlineAsync(IConfiguration cfg, Db db, LicenseActivateRequest request, CancellationToken ct)
     {
         var outletCode = (request.OutletCode ?? "").Trim().ToUpperInvariant();
         var activationCode = (request.ActivationCode ?? "").Trim();
@@ -111,6 +121,7 @@ public static class LicenseGuardModules
 
             WriteProtectedString(TokenPath(), central.Token);
             SaveOutletCode(payload!.OutletCode);
+            await SyncCentralStoreTypeAsync(db, payload);
             ClearServerBlock();
             MarkManaged();
 
@@ -130,7 +141,7 @@ public static class LicenseGuardModules
         }
     }
 
-    static async Task<IResult> CheckOnlineAsync(IConfiguration cfg, CancellationToken ct)
+    static async Task<IResult> CheckOnlineAsync(IConfiguration cfg, Db db, CancellationToken ct)
     {
         var outletCode = LoadOutletCode();
         if (string.IsNullOrWhiteSpace(outletCode))
@@ -176,10 +187,10 @@ public static class LicenseGuardModules
 
             if (statusCode == "expired")
             {
-                SaveServerBlock("EXPIRED", "License has expired. Renew it from Central Admin and click CHECK LICENSE again.");
+                ClearServerBlock();
                 return Results.Ok(new
                 {
-                    message = "License expired on Central.",
+                    message = "License grace period has ended. Billing is read-only until renewal.",
                     status = GetStatus(cfg)
                 });
             }
@@ -194,6 +205,7 @@ public static class LicenseGuardModules
 
             WriteProtectedString(TokenPath(), central.Token);
             SaveOutletCode(payload!.OutletCode);
+            await SyncCentralStoreTypeAsync(db, payload);
             ClearServerBlock();
             MarkManaged();
 
@@ -212,6 +224,24 @@ public static class LicenseGuardModules
         {
             return Results.Json(new { message = "Central license check failed: " + ex.Message, status = GetStatus(cfg) }, statusCode: 502);
         }
+    }
+
+    static async Task SyncCentralStoreTypeAsync(Db db, CentralTokenPayload payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload.StoreType)) return;
+        var row = await db.QuerySingleAsync("SELECT TOP 1 Id FROM OutletMaster ORDER BY Id");
+        if (row.Count == 0)
+        {
+            await db.ScalarAsync(
+                "INSERT OutletMaster(OutletName,StoreType,DefaultUnit) VALUES(@n,@t,'PCS');SELECT CAST(SCOPE_IDENTITY() AS int)",
+                new SqlParameter("@n", string.IsNullOrWhiteSpace(payload.OutletName) ? "Main Outlet" : payload.OutletName),
+                new SqlParameter("@t", payload.StoreType));
+            return;
+        }
+        await db.ScalarAsync(
+            "UPDATE OutletMaster SET StoreType=@t,UpdatedAt=SYSDATETIME() WHERE Id=@id;SELECT @id",
+            new SqlParameter("@t", payload.StoreType),
+            new SqlParameter("@id", Convert.ToInt32(row["Id"])));
     }
 
     static HttpClient CreateCentralClient(IConfiguration cfg)
@@ -577,57 +607,74 @@ public static class LicenseGuardModules
         int TokenVersion,
         string? Nonce,
         string? Status,
-        string? Plan);
+        string? Plan,
+        int? GraceDays,
+        string? RenewalUrl);
 
     public record ServerBlockState(string Code, string Message, DateTime CheckedAtUtc);
 
     public record LicenseStatus(
-        bool Managed, bool LoginAllowed, bool Active, bool Expired, bool ShowWarning, string Code, string DisplayText,
+        bool Managed, bool LoginAllowed, bool Active, bool Expired, bool ReadOnly, bool ShowWarning, string Code, string DisplayText,
         string Message, string? ValidFrom, string? ValidTill, int? DaysRemaining, string? OutletCode, string? OutletName,
-        string? StoreType, string? Plan, string DeviceId, int WarningDays, DateTime CheckedAtUtc)
+        string? StoreType, string? Plan, string? RenewalUrl, string DeviceId, int WarningDays, int GraceDays, DateTime CheckedAtUtc)
     {
         static string DateText(DateTime value) => value.ToUniversalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        static string PlanName(CentralTokenPayload p) => string.IsNullOrWhiteSpace(p.Plan) ? "SuvidhaPOS Premium" : p.Plan!;
 
         public static LicenseStatus Unmanaged(DateTime now, int warn) => new(
-            false, false, false, false, false, "NOT_ACTIVATED", "LICENSE • ACTIVATE",
-            "This SuvidhaPOS installation is not linked to Central yet. Activate it with the Outlet Code and Activation Code.",
-            null, null, null, null, null, null, null, CurrentDeviceId(), warn, now);
+            false, false, false, false, false, false, "NOT_ACTIVATED", "LICENSE • ACTIVATE",
+            "This SuvidhaPOS installation is not linked to SuvidhaPremium yet. Activate it with the Outlet Code and Activation Code.",
+            null, null, null, null, null, null, null, null, CurrentDeviceId(), warn, 3, now);
 
         public static LicenseStatus Invalid(string message, DateTime now, int warn) => new(
-            true, false, false, false, false, "INVALID", "LICENSE INVALID", message,
-            null, null, null, LoadOutletCode(), null, null, null, CurrentDeviceId(), warn, now);
+            true, false, false, false, false, false, "INVALID", "LICENSE INVALID", message,
+            null, null, null, LoadOutletCode(), null, null, null, null, CurrentDeviceId(), warn, 3, now);
 
         public static LicenseStatus ServerBlocked(string code, string message, CentralTokenPayload p, DateTime from, DateTime till, DateTime now, int warn) => new(
-            true, false, false, string.Equals(code, "EXPIRED", StringComparison.OrdinalIgnoreCase), false,
-            code, string.Equals(code, "EXPIRED", StringComparison.OrdinalIgnoreCase) ? "LICENSE EXPIRED" : "LICENSE BLOCKED",
-            message, DateText(from), DateText(till), null, p.OutletCode, p.OutletName, p.StoreType, p.Plan ?? "Premium",
-            CurrentDeviceId(), warn, now);
+            true, false, false, false, false, false, code, "LICENSE BLOCKED",
+            message, DateText(from), DateText(till), null, p.OutletCode, p.OutletName, p.StoreType, PlanName(p), p.RenewalUrl,
+            CurrentDeviceId(), warn, Math.Clamp(p.GraceDays ?? 3,0,7), now);
 
         public static LicenseStatus Blocked(string message, CentralTokenPayload p, DateTime from, DateTime till, DateTime now, int warn, string code) => new(
-            true, false, false, false, false, code, "LICENSE BLOCKED", message,
-            DateText(from), DateText(till), null, p.OutletCode, p.OutletName, p.StoreType, p.Plan ?? "Premium",
-            CurrentDeviceId(), warn, now);
+            true, false, false, false, false, false, code, "LICENSE BLOCKED", message,
+            DateText(from), DateText(till), null, p.OutletCode, p.OutletName, p.StoreType, PlanName(p), p.RenewalUrl,
+            CurrentDeviceId(), warn, Math.Clamp(p.GraceDays ?? 3,0,7), now);
 
-        public static LicenseStatus CreateExpired(CentralTokenPayload p, DateTime from, DateTime till, DateTime now, int warn) => new(
-            true, false, false, true, false, "EXPIRED", "LICENSE EXPIRED",
-            $"SuvidhaPOS validity expired on {till:dd-MMM-yyyy}. Please renew and click CHECK LICENSE.",
-            DateText(from), DateText(till), -1, p.OutletCode, p.OutletName, p.StoreType, p.Plan ?? "Premium",
-            CurrentDeviceId(), warn, now);
+        public static LicenseStatus CreateGrace(CentralTokenPayload p, DateTime from, DateTime till, int lapsedDays, int graceDays, DateTime now, int warn)
+        {
+            var msg = $"⚠️ Expired: Your SuvidhaPOS Premium subscription ended on {till:dd-MMM-yyyy}. You are in a grace period (day {lapsedDays} of {graceDays}). Renew today before billing features stop.";
+            return new(true, true, true, true, false, true, "GRACE", $"GRACE PERIOD • DAY {lapsedDays}/{graceDays}", msg,
+                DateText(from), DateText(till), -lapsedDays, p.OutletCode, p.OutletName, p.StoreType, PlanName(p), p.RenewalUrl,
+                CurrentDeviceId(), warn, graceDays, now);
+        }
 
-        public static LicenseStatus CreateActive(CentralTokenPayload p, DateTime from, DateTime till, int days, DateTime now, int warn)
+        public static LicenseStatus CreateLocked(CentralTokenPayload p, DateTime from, DateTime till, int days, int graceDays, DateTime now, int warn)
+        {
+            var msg = $"🔒 Service Locked: Your SuvidhaPOS Premium license expired on {till:dd-MMM-yyyy}. New billing is currently disabled. Reports remain read-only until renewal.";
+            return new(true, true, false, true, true, true, "LOCKED", "SERVICE LOCKED • READ-ONLY", msg,
+                DateText(from), DateText(till), days, p.OutletCode, p.OutletName, p.StoreType, PlanName(p), p.RenewalUrl,
+                CurrentDeviceId(), warn, graceDays, now);
+        }
+
+        public static LicenseStatus CreateActive(CentralTokenPayload p, DateTime from, DateTime till, int days, int graceDays, DateTime now, int warn)
         {
             var warning = days >= 0 && days <= warn;
             var text = days == 0 ? "EXPIRES TODAY" :
-                warning ? $"EXPIRES IN {days} DAY{(days == 1 ? "" : "S")}" :
+                days == 1 ? "EXPIRES TOMORROW" :
+                warning ? $"EXPIRES IN {days} DAYS" :
                 $"VALID TILL {till:dd MMM yyyy}".ToUpperInvariant();
 
-            var msg = days == 0 ? "Your SuvidhaPOS license expires today." :
-                warning ? $"Your billing software is going to expire in {days} day{(days == 1 ? "" : "s")}." :
-                $"License active till {till:dd-MMM-yyyy}.";
+            var msg = days == 0
+                ? $"🚨 Final Reminder: Your SuvidhaPOS Premium subscription expires today ({till:dd-MMM-yyyy}). Renew now to avoid billing lock & counter downtime."
+                : days == 1
+                    ? $"⚠️ Reminder: Your SuvidhaPOS Premium subscription expires tomorrow ({till:dd-MMM-yyyy}). Renew now to avoid billing disruptions."
+                    : warning
+                        ? $"Reminder: Your SuvidhaPOS Premium subscription expires in {days} days on {till:dd-MMM-yyyy}. Renew now to avoid billing disruptions."
+                        : $"License active till {till:dd-MMM-yyyy}.";
 
-            return new(true, true, true, false, warning, "ACTIVE", text, msg,
-                DateText(from), DateText(till), days, p.OutletCode, p.OutletName, p.StoreType, p.Plan ?? "Premium",
-                CurrentDeviceId(), warn, now);
+            return new(true, true, true, false, false, warning, "ACTIVE", text, msg,
+                DateText(from), DateText(till), days, p.OutletCode, p.OutletName, p.StoreType, PlanName(p), p.RenewalUrl,
+                CurrentDeviceId(), warn, graceDays, now);
         }
     }
 }

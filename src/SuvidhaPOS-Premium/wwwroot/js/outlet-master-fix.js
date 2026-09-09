@@ -1,7 +1,4 @@
 (function(){
-  const TYPES=[
-    'Retail Shop','Pharmacy / Medical Store','Agriculture Product Store','Seeds & Fertilizer Store','Pesticide / Crop Care Store','General Store','Grocery Store','Supermarket','Wholesale Store','Distributor','FMCG Store','Cosmetics & Beauty Store','Personal Care Store','Stationery Store','Hardware Store','Electrical Store','Electronics Store','Mobile & Accessories Store','Garments Store','Footwear Store','Hardware & Sanitary Store','Auto Parts Store','Pet / Veterinary Store','Dairy Store','Bakery','Restaurant / Cafe','Sweet Shop','Department Store','Jewellery Shop','Other'
-  ];
   const e=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
   const canonicalType=v=>/^(Gold & Diamond Jewellery|Silver Jewellery)$/i.test(String(v||'').trim())?'Jewellery Shop':(String(v||'').trim()||'Retail Shop');
   const saveLoginOutlet=(o)=>{try{localStorage.setItem('suvidha_outlet_display',JSON.stringify({OutletName:o?.OutletName||'Main Outlet',StoreType:canonicalType(o?.StoreType||'Retail Shop')}));}catch{}};
@@ -25,10 +22,10 @@
             <label class="full">Address<textarea id="sa" class="textarea">${e(x.Address)}</textarea></label>
           </div><button class="btn" style="margin-top:12px" onclick="saveSettings()">Save Settings</button></div>
           <div class="panel outlet-master-panel"><div class="panelhead"><h3>OUTLET MASTER</h3><span class="tag">ADMIN ONLY</span></div>
-            <p class="muted">Select the business profile for this outlet. Normal login has no outlet selector.</p>
+            <p class="muted">Outlet details can be edited here. Store Type is controlled only from SuvidhaPremium website and syncs through the signed license.</p>
             <div class="formgrid">
               <label>Outlet Name<input id="oname" class="input" value="${e(o.OutletName||'Main Outlet')}"></label>
-              <label>Store Type<select id="otype" class="select" onchange="applyOutletTypePreview()">${TYPES.map(t=>`<option value="${e(t)}" ${t===type?'selected':''}>${e(t)}</option>`).join('')}</select></label>
+              <label>Store Type<input id="otype" class="input" value="${e(type)}" readonly title="Managed from SuvidhaPremium website"></label>
               <label>Phone<input id="ophone" class="input" value="${e(o.Phone||'')}"></label>
               <label>GSTIN<input id="ogst" class="input" value="${e(o.Gstin||'')}"></label>
               <label class="full">Address<textarea id="oaddr" class="textarea">${e(o.Address||'')}</textarea></label>
@@ -66,7 +63,7 @@
       document.body.dataset.storeType=o.StoreType.replace(/[^a-z0-9]+/gi,'-').toLowerCase();
       if(window.refreshLoginOutlet)await window.refreshLoginOutlet(true);
       window.dispatchEvent(new CustomEvent('suvidha:outlet-saved',{detail:o}));
-      toast(o.StoreType==='Jewellery Shop'?'Jewellery Shop mode enabled — reloading workspace':'Outlet Master saved — reloading workspace');
+      toast('Outlet details saved — Store Type remains managed by SuvidhaPremium');
       setTimeout(()=>location.replace('/?outlet='+Date.now()),450);
     }catch(err){alert(err.message)}
   };

@@ -48,3 +48,5 @@ body[data-theme="light"] aside>nav::-webkit-scrollbar-thumb,body[data-theme="lig
 .license-message{min-height:18px;margin:8px 0 0;color:#8fa9bc;font-size:11px;line-height:1.45}
 .license-message.ok{color:#77d9a8}.license-message.error{color:#ff8b92}
 @media(max-width:650px){.license-activate-form{grid-template-columns:1fr}}
+
+.license-whatsapp{border:1px solid #2c9d63;background:linear-gradient(135deg,#1f9d59,#177c47);color:#fff;border-radius:10px;padding:11px 18px;font-size:11px;font-weight:850;cursor:pointer}.license-whatsapp:hover{filter:brightness(1.08)}body[data-license-readonly="1"] .license-pill{box-shadow:0 0 0 2px #ff626822 inset}

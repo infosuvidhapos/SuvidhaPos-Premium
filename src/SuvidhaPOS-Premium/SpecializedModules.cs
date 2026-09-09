@@ -17,7 +17,8 @@ public static class SpecializedModules
             ctx.Response.Headers.Expires = "0";
             var o = await db.QuerySingleAsync("SELECT TOP 1 OutletName,StoreType,UpdatedAt FROM OutletMaster ORDER BY Id");
             var name = o.GetValueOrDefault("OutletName")?.ToString();
-            var type = CanonicalStoreType(o.GetValueOrDefault("StoreType")?.ToString());
+            var signedType = LicenseGuardModules.GetStatus().StoreType;
+            var type = CanonicalStoreType(!string.IsNullOrWhiteSpace(signedType) ? signedType : o.GetValueOrDefault("StoreType")?.ToString());
             if (string.IsNullOrWhiteSpace(name)) name = "Main Outlet";
             
             return Results.Ok(new {
@@ -32,7 +33,8 @@ public static class SpecializedModules
         app.MapGet("/api/specialization", async (Db db) =>
         {
             var o = await db.QuerySingleAsync("SELECT TOP 1 OutletName,StoreType FROM OutletMaster ORDER BY Id");
-            var type = CanonicalStoreType(o.GetValueOrDefault("StoreType")?.ToString());
+            var signedType = LicenseGuardModules.GetStatus().StoreType;
+            var type = CanonicalStoreType(!string.IsNullOrWhiteSpace(signedType) ? signedType : o.GetValueOrDefault("StoreType")?.ToString());
             return Results.Ok(new { OutletName = o.GetValueOrDefault("OutletName")?.ToString() ?? "Main Outlet", StoreType = type, IsJewellery = IsJewellery(type), IsUom = !IsJewellery(type) });
         });
 
