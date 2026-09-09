@@ -33,5 +33,20 @@ public sealed class DatabaseInitializer
   const int iterations=120000; var salt=RandomNumberGenerator.GetBytes(16); var key=Rfc2898DeriveBytes.Pbkdf2(password,salt,iterations,HashAlgorithmName.SHA256,32);
   return $"PBKDF2${iterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(key)}";
  }
- async Task RunScriptAsync(string path){var sql=await File.ReadAllTextAsync(path); foreach(var part in Regex.Split(sql,@"^\s*GO\s*$",RegexOptions.Multiline|RegexOptions.IgnoreCase)){if(string.IsNullOrWhiteSpace(part))continue; using var c=_db.CreateConnection(); await c.OpenAsync(); using var setup=new SqlCommand("SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON; SET ANSI_PADDING ON; SET ANSI_WARNINGS ON; SET CONCAT_NULL_YIELDS_NULL ON; SET ARITHABORT ON; SET NUMERIC_ROUNDABORT OFF;",c); await setup.ExecuteNonQueryAsync(); using var cmd=new SqlCommand(part,c); await cmd.ExecuteNonQueryAsync();}}
+ async Task RunScriptAsync(string path){
+  var sql=await File.ReadAllTextAsync(path);var batchNo=0;
+  foreach(var part in Regex.Split(sql,@"^\s*GO\s*$",RegexOptions.Multiline|RegexOptions.IgnoreCase)){
+   if(string.IsNullOrWhiteSpace(part))continue;batchNo++;
+   try{
+    using var c=_db.CreateConnection();await c.OpenAsync();
+    using var setup=new SqlCommand("SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON; SET ANSI_PADDING ON; SET ANSI_WARNINGS ON; SET CONCAT_NULL_YIELDS_NULL ON; SET ARITHABORT ON; SET NUMERIC_ROUNDABORT OFF;",c);await setup.ExecuteNonQueryAsync();
+    using var cmd=new SqlCommand(part,c);await cmd.ExecuteNonQueryAsync();
+   }catch(Exception ex){
+    // Legacy customer databases can contain old duplicate/index data. Do not let one
+    // non-critical batch prevent later compatibility migrations (OutletMaster, print,
+    // UOM, returns, etc.) from running.
+    Console.WriteLine($"Database migration warning: {Path.GetFileName(path)} batch {batchNo}: {ex.Message}");
+   }
+  }
+ }
 }

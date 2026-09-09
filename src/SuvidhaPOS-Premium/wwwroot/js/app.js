@@ -33,7 +33,7 @@ async function api(url,opt={}){
   const headers=new Headers(opt.headers||{});
   if(token) headers.set('Authorization','Bearer '+token);
   const r=await fetch(url,{...opt,headers,credentials:'same-origin',cache:opt.cache||'no-store'});
-  let d={};try{d=await r.json()}catch{}
+  const raw=await r.text();let d={};try{d=raw?JSON.parse(raw):{}}catch{}
   if(r.status===401){
     window.suvidhaAuthToken=null;
     try{sessionStorage.removeItem('suvidha_auth_token')}catch{}
@@ -42,7 +42,10 @@ async function api(url,opt={}){
     if(screen)screen.style.setProperty('display','flex','important');
     throw new Error(token?'Session expired. Please login again.':'Login required');
   }
-  if(!r.ok)throw new Error((d.message||d.detail||'Request failed')+' ['+url+']');
+  if(!r.ok){
+    const detail=d.message||d.detail||(raw&&raw.length<=700?raw:'')||('HTTP '+r.status);
+    throw new Error(detail+' ['+url+']');
+  }
   return d
 }
 const money=x=>Number(x||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});

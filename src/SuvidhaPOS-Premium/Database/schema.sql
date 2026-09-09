@@ -10,12 +10,57 @@ SET CONCAT_NULL_YIELDS_NULL ON;
 SET ARITHABORT ON;
 SET NUMERIC_ROUNDABORT OFF;
 GO
+-- RUNTIME-COMPAT-92: repair legacy databases before normal schema batches.
+-- These guards are intentionally idempotent and run before optional indexes.
+IF OBJECT_ID('dbo.OutletMaster') IS NULL
+CREATE TABLE dbo.OutletMaster(
+ Id int IDENTITY PRIMARY KEY,
+ OutletName nvarchar(200) NOT NULL DEFAULT 'Main Outlet',
+ StoreType nvarchar(100) NOT NULL DEFAULT 'Retail Shop',
+ Address nvarchar(500) NULL,
+ Phone nvarchar(50) NULL,
+ Gstin nvarchar(30) NULL,
+ RequireBatch bit NOT NULL DEFAULT 0,
+ RequireExpiry bit NOT NULL DEFAULT 0,
+ DefaultUnit nvarchar(30) NOT NULL DEFAULT 'PCS',
+ UpdatedAt datetime2 NOT NULL DEFAULT SYSDATETIME()
+);
+IF NOT EXISTS(SELECT 1 FROM dbo.OutletMaster)
+ INSERT dbo.OutletMaster(OutletName,StoreType) VALUES('Main Outlet','Retail Shop');
+
+IF OBJECT_ID('dbo.Sales') IS NOT NULL
+BEGIN
+ IF COL_LENGTH('dbo.Sales','BillDate') IS NULL ALTER TABLE dbo.Sales ADD BillDate datetime2 NOT NULL CONSTRAINT DF_Sales_Compat_BillDate DEFAULT SYSDATETIME() WITH VALUES;
+ IF COL_LENGTH('dbo.Sales','Tax') IS NULL ALTER TABLE dbo.Sales ADD Tax decimal(18,2) NOT NULL CONSTRAINT DF_Sales_Compat_Tax DEFAULT 0 WITH VALUES;
+ IF COL_LENGTH('dbo.Sales','GrandTotal') IS NULL ALTER TABLE dbo.Sales ADD GrandTotal decimal(18,2) NOT NULL CONSTRAINT DF_Sales_Compat_GrandTotal DEFAULT 0 WITH VALUES;
+ IF COL_LENGTH('dbo.Sales','TotalCost') IS NULL ALTER TABLE dbo.Sales ADD TotalCost decimal(18,2) NOT NULL CONSTRAINT DF_Sales_Compat_TotalCost DEFAULT 0 WITH VALUES;
+ IF COL_LENGTH('dbo.Sales','Status') IS NULL ALTER TABLE dbo.Sales ADD Status nvarchar(20) NOT NULL CONSTRAINT DF_Sales_Compat_Status DEFAULT 'Completed' WITH VALUES;
+END
+
+IF OBJECT_ID('dbo.Customers') IS NOT NULL AND COL_LENGTH('dbo.Customers','IsActive') IS NULL
+ ALTER TABLE dbo.Customers ADD IsActive bit NOT NULL CONSTRAINT DF_Customers_Compat_IsActive DEFAULT 1 WITH VALUES;
+IF OBJECT_ID('dbo.Suppliers') IS NOT NULL AND COL_LENGTH('dbo.Suppliers','IsActive') IS NULL
+ ALTER TABLE dbo.Suppliers ADD IsActive bit NOT NULL CONSTRAINT DF_Suppliers_Compat_IsActive DEFAULT 1 WITH VALUES;
+IF OBJECT_ID('dbo.Products') IS NOT NULL
+BEGIN
+ IF COL_LENGTH('dbo.Products','IsActive') IS NULL ALTER TABLE dbo.Products ADD IsActive bit NOT NULL CONSTRAINT DF_Products_Compat_IsActive DEFAULT 1 WITH VALUES;
+ IF COL_LENGTH('dbo.Products','MinStock') IS NULL ALTER TABLE dbo.Products ADD MinStock decimal(18,3) NOT NULL CONSTRAINT DF_Products_Compat_MinStock DEFAULT 0 WITH VALUES;
+END
+IF OBJECT_ID('dbo.ProductBatches') IS NOT NULL
+BEGIN
+ IF COL_LENGTH('dbo.ProductBatches','Quantity') IS NULL ALTER TABLE dbo.ProductBatches ADD Quantity decimal(18,3) NOT NULL CONSTRAINT DF_ProductBatches_Compat_Quantity DEFAULT 0 WITH VALUES;
+ IF COL_LENGTH('dbo.ProductBatches','CostPrice') IS NULL ALTER TABLE dbo.ProductBatches ADD CostPrice decimal(18,2) NOT NULL CONSTRAINT DF_ProductBatches_Compat_Cost DEFAULT 0 WITH VALUES;
+ IF COL_LENGTH('dbo.ProductBatches','ExpiryDate') IS NULL ALTER TABLE dbo.ProductBatches ADD ExpiryDate date NULL;
+END
+GO
 IF OBJECT_ID('dbo.Settings') IS NULL CREATE TABLE dbo.Settings(Id int IDENTITY PRIMARY KEY, CompanyName nvarchar(200) NOT NULL DEFAULT 'SuvidhaPOS', Address nvarchar(500) NULL, Phone nvarchar(50) NULL, Gstin nvarchar(30) NULL, InvoicePrefix nvarchar(20) NOT NULL DEFAULT 'INV', UpdatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
 IF OBJECT_ID('dbo.Categories') IS NULL CREATE TABLE dbo.Categories(Id int IDENTITY PRIMARY KEY,Name nvarchar(120) NOT NULL UNIQUE,IsActive bit NOT NULL DEFAULT 1);
 IF OBJECT_ID('dbo.Customers') IS NULL CREATE TABLE dbo.Customers(Id int IDENTITY PRIMARY KEY,Name nvarchar(200) NOT NULL,Phone nvarchar(30) NULL,Address nvarchar(500) NULL,GstIn nvarchar(30) NULL,OpeningBalance decimal(18,2) NOT NULL DEFAULT 0,IsActive bit NOT NULL DEFAULT 1,CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
 IF OBJECT_ID('dbo.Suppliers') IS NULL CREATE TABLE dbo.Suppliers(Id int IDENTITY PRIMARY KEY,Name nvarchar(200) NOT NULL,Phone nvarchar(30) NULL,Address nvarchar(500) NULL,GstIn nvarchar(30) NULL,OpeningBalance decimal(18,2) NOT NULL DEFAULT 0,IsActive bit NOT NULL DEFAULT 1,CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
 IF OBJECT_ID('dbo.Products') IS NULL CREATE TABLE dbo.Products(Id int IDENTITY PRIMARY KEY,Name nvarchar(200) NOT NULL,Barcode nvarchar(80) NULL,Sku nvarchar(80) NULL,CategoryId int NULL REFERENCES dbo.Categories(Id),Category nvarchar(100) NULL,Unit nvarchar(30) NOT NULL DEFAULT 'PCS',Hsn nvarchar(30) NULL,GstRate decimal(8,2) NOT NULL DEFAULT 0,Mrp decimal(18,2) NOT NULL DEFAULT 0,PurchasePrice decimal(18,2) NOT NULL DEFAULT 0,SalePrice decimal(18,2) NOT NULL DEFAULT 0,MinStock decimal(18,3) NOT NULL DEFAULT 0,MaxStock decimal(18,3) NOT NULL DEFAULT 0,IsActive bit NOT NULL DEFAULT 1,CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
-IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_Products_Barcode') CREATE UNIQUE INDEX IX_Products_Barcode ON dbo.Products(Barcode) WHERE Barcode IS NOT NULL AND Barcode<>'';
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_Products_Barcode' AND object_id=OBJECT_ID('dbo.Products'))
+AND NOT EXISTS(SELECT 1 FROM dbo.Products WHERE Barcode IS NOT NULL AND Barcode<>'' GROUP BY Barcode HAVING COUNT(*)>1)
+CREATE UNIQUE INDEX IX_Products_Barcode ON dbo.Products(Barcode) WHERE Barcode IS NOT NULL AND Barcode<>'';
 IF OBJECT_ID('dbo.ProductBatches') IS NULL CREATE TABLE dbo.ProductBatches(Id int IDENTITY PRIMARY KEY,ProductId int NOT NULL REFERENCES dbo.Products(Id),BatchNo nvarchar(100) NOT NULL,Quantity decimal(18,3) NOT NULL DEFAULT 0,CostPrice decimal(18,2) NOT NULL DEFAULT 0,SellingPrice decimal(18,2) NOT NULL DEFAULT 0,Mrp decimal(18,2) NOT NULL DEFAULT 0,ManufactureDate date NULL,ExpiryDate date NOT NULL,CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_ProductBatches_ProductExpiry') CREATE INDEX IX_ProductBatches_ProductExpiry ON dbo.ProductBatches(ProductId,ExpiryDate,Quantity);
 IF OBJECT_ID('dbo.Purchases') IS NULL CREATE TABLE dbo.Purchases(Id int IDENTITY PRIMARY KEY,InvoiceNo nvarchar(80) NOT NULL,SupplierId int NULL REFERENCES dbo.Suppliers(Id),SupplierName nvarchar(200) NOT NULL,PurchaseDate datetime2 NOT NULL,SubTotal decimal(18,2) NOT NULL DEFAULT 0,Discount decimal(18,2) NOT NULL DEFAULT 0,Tax decimal(18,2) NOT NULL DEFAULT 0,GrandTotal decimal(18,2) NOT NULL,PaymentMode nvarchar(30) NOT NULL DEFAULT 'Credit',PaidAmount decimal(18,2) NOT NULL DEFAULT 0,Notes nvarchar(500) NULL);

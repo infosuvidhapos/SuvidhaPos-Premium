@@ -12,6 +12,22 @@ var builder=WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<Db>(); builder.Services.AddSingleton<DatabaseInitializer>();
 var app=builder.Build();
 using(var scope=app.Services.CreateScope()){try{await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync();}catch(Exception ex){Console.WriteLine("Database initialization failed: "+ex.Message);}}
+app.Use(async (ctx,next) => {
+    try { await next(); }
+    catch(Exception ex)
+    {
+        Console.WriteLine($"API runtime error {ctx.Request.Method} {ctx.Request.Path}: {ex.Message}");
+        if(ctx.Response.HasStarted) throw;
+        if(ctx.Request.Path.StartsWithSegments("/api"))
+        {
+            ctx.Response.Clear();
+            ctx.Response.StatusCode=500;
+            await ctx.Response.WriteAsJsonAsync(new { message=ex.Message, endpoint=ctx.Request.Path.Value });
+            return;
+        }
+        throw;
+    }
+});
 app.UseDefaultFiles(); app.UseStaticFiles();
 var sessions = new ConcurrentDictionary<string, SessionUser>();
 app.Use(async (ctx,next) => {
