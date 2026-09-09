@@ -15,7 +15,13 @@ using(var scope=app.Services.CreateScope()){try{await scope.ServiceProvider.GetR
 app.UseDefaultFiles(); app.UseStaticFiles();
 var sessions = new ConcurrentDictionary<string, SessionUser>();
 app.Use(async (ctx,next) => {
-    if (!ctx.Request.Path.StartsWithSegments("/api") || ctx.Request.Path.StartsWithSegments("/api/health") || ctx.Request.Path.StartsWithSegments("/api/login")) { await next(); return; }
+    var path = ctx.Request.Path;
+    var publicApi =
+        path.StartsWithSegments("/api/health") ||
+        path.StartsWithSegments("/api/login") ||
+        path.StartsWithSegments("/api/license/activate") ||
+        path.StartsWithSegments("/api/license/check");
+    if (!path.StartsWithSegments("/api") || publicApi) { await next(); return; }
 
     string? token = null;
     if (ctx.Request.Cookies.TryGetValue("suvidha_session", out var cookieToken))

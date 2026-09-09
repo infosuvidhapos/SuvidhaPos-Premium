@@ -125,7 +125,8 @@ jobs:
           if($settings -match 'CentralLicense"[\s\S]{0,500}(Server=|Data Source=|38\.247\.|192\.168\.)'){ throw 'POS CentralLicense config must contain website/API URL only, never central SQL Server/IP' }
           foreach($token in @('http://suvidhapremium.suvidhapos.in/','SuvidhaPOS-Central','main-v1')){ if(-not $settings.Contains($token)){ throw "Central license configuration missing: $token" } }
           $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
-          foreach($token in @('LicenseGuardModules.GetStatus','statusCode:423','LicenseGuardModules.Map(app)')){ if(-not $program.Contains($token)){ throw "Login expiry enforcement missing: $token" } }
+          foreach($token in @('LicenseGuardModules.GetStatus','statusCode:423','LicenseGuardModules.Map(app)','path.StartsWithSegments("/api/license/activate")','path.StartsWithSegments("/api/license/check")')){ if(-not $program.Contains($token)){ throw "Login/license activation enforcement missing: $token" } }
+          if($program -match 'if \(!ctx\.Request\.Path\.StartsWithSegments\("/api"\).*StartsWithSegments\("/api/login"\)\)'){ throw 'License activation/check endpoints are still trapped behind login middleware' }
           $login = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/login-authfix7.js' -Raw -Encoding UTF8
           foreach($token in @('status === 423','showLicenseExpired','showLicenseActivation','refreshLicenseStatus(true)')){ if(-not $login.Contains($token)){ throw "Login license UI missing: $token" } }
           $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/license-status.js' -Raw -Encoding UTF8
