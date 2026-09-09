@@ -16,7 +16,7 @@ function notify(x){try{toast(x)}catch(_){alert(x)}}
 function ensureNav(){
  var side=d.getElementById('sidebar');if(!side)return;
  if(!jewel()){
-   var ai=side.querySelector('[data-page="aiimport"] span');if(ai)ai.textContent='Item Import Master';
+   var ai=side.querySelector('[data-page="aiimport"] span');if(ai)ai.textContent='AI Import';var im=side.querySelector('[data-page="itemimport"] span');if(im)im.textContent='Item Import Master';
    var bottom=side.querySelector('.sidebottom');
    if(bottom&&enabled('P-03')&&!d.getElementById('barcodeMasterNav')){
      var b=d.createElement('button');b.id='barcodeMasterNav';b.className='plain';b.innerHTML='▥ Barcode Print Master';b.onclick=function(){w.loadBarcodePrintMaster()};bottom.insertBefore(b,bottom.querySelector('.logoutBtn')||bottom.firstChild);
@@ -207,7 +207,7 @@ w.loadBarcodePrintMaster=async function(){
 };
 w.premiumChooseBarcodeTemplate=function(t){C.barcodeTemplate=t;d.querySelectorAll('.barcode-template').forEach(function(x){x.classList.toggle('selected',x.textContent.indexOf(t)===0)});w.premiumBarcodePreview()};
 w.premiumBarcodePreview=function(){var b=d.getElementById('bcPreview');if(b)b.innerHTML=labelHtml(selectedBarcodeItem(),C.barcodeScope,C.barcodeTemplate)};
-w.premiumSaveBarcodeDefaults=async function(){try{var vals={'Barcode.PrinterName':val('bcPrinter'),'Barcode.Dpi':val('bcDpi'),'Barcode.GapMm':val('bcGap'),'Barcode.Orientation':val('bcOrientation'),'Barcode.Template.'+C.barcodeScope:C.barcodeTemplate};await Promise.all(Object.keys(vals).map(function(k){return api('/api/app-settings/'+encodeURIComponent(k),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:String(vals[k]||'')})})}));notify('Barcode printer defaults saved')}catch(err){alert(err.message)}};
+w.premiumSaveBarcodeDefaults=async function(){try{var vals={'Barcode.PrinterName':val('bcPrinter'),'Barcode.Dpi':val('bcDpi'),'Barcode.GapMm':val('bcGap'),'Barcode.Orientation':val('bcOrientation'),['Barcode.Template.'+C.barcodeScope]:C.barcodeTemplate};await Promise.all(Object.keys(vals).map(function(k){return api('/api/app-settings/'+encodeURIComponent(k),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:String(vals[k]||'')})})}));notify('Barcode printer defaults saved')}catch(err){alert(err.message)}};
 
 async function printAction(){try{var x=await api('/api/app-settings/'+encodeURIComponent('Print.ActionMode'));return String(x.Value||x.value||'PREVIEW').toUpperCase()}catch(_){return 'PREVIEW'}}
 w.premiumPrintHtml=async function(html,name){
@@ -276,8 +276,8 @@ function ownershipPulse(reason){
  w.backgroundOutletSync('PULL',reason||'periodic',false);
 }
 new MutationObserver(function(){var on=d.body.getAttribute('data-authenticated')==='true';if(on&&!authSeen){authSeen=true;ownershipPulse('login')}if(!on)authSeen=false}).observe(d.body,{attributes:true,attributeFilter:['data-authenticated']});
-w.addEventListener('focus',function(){if(d.body.getAttribute('data-authenticated')==='true')ownershipPulse('focus')});
-setInterval(function(){if(d.body.getAttribute('data-authenticated')==='true')ownershipPulse('periodic')},300000);
+// Central ownership sync runs only on startup, verified login, manual Sync Now and outlet save.
+ // Do not poll every five minutes or on window focus; billing must stay fully local and latency-free.
 
 function enhancePaymentRefs(){
  var box=d.getElementById('jsPayRows');if(!box)return;[].slice.call(box.children).forEach(function(row,i){if(row.querySelector('.payment-reference'))return;var inp=d.createElement('input');inp.className='payment-reference';inp.placeholder='Reference / UTR';inp.value=(w.__jewelSuiteState&&w.__jewelSuiteState.payments[i]&&w.__jewelSuiteState.payments[i].reference)||'';inp.onchange=function(){if(w.JSuitePayment)w.JSuitePayment(i,'reference',this.value)};row.insertBefore(inp,row.lastElementChild)});

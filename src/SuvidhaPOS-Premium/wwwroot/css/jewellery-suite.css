@@ -165,3 +165,9 @@ body.jewel-suite-mode .js-brand-logo{display:block!important;width:122px!importa
 body.jewel-suite-mode [data-premium-completion="1"]{display:block}
 body.jewel-suite-mode [data-premium-completion="1"] .nav{display:flex!important}
 @media(max-width:780px){body.jewel-suite-mode .js-brand{height:86px!important;min-height:86px!important}.jewel-suite-mode .js-brand-logo{width:110px!important;height:66px!important;max-width:110px!important}}
+
+
+/* 6.12.3 final logo safe-area */
+body.jewel-suite-mode .js-brand{height:104px!important;min-height:104px!important;padding:14px 24px!important;overflow:visible!important}
+body.jewel-suite-mode .js-brand-logo{width:116px!important;height:70px!important;max-width:116px!important;max-height:70px!important;object-fit:contain!important;object-position:50% 50%!important;clip-path:none!important}
+@media(max-width:780px){body.jewel-suite-mode .js-brand{height:94px!important;min-height:94px!important}.jewel-suite-mode .js-brand-logo{width:104px!important;height:64px!important;max-width:104px!important}}

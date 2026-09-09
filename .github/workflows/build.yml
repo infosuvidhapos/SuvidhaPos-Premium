@@ -149,6 +149,22 @@ jobs:
           if(-not $html.Contains('runtimeInputGuard')){ throw 'Authenticated input guard missing' }
           $iss = Get-Content 'installer/SuvidhaPOS.iss' -Raw -Encoding UTF8
           if(-not $iss.Contains('runasoriginaluser')){ throw 'Post-install app must launch as normal desktop user' }
+      - name: Validate premium completion JavaScript runtime syntax
+        shell: powershell
+        run: |
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js'
+          $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js' -Raw -Encoding UTF8
+          if($ui.Contains("setInterval(function(){if(d.body.getAttribute('data-authenticated')==='true')ownershipPulse('periodic')},300000)")){ throw 'Five-minute Central outlet polling must not return' }
+          foreach($token in @("['Barcode.Template.'+C.barcodeScope]",'AI Import','Item Import Master')){ if(-not $ui.Contains($token)){ throw "Completion runtime wiring missing: $token" } }
+          $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
+          foreach($token in @('data-page="aiimport"','>AI Import<','data-page="itemimport"','>Item Import Master<')){ if(-not $html.Contains($token)){ throw "Separate import menu missing: $token" } }
+          $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
+          foreach($token in @('Jewellery Billing','Item Entry','loadDayClosing()')){ if(-not $jewel.Contains($token)){ throw "Jewellery runtime menu missing: $token" } }
+          $app = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
+          foreach($token in @("desktopMessage('exit')",'Day closed successfully')){ if(-not $app.Contains($token)){ throw "Logout/day-close desktop exit missing: $token" } }
+          $logo = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/img/suvidha-pos-mark.svg' -Raw -Encoding UTF8
+          if(-not $logo.Contains('viewBox="-30 -20 420 280"')){ throw 'Logo safe-area viewBox missing' }
+
       - name: Validate master visibility and license file concurrency
         shell: powershell
         run: |
@@ -229,7 +245,7 @@ jobs:
           if($tax.Contains('stopImmediatePropagation')){ throw 'Tax Master must not intercept sidebar navigation separately' }
           if(-not $tax.Contains('window.loadTaxMaster=window.loadTaxmaster')){ throw 'Tax Master unified route alias missing' }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
-          $pages = @('dashboard','billing','products','openingstock','itemimport','purchase','sales','billmaster','customers','suppliers','expiry','returns','expenses','taxmaster','unitmaster','reports')
+          $pages = @('dashboard','billing','products','openingstock','aiimport','itemimport','purchase','sales','billmaster','customers','suppliers','expiry','returns','expenses','taxmaster','unitmaster','reports')
           foreach($page in $pages){ if(-not $html.Contains('data-page="'+$page+'"')){ throw "Sidebar page missing: $page" } }
       - name: Validate keyboard-first base-unit billing flow
         shell: powershell

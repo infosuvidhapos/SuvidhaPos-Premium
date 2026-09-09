@@ -14,14 +14,14 @@
   function shell(){
     const side=document.getElementById('sidebar'); if(!side)return;
     side.innerHTML=`
-      <div class="js-brand"><img class="js-brand-logo" src="/img/suvidha-pos-mark.svg?v=6115jewelreports" alt="Suvidha POS"></div>
+      <div class="js-brand"><img class="js-brand-logo" src="/img/suvidha-pos-mark.svg?v=6123runtimewire" alt="Suvidha POS"></div>
       <div class="js-quick"><span>⌘ K</span><input id="jsQuickSearch" placeholder="Quick search"></div>
       <div class="js-side-scroll">
         <div class="js-section">OVERVIEW</div>
         <button class="nav js-nav active" data-page="dashboard" onclick="loadDashboard()">${icon('▦')}<span>Dashboard</span></button>
         <div class="js-section js-section-row">BILLING <span>⌄</span></div>
         <button class="nav js-nav" data-page="jewelInvoices" onclick="loadJewelInvoices()">${icon('▤')}<span>All Invoices</span></button>
-        <button class="nav js-nav" data-page="billing" onclick="loadBilling()">${icon('▣')}<span>Create Invoice</span></button>
+        <button class="nav js-nav" data-page="billing" onclick="loadBilling()">${icon('▣')}<span>Jewellery Billing</span></button>
         <button class="nav js-nav" data-page="purchase" onclick="loadPurchase()">${icon('🛒')}<span>Purchase Bill</span></button>
         <button class="nav js-nav" onclick="jewelSuiteInvoice('karigar')">${icon('⚒')}<span>Karigar Bill</span></button>
         <button class="nav js-nav" onclick="jewelSuiteInvoice('exchange')">${icon('↔')}<span>Exchange</span></button>
@@ -49,6 +49,7 @@
         <div class="js-section">MASTERS</div>
         <div data-premium-completion="1">
           <button class="nav js-nav" data-page="jItemMaster" onclick="loadJewelleryItemMaster()">${icon('◆')}<span>Item Master</span></button>
+          <button class="nav js-nav" onclick="openPremiumJewelleryItem()">${icon('＋')}<span>Item Entry</span></button>
           <button class="nav js-nav" data-page="jItemImport" onclick="loadJewelleryItemImportMaster()">${icon('⇩')}<span>Item Import Master</span></button>
           <button class="nav js-nav" data-page="jBarcode" onclick="loadBarcodePrintMaster()">${icon('▥')}<span>Barcode Print Master</span></button>
         </div>
@@ -56,6 +57,7 @@
         <button class="nav js-nav" onclick="loadJewelRates()">${icon('↗')}<span>Au/Ag Rates</span></button>
         <div class="js-section">SYSTEM</div>
         <button class="nav js-nav" onclick="loadSettings()">${icon('⚙')}<span>Settings</span></button>
+        <button class="nav js-nav" onclick="loadDayClosing()">${icon('▣')}<span>Day Closing</span></button>
       </div>
       <div class="js-side-user"><b>${esc(window.currentUser?.DisplayName||'Super Admin')}</b><small>${esc(window.currentUser?.Role||'Super Admin')}</small><button onclick="logout()">↪ &nbsp; Sign Out</button></div>`;
     const q=document.getElementById('jsQuickSearch');
