@@ -362,9 +362,10 @@ jobs:
           if($null -eq $installer){ throw 'Installer not generated for release publishing' }
           $backup = Get-Item 'database-artifact/SuvidhaPos.bak' -ErrorAction Stop
 
-          $existing = gh release list --repo "${{ github.repository }}" --limit 100 --json tagName --jq ".[] | select(.tagName == \"$tag\") | .tagName"
+          $releaseJson = gh release list --repo "${{ github.repository }}" --limit 100 --json tagName
           if($LASTEXITCODE -ne 0){ throw 'Unable to query existing GitHub releases' }
-          if($existing){
+          $existing = @($releaseJson | ConvertFrom-Json | Where-Object { $_.tagName -eq $tag })
+          if($existing.Count -gt 0){
             gh release delete $tag --repo "${{ github.repository }}" --cleanup-tag --yes
             if($LASTEXITCODE -ne 0){ throw 'Unable to replace previous latest-build release' }
           }
