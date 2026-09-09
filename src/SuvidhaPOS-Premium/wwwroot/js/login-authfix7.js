@@ -113,7 +113,11 @@
       if (status === 423) {
         var lic=data.license||data.License||{};
         fail(data.message||data.Message||'SuvidhaPOS license is expired or blocked.');
-        if(typeof w.showLicenseExpired==='function') w.setTimeout(function(){w.showLicenseExpired(lic);},0);
+        var code=String(lic.code||lic.Code||'').toUpperCase();
+        if((lic.managed===false||lic.Managed===false||code==='NOT_ACTIVATED')&&typeof w.showLicenseActivation==='function')
+          w.setTimeout(function(){w.showLicenseActivation(lic);},0);
+        else if(typeof w.showLicenseExpired==='function')
+          w.setTimeout(function(){w.showLicenseExpired(lic);},0);
         return false;
       }
       if (status < 200 || status >= 300) {
