@@ -382,7 +382,5 @@ jobs:
         shell: powershell
         run: |
           $wf = Get-Content '.github/workflows/build.yml' -Raw -Encoding UTF8
-          if($wf -match '(?m)^\s*uses:\s*actions/upload-artifact@v4\s*
-          foreach($token in @('contents: write','Publish rolling GitHub Release','latest-build','gh release create','gh release upload')){ if(-not $wf.Contains($token)){ throw "Release publishing policy missing: $token" } }
-){ throw 'Actions artifact storage must not be used by this workflow' }
+          if($wf -match '(?m)^\s*uses:\s*actions/upload-artifact@v4\s*$'){ throw 'Actions artifact storage must not be used by this workflow' }
           foreach($token in @('contents: write','Publish rolling GitHub Release','latest-build','gh release create','gh release upload')){ if(-not $wf.Contains($token)){ throw "Release publishing policy missing: $token" } }
