@@ -213,8 +213,6 @@ WHERE x.TxnDate>=@f AND x.TxnDate<@e
 ORDER BY x.TxnDate DESC", P("@f", f), P("@e", e), P("@q", term), P("@l", like), P("@type", kind));
             return Results.Ok(rows);
         });
-    }
-
 
         app.MapGet("/api/reports/audit-summary", async (Db db, DateTime? from, DateTime? to, string? cashier) =>
         {
@@ -338,6 +336,7 @@ WHERE CreatedAt>=@f AND CreatedAt<@e
                 audit
             });
         });
+    }
 
     static async Task<List<ProductLookup>> LoadProductsAsync(Db db)
     {
