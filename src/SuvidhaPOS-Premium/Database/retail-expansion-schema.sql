@@ -13,7 +13,7 @@ BEGIN
  CREATE TABLE dbo.BtcAdvances(
   Id bigint IDENTITY PRIMARY KEY,
   ReceiptNo nvarchar(80) NOT NULL,
-  CompanyId int NOT NULL,
+  CompanyId int NOT NULL REFERENCES dbo.BtcCompanies(Id),
   Amount decimal(18,2) NOT NULL,
   PaymentMode nvarchar(40) NOT NULL,
   ReferenceNo nvarchar(120) NULL,
@@ -26,4 +26,8 @@ GO
 
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_BtcAdvances_CompanyDate' AND object_id=OBJECT_ID('dbo.BtcAdvances'))
  CREATE INDEX IX_BtcAdvances_CompanyDate ON dbo.BtcAdvances(CompanyId,CreatedAt,Id);
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='UX_BtcAdvances_ReceiptNo' AND object_id=OBJECT_ID('dbo.BtcAdvances'))
+ CREATE UNIQUE INDEX UX_BtcAdvances_ReceiptNo ON dbo.BtcAdvances(ReceiptNo);
+IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys WHERE name='FK_BtcAdvances_Companies' AND parent_object_id=OBJECT_ID('dbo.BtcAdvances'))
+ ALTER TABLE dbo.BtcAdvances WITH CHECK ADD CONSTRAINT FK_BtcAdvances_Companies FOREIGN KEY(CompanyId) REFERENCES dbo.BtcCompanies(Id);
 GO
