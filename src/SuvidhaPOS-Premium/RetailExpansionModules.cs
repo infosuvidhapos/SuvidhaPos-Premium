@@ -55,6 +55,19 @@ Mrp=COALESCE(@m,Mrp),PurchasePrice=COALESCE(@p,PurchasePrice),SalePrice=COALESCE
 WHERE Id=@id AND IsActive=1", c, tx);
                     cmd.Parameters.AddRange(new[] { P("@m", r.Mrp), P("@p", r.PurchasePrice), P("@s", r.SalePrice), P("@id", r.ProductId) });
                     updated += await cmd.ExecuteNonQueryAsync();
+
+                    using var uom = new SqlCommand(@"UPDATE ProductUoms SET
+LooseSalePrice=COALESCE(@s,LooseSalePrice),
+PackSalePrice=CASE WHEN @s IS NULL THEN PackSalePrice ELSE @s*CASE WHEN ConversionFactor>0 THEN ConversionFactor ELSE 1 END END,
+InnerSalePrice=CASE WHEN @s IS NULL THEN InnerSalePrice ELSE @s*CASE WHEN InnerConversionFactor>0 THEN InnerConversionFactor ELSE 1 END END,
+PackPurchaseRate=CASE WHEN @p IS NULL THEN PackPurchaseRate ELSE @p*CASE WHEN ConversionFactor>0 THEN ConversionFactor ELSE 1 END END,
+InnerPurchaseRate=CASE WHEN @p IS NULL THEN InnerPurchaseRate ELSE @p*CASE WHEN InnerConversionFactor>0 THEN InnerConversionFactor ELSE 1 END END,
+PackMrp=CASE WHEN @m IS NULL THEN PackMrp ELSE @m*CASE WHEN ConversionFactor>0 THEN ConversionFactor ELSE 1 END END,
+InnerMrp=CASE WHEN @m IS NULL THEN InnerMrp ELSE @m*CASE WHEN InnerConversionFactor>0 THEN InnerConversionFactor ELSE 1 END END,
+UpdatedAt=SYSDATETIME()
+WHERE ProductId=@id", c, tx);
+                    uom.Parameters.AddRange(new[] { P("@m", r.Mrp), P("@p", r.PurchasePrice), P("@s", r.SalePrice), P("@id", r.ProductId) });
+                    await uom.ExecuteNonQueryAsync();
                 }
                 using (var audit = new SqlCommand("INSERT AuditLogs(UserName,Action,Entity,Details) VALUES(@u,'ITEM_RATE_BULK_UPDATE','Product',@d)", c, tx))
                 {
