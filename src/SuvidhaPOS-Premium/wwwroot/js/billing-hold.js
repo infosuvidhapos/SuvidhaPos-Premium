@@ -42,18 +42,24 @@ function makeDraft(){
  };
 }
 async function fetchHolds(){holdRows=await api('/api/billing/holds').catch(()=>[]);return Array.isArray(holdRows)?holdRows:[]}
+function setBadgeCount(count){
+ const badge=d.querySelector('#cbHoldCount');if(!badge)return;
+ const n=Math.max(0,Math.min(10,Number(count)||0));
+ badge.textContent=String(n);badge.dataset.count=String(n);badge.hidden=n===0;
+ badge.setAttribute('aria-label',n+' held bill'+(n===1?'':'s'));
+}
 function holdListHtml(rows){
  if(!rows.length)return '<div class="hold-empty">No held bills. You can keep up to 10 bills on hold.</div>';
  return rows.map((x,i)=>`<div class="hold-row"><div class="hold-slot">${i+1}</div><div class="hold-info"><b>${esc(x.HoldNo||('HOLD-'+x.Id))}</b><span>${new Date(x.HeldAt).toLocaleString('en-IN')} · ${esc(x.CustomerName||'Walk-in Customer')}</span><small>${Number(x.ItemCount||0)} item(s) · ₹${money(x.GrandTotal)}${x.CustomerMobile?' · '+esc(x.CustomerMobile):''}</small></div><div class="hold-actions"><button class="btn green small" onclick="cbUnholdBill(${Number(x.Id)})">↩ Unhold</button><button class="btn danger small" onclick="cbDeleteHeldBill(${Number(x.Id)})">× Delete</button></div></div>`).join('');
 }
 async function refreshBadge(force){
- if(!root())return;const now=Date.now();if(!force&&now-lastCountAt<3000)return;lastCountAt=now;const rows=await fetchHolds();const badge=d.querySelector('#cbHoldCount');if(badge)badge.textContent=String(rows.length);
+ if(!root())return;const now=Date.now();if(!force&&now-lastCountAt<3000)return;lastCountAt=now;const rows=await fetchHolds();setBadgeCount(rows.length);
 }
 function patchBilling(){
  const r=root();if(!r)return;installPaymentBridge();
  const btn=r.querySelector('.cb-actions .hold');
  if(btn&&btn.dataset.holdBillPatched!=='1'){
-  btn.dataset.holdBillPatched='1';btn.onclick=function(ev){ev?.preventDefault();w.cbOpenHoldBills()};btn.classList.add('holdbill');btn.innerHTML='🧾⏱️ Hold Bill <span id="cbHoldCount" class="hold-count">0</span>';btn.title='Hold / Unhold bill (maximum 10)';
+  btn.dataset.holdBillPatched='1';btn.onclick=function(ev){ev?.preventDefault();w.cbOpenHoldBills()};btn.classList.add('holdbill');btn.innerHTML='🧾⏱️ Hold Bill <span id="cbHoldCount" class="hold-count" hidden>0</span>';btn.title='Hold / Unhold bill (maximum 10)';
  }
  const f3=[...r.querySelectorAll('.cb-shortcuts span')].find(x=>/F3\s+Customer/i.test(x.textContent||''));if(f3&&f3.textContent!=='F3 Hold Bill')f3.textContent='F3 Hold Bill';
  const mobileLabel=[...r.querySelectorAll('.cb-customer .cb-label')].find(x=>/Mobile\s*\(F3\)/i.test(x.textContent||''));if(mobileLabel&&mobileLabel.textContent!=='Mobile')mobileLabel.textContent='Mobile';
@@ -74,7 +80,7 @@ async function restorePayment(draft){
  if(typeof w.cbPaySelect==='function')w.cbPaySelect(mode);
 }
 w.cbOpenHoldBills=async function(){
- if(!root())return;const rows=await fetchHolds(),cart=(typeof state!=='undefined'&&state.cart)||[],total=totalsFromCart();
+ if(!root())return;const rows=await fetchHolds(),cart=(typeof state!=='undefined'&&state.cart)||[],total=totalsFromCart();setBadgeCount(rows.length);
  modal('🧾⏱️ Hold Bill / Unhold',`<div class="hold-manager"><div class="hold-summary"><div><span>Current Bill</span><b>${cart.length} item(s)</b><small>₹${money(total)}</small></div><div><span>Held Bills</span><b>${rows.length} / 10</b><small>${10-rows.length} slot(s) free</small></div></div><div class="hold-list" id="holdBillList">${holdListHtml(rows)}</div></div>`,`<button class="btn green" ${cart.length?'':'disabled'} onclick="cbHoldCurrentBill()">🧾⏱️ Hold Current Bill</button><button class="btn secondary" onclick="closeModal()">Close</button>`);
 };
 w.cbHoldCurrentBill=async function(){
@@ -103,7 +109,7 @@ w.cbUnholdBill=async function(id){
   await api('/api/billing/holds/'+Number(id),{method:'DELETE'});closeModal();notice((row.HoldNo||'Bill')+' unheld');lastCountAt=0;refreshBadge(true);d.querySelector('#cbSearch')?.focus();
  }catch(e){alert(e.message||e)}
 };
-w.cbDeleteHeldBill=async function(id){if(!confirm('Delete this held bill?'))return;try{await api('/api/billing/holds/'+Number(id),{method:'DELETE'});const rows=await fetchHolds(),box=d.querySelector('#holdBillList');if(box)box.innerHTML=holdListHtml(rows);const badge=d.querySelector('#cbHoldCount');if(badge)badge.textContent=String(rows.length);notice('Held bill deleted')}catch(e){alert(e.message||e)}};
+w.cbDeleteHeldBill=async function(id){if(!confirm('Delete this held bill?'))return;try{await api('/api/billing/holds/'+Number(id),{method:'DELETE'});const rows=await fetchHolds(),box=d.querySelector('#holdBillList');if(box)box.innerHTML=holdListHtml(rows);setBadgeCount(rows.length);notice('Held bill deleted')}catch(e){alert(e.message||e)}};
 d.addEventListener('keydown',function(e){if(e.key==='F3'&&root()){e.preventDefault();e.stopImmediatePropagation();w.cbOpenHoldBills()}},true);
 new MutationObserver(()=>requestAnimationFrame(patchBilling)).observe(d.querySelector('#app')||d.body,{childList:true,subtree:true});
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',patchBilling);else patchBilling();
