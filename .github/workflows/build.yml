@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: suvidhapos-premium-windows-build
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   build-test-publish:
     runs-on: windows-latest
