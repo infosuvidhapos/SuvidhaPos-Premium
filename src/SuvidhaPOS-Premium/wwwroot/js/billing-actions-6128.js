@@ -77,12 +77,14 @@ async function loadRuntime(){
  addCss('/css/billing-layout-fix.css?v=6140mastersbtc','billingLayoutFix6130');
  addCss('/css/btc-payment-receipt-flow.css?v=6140mastersbtc','btcReceiptFlowCss6130');
  addCss('/css/retail-expansion.css?v=6140mastersbtc','retailExpansionCss6140');
+ addCss('/css/audit-report-thermal.css?v=6140audit','auditReportThermalCss6140');
  try{
   await addScript('/js/btc-payment-receipt-flow.js?v=6140mastersbtc','btcReceiptFlowJs6130');
   await addScript('/js/btc-payment-receipt-input-fix.js?v=6140mastersbtc','btcReceiptInputFixJs6130');
   await addScript('/js/billing-hold.js?v=6140mastersbtc','billingHoldJs6130');
   await addScript('/js/india-locations.js?v=6140mastersbtc','indiaLocationsJs6140');
   await addScript('/js/retail-masters-ui.js?v=6140mastersbtc','retailMastersUiJs6140');
+  await addScript('/js/audit-report-thermal.js?v=6140audit','auditReportThermalJs6140');
  }catch(e){console.error('Suvidha retail/BTC runtime 6.14.0:',e)}
 }
 if(d.readyState==='complete')loadRuntime();else w.addEventListener('load',loadRuntime,{once:true});
