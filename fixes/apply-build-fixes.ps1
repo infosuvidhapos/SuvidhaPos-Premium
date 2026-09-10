@@ -15,6 +15,7 @@ $desktop=Get-Content $desktopPath -Raw
 $completion=Get-Content $completionUi -Raw -Encoding UTF8
 $backend=Get-Content $completionBackend -Raw -Encoding UTF8
 $runtime=Get-Content $runtimePath -Raw -Encoding UTF8
+$runtimeBackendText=Get-Content $runtimeBackend -Raw -Encoding UTF8
 if(-not(Test-Path $runtimeNewPath)){throw 'runtime-fixes-6126.js missing'}
 if(-not(Test-Path $runtimeBackend)){throw 'RuntimeFix6126Modules.cs missing'}
 
@@ -91,6 +92,10 @@ if($backend.Contains($qtyMap)){$backend=$backend.Replace($qtyMap,$qtyMapNew)}
 if(-not $backend.Contains('public decimal OpeningQty{get;set;}=1;')){throw 'Jewellery import OpeningQty property patch missing'}
 if(-not $backend.Contains('OpeningQty=OpeningQty<=0?1:OpeningQty')){throw 'Jewellery import OpeningQty mapping patch missing'}
 
+# NPOI exposes LastCellNum as Int16; make the overload explicit for Math.Max.
+$runtimeBackendText=$runtimeBackendText.Replace('var last = Math.Max(0, row.LastCellNum);','var last = Math.Max(0, (int)row.LastCellNum);')
+if(-not $runtimeBackendText.Contains('Math.Max(0, (int)row.LastCellNum)')){throw 'NPOI LastCellNum compile fix missing'}
+
 # P-03 uses a functional Code 39 renderer named barcodeSvg/code39. Keep the explicit
 # symbology marker for deterministic P-01..P-20 validation and published diagnostics.
 if(-not $completion.Contains('Code39')){
@@ -116,9 +121,8 @@ foreach($token in @('/api/jewellery/quantity-catalog','/api/jewellery/sales/quan
   if(-not $newRuntime.Contains($token)){throw "Runtime 6.12.6 feature missing: $token"}
 }
 if($newRuntime.Contains("api('/api/ai/import'")){throw 'Item Import Master runtime must never call AI import'}
-$backend6126=Get-Content $runtimeBackend -Raw -Encoding UTF8
 foreach($token in @('AvailableQty','QuantityAvailable','JewellerySaleLines','Quantity','/api/item-import/direct/parse','WorkbookFactory.Create','CreateSampleWorkbook','OpenAI')){
-  if(-not $backend6126.Contains($token)){throw "Runtime 6.12.6 backend missing: $token"}
+  if(-not $runtimeBackendText.Contains($token)){throw "Runtime 6.12.6 backend missing: $token"}
 }
 
 # index.html is committed directly in UTF-8. Do not rewrite it here.
@@ -135,5 +139,6 @@ Set-Content $project $proj -Encoding UTF8
 Set-Content $desktopPath $desktop -Encoding UTF8
 Set-Content $completionUi $completion -Encoding UTF8
 Set-Content $completionBackend $backend -Encoding UTF8
+Set-Content $runtimeBackend $runtimeBackendText -Encoding UTF8
 Set-Content $runtimePath $runtime -Encoding UTF8
 Write-Host 'Build fixes applied. Runtime 6.12.6 validated; index.html remains untouched to preserve UTF-8.'
