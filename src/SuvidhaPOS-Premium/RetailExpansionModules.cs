@@ -215,6 +215,129 @@ ORDER BY x.TxnDate DESC", P("@f", f), P("@e", e), P("@q", term), P("@l", like), 
         });
     }
 
+
+        app.MapGet("/api/reports/audit-summary", async (Db db, DateTime? from, DateTime? to, string? cashier) =>
+        {
+            var f=(from??DateTime.Today).Date;
+            var t=(to??DateTime.Today).Date;
+            if(t<f)(f,t)=(t,f);
+            var end=t.AddDays(1);
+            var cashierName=(cashier??"").Trim();
+
+            var outlet=await db.QuerySingleAsync(@"SELECT TOP 1 OutletName,Address,Phone,Gstin,State,City FROM OutletMaster ORDER BY Id");
+            var summary=await db.QuerySingleAsync(@"
+SELECT
+ COUNT(*) TicketCount,
+ CAST(ISNULL(SUM(SubTotal),0) AS decimal(18,2)) TotalSales,
+ CAST(ISNULL(SUM(Discount),0) AS decimal(18,2)) TotalDiscount,
+ CAST(ISNULL(SUM(SubTotal-Discount),0) AS decimal(18,2)) NetSales,
+ CAST(ISNULL(SUM(Tax),0) AS decimal(18,2)) TotalTax,
+ CAST(ISNULL(SUM(RoundOff),0) AS decimal(18,2)) TotalRoundOff,
+ CAST(ISNULL(SUM(GrandTotal),0) AS decimal(18,2)) GrandTotal,
+ SUM(CASE WHEN Discount>0 THEN 1 ELSE 0 END) DiscountTickets,
+ CAST(ISNULL(SUM(CASE WHEN PaymentMode='BTC' THEN PendingAmount ELSE 0 END),0) AS decimal(18,2)) UnsettledAmount,
+ (SELECT TOP 1 InvoiceNo FROM Sales s1 WHERE s1.Status='Completed' AND s1.BillDate>=@f AND s1.BillDate<@e AND (@cashier='' OR ISNULL(s1.CashierName,'')=@cashier) ORDER BY s1.BillDate,s1.Id) FirstBillNo,
+ (SELECT TOP 1 InvoiceNo FROM Sales s2 WHERE s2.Status='Completed' AND s2.BillDate>=@f AND s2.BillDate<@e AND (@cashier='' OR ISNULL(s2.CashierName,'')=@cashier) ORDER BY s2.BillDate DESC,s2.Id DESC) LastBillNo
+FROM Sales s
+WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e
+ AND (@cashier='' OR ISNULL(s.CashierName,'')=@cashier)",
+                P("@f",f),P("@e",end),P("@cashier",cashierName));
+
+            var payments=await db.QueryAsync(@"
+WITH PayRows AS(
+ SELECT
+  CASE
+   WHEN UPPER(ISNULL(sp.PaymentMode,''))='BTC' THEN 'Credit Bill'
+   WHEN UPPER(ISNULL(sp.PaymentMode,'')) IN ('CREDIT/UPI','CARD / UPI','UPI') THEN ISNULL(NULLIF(sp.PaymentType,''),sp.PaymentMode)
+   ELSE ISNULL(NULLIF(sp.PaymentType,''),sp.PaymentMode)
+  END PaymentMode,
+  sp.Amount
+ FROM SalePayments sp
+ JOIN Sales s ON s.Id=sp.SaleId
+ WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e
+  AND (@cashier='' OR ISNULL(s.CashierName,'')=@cashier)
+ UNION ALL
+ SELECT
+  CASE WHEN UPPER(ISNULL(s.PaymentMode,''))='BTC' THEN 'Credit Bill'
+       WHEN UPPER(ISNULL(s.PaymentMode,''))='CREDIT/UPI' THEN 'Credit / UPI'
+       ELSE ISNULL(NULLIF(s.PaymentMode,''),'Cash') END,
+  CASE WHEN UPPER(ISNULL(s.PaymentMode,''))='BTC' THEN s.GrandTotal
+       WHEN s.PaidAmount>0 THEN s.PaidAmount ELSE s.GrandTotal END
+ FROM Sales s
+ WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e
+  AND (@cashier='' OR ISNULL(s.CashierName,'')=@cashier)
+  AND NOT EXISTS(SELECT 1 FROM SalePayments sp WHERE sp.SaleId=s.Id)
+)
+SELECT PaymentMode,CAST(SUM(Amount) AS decimal(18,2)) Amount
+FROM PayRows
+GROUP BY PaymentMode
+ORDER BY CASE WHEN PaymentMode='Cash' THEN 0 WHEN PaymentMode='Credit Bill' THEN 1 ELSE 2 END,PaymentMode",
+                P("@f",f),P("@e",end),P("@cashier",cashierName));
+
+            var taxes=await db.QueryAsync(@"
+SELECT sl.TaxRate,
+ CAST(SUM(sl.Quantity*sl.SalePrice-sl.Discount) AS decimal(18,2)) TaxableAmount,
+ CAST(SUM((sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100) AS decimal(18,2)) TaxAmount
+FROM SaleLines sl
+JOIN Sales s ON s.Id=sl.SaleId
+WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e
+ AND (@cashier='' OR ISNULL(s.CashierName,'')=@cashier)
+GROUP BY sl.TaxRate
+HAVING ABS(SUM((sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100))>0.004
+ORDER BY sl.TaxRate",
+                P("@f",f),P("@e",end),P("@cashier",cashierName));
+
+            var cashiers=await db.QueryAsync(@"
+SELECT ISNULL(NULLIF(CashierName,''),'System') Cashier,
+ CAST(SUM(GrandTotal) AS decimal(18,2)) Amount,
+ CAST(SUM(CASE WHEN PaymentMode='BTC' THEN GrandTotal ELSE 0 END) AS decimal(18,2)) BtcAmount,
+ COUNT(*) Tickets
+FROM Sales
+WHERE Status='Completed' AND BillDate>=@f AND BillDate<@e
+ AND (@cashier='' OR ISNULL(CashierName,'')=@cashier)
+GROUP BY ISNULL(NULLIF(CashierName,''),'System')
+ORDER BY Amount DESC",
+                P("@f",f),P("@e",end),P("@cashier",cashierName));
+
+            var audit=await db.QuerySingleAsync(@"
+SELECT
+ SUM(CASE WHEN Action LIKE '%CANCEL%' OR Action LIKE '%VOID%' THEN 1 ELSE 0 END) CancelActions,
+ SUM(CASE WHEN Action LIKE '%MODIF%' OR Action LIKE '%EDIT%' OR Action LIKE '%UPDATE%' THEN 1 ELSE 0 END) ModifyActions
+FROM AuditLogs
+WHERE CreatedAt>=@f AND CreatedAt<@e
+ AND (@cashier='' OR ISNULL(UserName,'')=@cashier)",
+                P("@f",f),P("@e",end),P("@cashier",cashierName));
+
+            decimal D(string key)=>summary.TryGetValue(key,out var v)&&v is not null&&v is not DBNull?Convert.ToDecimal(v):0m;
+            var tickets=summary.TryGetValue("TicketCount",out var tc)&&tc is not null&&tc is not DBNull?Convert.ToInt32(tc):0;
+            return Results.Ok(new{
+                outlet,
+                from=f,
+                to=t,
+                printDateTime=DateTime.Now,
+                cashier=cashierName,
+                sales=new{
+                    firstBillNo=summary.GetValueOrDefault("FirstBillNo")?.ToString(),
+                    lastBillNo=summary.GetValueOrDefault("LastBillNo")?.ToString(),
+                    ticketCount=tickets,
+                    grossApc=tickets>0?Math.Round(D("TotalSales")/tickets,2):0,
+                    netApc=tickets>0?Math.Round(D("NetSales")/tickets,2):0,
+                    totalSales=D("TotalSales"),
+                    totalDiscount=D("TotalDiscount"),
+                    discountTickets=summary.GetValueOrDefault("DiscountTickets") is null?0:Convert.ToInt32(summary["DiscountTickets"]),
+                    netSales=D("NetSales"),
+                    totalTax=D("TotalTax"),
+                    totalRoundOff=D("TotalRoundOff"),
+                    grandTotal=D("GrandTotal"),
+                    unsettledAmount=D("UnsettledAmount")
+                },
+                payments,
+                taxes,
+                cashiers,
+                audit
+            });
+        });
+
     static async Task<List<ProductLookup>> LoadProductsAsync(Db db)
     {
         var rows = await db.QueryAsync(@"SELECT p.Id,p.Name,p.Barcode,p.Sku,p.Mrp,p.PurchasePrice,p.SalePrice,
