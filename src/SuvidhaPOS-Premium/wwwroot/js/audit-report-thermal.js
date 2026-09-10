@@ -80,5 +80,20 @@ function patchExisting(){
  });
 }
 const oldOpenNormal=w.openNormalReport;if(typeof oldOpenNormal==='function'&&!oldOpenNormal.__auditWrapped){const fn=async function(type){if(String(type||'').toLowerCase()==='audit'||String(type||'').toLowerCase()==='audit-report')return w.openAuditThermalReport();return oldOpenNormal.apply(this,arguments)};fn.__auditWrapped=true;w.openNormalReport=fn}
-new MutationObserver(patchExisting).observe(d.querySelector('#app')||d.body,{childList:true,subtree:true});patchExisting();
+
+function injectAuditTile(){
+ const grid=d.querySelector('.normal-report-grid');if(!grid||grid.querySelector('[data-audit-thermal-report]'))return;
+ // If an Audit Report tile exists in a future/legacy report catalog, bind that tile instead of duplicating it.
+ const existing=[...grid.querySelectorAll('button,a')].find(x=>String(x.textContent||'').replace(/\s+/g,' ').trim().toLowerCase().startsWith('audit report'));
+ if(existing){existing.dataset.auditThermalReport='1';existing.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();w.openAuditThermalReport()},true);return}
+ const b=d.createElement('button');b.className='normal-report-tile tone-red';b.dataset.auditThermalReport='1';b.dataset.report='audit-report';
+ b.onclick=w.openAuditThermalReport;
+ b.innerHTML='<div class="normal-report-tile-top"><span class="normal-report-icon">⌕</span><span class="normal-report-arrow">↗</span></div><span class="normal-report-category">Audit / Thermal</span><b>Audit Report</b><small>80mm account summary · sales, payments, tax, cashier & audit activity</small>';
+ grid.appendChild(b);
+}
+const reportsBeforeAudit=w.loadReports;
+if(typeof reportsBeforeAudit==='function'&&!reportsBeforeAudit.__auditThermalReportsWrapped){
+ const fn=async function(){const r=await reportsBeforeAudit.apply(this,arguments);setTimeout(()=>{injectAuditTile();patchExisting()},0);return r};fn.__auditThermalReportsWrapped=true;w.loadReports=fn;
+}
+new MutationObserver(()=>{patchExisting();injectAuditTile()}).observe(d.querySelector('#app')||d.body,{childList:true,subtree:true});patchExisting();injectAuditTile();
 })(window,document);
