@@ -12,13 +12,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: 'fix/build-queue-hold-badge-20260910'
-      - name: Disable auto-cancel of running builds
+      - name: Stage no-cancel workflow copy
         run: |
-          sed -i 's/cancel-in-progress: true/cancel-in-progress: false/' .github/workflows/build.yml
-          grep -q 'cancel-in-progress: false' .github/workflows/build.yml
+          sed 's/cancel-in-progress: true/cancel-in-progress: false/' .github/workflows/build.yml > build-patched.yml.txt
+          grep -q 'cancel-in-progress: false' build-patched.yml.txt
           git config user.name 'infosuvidhapos'
           git config user.email 'info@suvidhapos.in'
-          git add .github/workflows/build.yml
+          git add build-patched.yml.txt
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Keep running builds instead of auto-cancelling'
+          git commit -m 'Stage no-cancel build workflow'
           git push origin HEAD:fix/build-queue-hold-badge-20260910
