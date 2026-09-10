@@ -98,13 +98,15 @@ WHERE Id=@id AND IsActive=1", c, tx);
 SELECT 'Customer' PartyType,c.Id,c.Name,c.Phone,c.GstIn,c.Address,
  CAST(c.OpeningBalance+ISNULL((SELECT SUM(GrandTotal-PaidAmount) FROM Sales s WHERE s.CustomerId=c.Id AND s.Status='Completed'),0)
  -ISNULL((SELECT SUM(Amount) FROM CustomerPayments cp WHERE cp.CustomerId=c.Id),0) AS decimal(18,2)) Balance,
- CAST(0 AS decimal(18,2)) AdvanceBalance
+ CAST(0 AS decimal(18,2)) AdvanceBalance,c.OpeningBalance,
+ CAST(0 AS decimal(18,2)) CreditLimit,CAST(0 AS int) CreditDays
 FROM Customers c
 WHERE c.IsActive=1 AND (@q='' OR c.Name LIKE @l OR ISNULL(c.Phone,'') LIKE @l OR ISNULL(c.GstIn,'') LIKE @l)
 UNION ALL
 SELECT 'Company',b.Id,b.CompanyName,b.Phone,b.GstIn,b.Address,
  CAST(ISNULL((SELECT SUM(s.PendingAmount) FROM Sales s WHERE s.BtcCompanyId=b.Id AND s.PaymentMode='BTC' AND s.Status='Completed'),0) AS decimal(18,2)),
- CAST(ISNULL((SELECT SUM(a.Amount) FROM BtcAdvances a WHERE a.CompanyId=b.Id),0) AS decimal(18,2))
+ CAST(ISNULL((SELECT SUM(a.Amount) FROM BtcAdvances a WHERE a.CompanyId=b.Id),0) AS decimal(18,2)),
+ CAST(0 AS decimal(18,2)),b.CreditLimit,b.CreditDays
 FROM BtcCompanies b
 WHERE b.IsActive=1 AND (@q='' OR b.CompanyName LIKE @l OR ISNULL(b.Phone,'') LIKE @l OR ISNULL(b.GstIn,'') LIKE @l)
 ORDER BY Name", P("@q", term), P("@l", like));
