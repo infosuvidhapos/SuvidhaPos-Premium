@@ -12,6 +12,8 @@ $raw=[Convert]::FromBase64String($m.Groups['data'].Value)
 $input=New-Object IO.MemoryStream(,$raw)
 $source=[Drawing.Bitmap]::FromStream($input)
 
+# Keep the compact SP mark, but leave a generous safe area so Windows shortcut/icon
+# scaling never clips the left/right strokes or the top jewellery mark.
 $crop=New-Object Drawing.Rectangle(
   [int][Math]::Round($source.Width * 40 / 360.0),
   [int][Math]::Round($source.Height * 15 / 240.0),
@@ -30,7 +32,7 @@ try{
         $g.SmoothingMode=[Drawing.Drawing2D.SmoothingMode]::HighQuality
         $g.InterpolationMode=[Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
         $g.PixelOffsetMode=[Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-        $pad=[Math]::Max(1,[int][Math]::Round($size*0.055))
+        $pad=[Math]::Max(2,[int][Math]::Round($size*0.14))
         $avail=$size-($pad*2)
         $scale=[Math]::Min($avail/$crop.Width,$avail/$crop.Height)
         $dw=[int][Math]::Round($crop.Width*$scale)
@@ -75,4 +77,4 @@ try{
 }
 $ico=Get-Item $OutputIco
 if($ico.Length -lt 5000){throw "Generated icon is unexpectedly small: $($ico.Length) bytes"}
-Write-Host "Generated branded multi-size icon: $OutputIco ($($ico.Length) bytes)"
+Write-Host "Generated branded multi-size icon with 14% safe area: $OutputIco ($($ico.Length) bytes)"
