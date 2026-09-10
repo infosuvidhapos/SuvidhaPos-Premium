@@ -84,6 +84,16 @@ WHERE ProductId=@id", c, tx);
             }
         });
 
+        app.MapPost("/api/retail/categories", async (Db db, CategoryEditRequest x) =>
+        {
+            var name = (x.Name ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(name)) return Results.BadRequest(new { message = "Category name is required" });
+            var dup = await db.QuerySingleAsync("SELECT TOP 1 Id FROM Categories WHERE IsActive=1 AND UPPER(LTRIM(RTRIM(Name)))=UPPER(@n)", P("@n", name));
+            if (dup.Count > 0) return Results.BadRequest(new { message = "Category already exists" });
+            var id = await db.ScalarAsync("INSERT Categories(Name,IsActive) VALUES(@n,1);SELECT CAST(SCOPE_IDENTITY() AS int)", P("@n", name));
+            return Results.Ok(new { id, name });
+        });
+
         app.MapPut("/api/retail/categories/{id:int}", async (Db db, int id, CategoryEditRequest x) =>
         {
             var name = (x.Name ?? "").Trim();
