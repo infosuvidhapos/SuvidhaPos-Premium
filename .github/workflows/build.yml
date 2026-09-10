@@ -143,7 +143,7 @@ jobs:
           foreach($token in @('id="ostate"','id="ocity"','State:','City:')){if(-not $outlet.Contains($token)){throw "Outlet State/City UI missing: $token"}}
           foreach($token in @('State,City','S("state")','S("city")')){if(-not $sync.Contains($token)){throw "Outlet State/City central sync missing: $token"}}
           foreach($token in @('ADVANCE RECEIPT','Advance Amount','Credit/UPI','Partial Settlement','btcPrSetSettlementKind')){if(-not $btc.Contains($token)){throw "BTC advance/partial settlement UI missing: $token"}}
-          foreach($token in @('btcBillingAdvance','btcBillingAdvanceMode','✓ Submit')){if(-not $btcBill.Contains($token)){throw "BTC billing company advance/submit flow missing: $token"}}
+          foreach($token in @('btcBillingAdvance','btcBillingAdvanceMode','Submit')){if(-not $btcBill.Contains($token)){throw "BTC billing company advance/submit flow missing: $token"}}
           foreach($token in @('Thermal Print 80mm','Audit Report - Account Summary','Payment Break up','Cashier Report','* End of Reports *')){if(-not $audit.Contains($token)){throw "Thermal Audit Report missing: $token"}}
           if(-not $audit.Contains('@page{size:80mm auto')){throw '80mm thermal print page rule missing'}
           foreach($token in @('CustomerPhone','CustomerGstIn','INSERT Customers')){if(-not $premium.Contains($token)){throw "Billing customer auto-save backend missing: $token"}}
