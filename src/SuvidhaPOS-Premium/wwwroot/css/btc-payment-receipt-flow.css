@@ -45,3 +45,6 @@ body[data-theme="light"] .btcpr-page{background:linear-gradient(180deg,#fbf6e9,#
 @media(max-width:1200px){.btcpr-advance-bar{grid-template-columns:1fr 1fr 1fr}.btcpr-advance-bar>.btn{grid-column:auto}.btcpr-advance-ref{grid-column:auto}}
 @media(max-width:850px){.btcpr-advance-bar{grid-template-columns:1fr 1fr}.btcpr-advance-bar>div:first-child{grid-column:1/-1}}
 body[data-theme="light"] .btcpr-advance-bar{background:#fff9ee;border-color:#d5c2a3}body[data-theme="light"] .btcpr-advance-bar>div:first-child b{color:#4b4136}body[data-theme="light"] .btcpr-advance-modes button{background:#fff5e5;border-color:#ceb895;color:#534738}
+
+.btcpr-settle-kind{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}.btcpr-settle-kind button{height:26px;border:1px solid #31516b;border-radius:6px;background:#10283c;color:#abc0cf;font-size:8px;font-weight:800;cursor:pointer}.btcpr-settle-kind button.active{background:#245b45;border-color:#4ca978;color:#fff}
+body[data-theme="light"] .btcpr-settle-kind button{background:#fff5e6;border-color:#ccb895;color:#574b3d}body[data-theme="light"] .btcpr-settle-kind button.active{background:#d7aa3d;color:#fff}
