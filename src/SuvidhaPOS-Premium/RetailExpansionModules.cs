@@ -136,6 +136,8 @@ ORDER BY Name", P("@q", term), P("@l", like));
         {
             var pending = Convert.ToDecimal(await db.ScalarAsync("SELECT ISNULL(SUM(PendingAmount),0) FROM Sales WHERE BtcCompanyId=@id AND PaymentMode='BTC' AND Status='Completed'", P("@id", id)) ?? 0m);
             if (pending > 0.005m) return Results.BadRequest(new { message = $"Company has pending BTC amount ₹{pending:0.00}. Settle it before delete." });
+            var advance = Convert.ToDecimal(await db.ScalarAsync("SELECT ISNULL(SUM(Amount),0) FROM BtcAdvances WHERE CompanyId=@id", P("@id", id)) ?? 0m);
+            if (advance > 0.005m) return Results.BadRequest(new { message = $"Company has recorded advance ₹{advance:0.00}. Keep the company active so advance history remains available." });
             await db.ScalarAsync("UPDATE BtcCompanies SET IsActive=0,UpdatedAt=SYSDATETIME() WHERE Id=@id", P("@id", id));
             return Results.Ok(new { deleted = true });
         });
