@@ -3,6 +3,9 @@ using NPOI.SS.UserModel;
 using SuvidhaPOS.Premium.Data;
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace SuvidhaPOS.Premium;
 
@@ -501,9 +504,101 @@ FROM Products p WHERE p.IsActive=1");
                 }
                 return new ParsedUpload(file.FileName, rows, null);
             }
-            return new ParsedUpload(file.FileName, new(), "Only .xlsx, .xls and .csv are supported here");
+            if (ext == ".pdf")
+            {
+                var rows = ParsePdfTable(ms.ToArray());
+                if (rows.Count == 0) return new ParsedUpload(file.FileName, new(), "PDF text/table could not be read. Use a searchable text PDF (not a scanned image) or Excel.");
+                return new ParsedUpload(file.FileName, rows, null);
+            }
+            return new ParsedUpload(file.FileName, new(), "Only .xlsx, .xls, .csv and searchable .pdf are supported here");
         }
         catch (Exception ex) { return new ParsedUpload(file.FileName, new(), ex.Message); }
+    }
+
+    static List<Dictionary<string, string>> ParsePdfTable(byte[] bytes)
+    {
+        var lines = new List<string>();
+        using (var pdf = PdfDocument.Open(bytes))
+        {
+            foreach (var page in pdf.GetPages())
+            {
+                var text = ContentOrderTextExtractor.GetText(page) ?? "";
+                lines.AddRange(text.Replace("\r", "\n").Split('\n').Select(x => x.TrimEnd()).Where(x => !string.IsNullOrWhiteSpace(x)));
+            }
+        }
+        if (lines.Count == 0) return new();
+
+        var headerIndex = -1;
+        List<string> headers = new();
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var cells = PdfCells(lines[i]);
+            var normalized = cells.Select(Normalize).ToList();
+            var joined = string.Join(" ", normalized);
+            if ((joined.Contains("item") || joined.Contains("name") || joined.Contains("barcode") || joined.Contains("sku")) &&
+                (joined.Contains("mrp") || joined.Contains("purchase") || joined.Contains("sale") || joined.Contains("selling")))
+            {
+                headerIndex = i;
+                headers = cells.Select(Normalize).ToList();
+                break;
+            }
+        }
+
+        var result = new List<Dictionary<string, string>>();
+        if (headerIndex >= 0 && headers.Count >= 2)
+        {
+            for (var i = headerIndex + 1; i < lines.Count; i++)
+            {
+                var cells = PdfCells(lines[i]);
+                if (cells.Count < 2) continue;
+                var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                for (var j = 0; j < headers.Count; j++)
+                {
+                    if (string.IsNullOrWhiteSpace(headers[j])) continue;
+                    d[headers[j]] = j < cells.Count ? cells[j].Trim() : "";
+                }
+                if (d.Values.Any(v => !string.IsNullOrWhiteSpace(v))) result.Add(d);
+            }
+            if (result.Count > 0) return result;
+        }
+
+        // Fallback for simple PDF rate sheets: [barcode/item text] [MRP] [purchase] [sale].
+        foreach (var line in lines)
+        {
+            var tokens = Regex.Split(line.Trim(), @"\s+").Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+            if (tokens.Count < 4) continue;
+            var numeric = new List<(int Index, string Value)>();
+            for (var i = 0; i < tokens.Count; i++)
+            {
+                var raw = tokens[i].Replace("₹", "").Replace(",", "");
+                if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out _)) numeric.Add((i, raw));
+            }
+            if (numeric.Count < 3) continue;
+            var tail = numeric.TakeLast(3).ToList();
+            if (tail[0].Index < 1) continue;
+            var prefix = tokens.Take(tail[0].Index).ToList();
+            var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["mrp"] = tail[0].Value,
+                ["purchaseprice"] = tail[1].Value,
+                ["saleprice"] = tail[2].Value
+            };
+            if (prefix.Count > 0 && Regex.IsMatch(prefix[0], @"^\d{6,}$"))
+            {
+                d["barcode"] = prefix[0];
+                d["itemname"] = string.Join(" ", prefix.Skip(1));
+            }
+            else d["itemname"] = string.Join(" ", prefix);
+            if (!string.IsNullOrWhiteSpace(d.GetValueOrDefault("itemname")) || !string.IsNullOrWhiteSpace(d.GetValueOrDefault("barcode"))) result.Add(d);
+        }
+        return result;
+    }
+
+    static List<string> PdfCells(string line)
+    {
+        if (line.Contains('|')) return line.Split('|').Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+        var cells = Regex.Split(line.Trim(), @"\t+|\s{2,}").Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+        return cells.Count > 1 ? cells : Regex.Split(line.Trim(), @"\s+").Where(x => x.Length > 0).ToList();
     }
 
     static List<string> CsvSplit(string line)
