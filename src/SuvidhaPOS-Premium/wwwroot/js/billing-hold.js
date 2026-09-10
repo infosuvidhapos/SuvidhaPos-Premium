@@ -2,10 +2,22 @@
 'use strict';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=x=>Number(x||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-let lastRoot=null,lastCountAt=0,holdRows=[];
+const parseMoney=v=>Math.max(0,Number(String(v??'').replace(/[^0-9.-]/g,''))||0);
+let lastRoot=null,lastCountAt=0,holdRows=[],paymentMirror=null;
 function notice(m){try{toast(m)}catch(_){}}
 function root(){return d.querySelector('.counter-billing')}
 function selectedMode(){return root()?.querySelector('.cb-pay button.selected')?.dataset?.mode||'Cash'}
+function readMultiRows(){
+ return [...d.querySelectorAll('#mpRows tr')].map(tr=>[...tr.querySelectorAll('td')]).filter(td=>td.length>=3&&!td[0].classList.contains('empty')).map(td=>({Mode:'Multi Mode',Type:(td[0].textContent||'').trim(),Amount:parseMoney(td[1].textContent),ReferenceNo:(td[2].textContent||'').trim()||null})).filter(x=>x.Amount>0);
+}
+function installPaymentBridge(){
+ if(w.__cbHoldPaymentBridge6130)return;w.__cbHoldPaymentBridge6130=true;
+ const pay=w.cbPaySelect;if(typeof pay==='function')w.cbPaySelect=function(mode,subtype){const r=pay.apply(this,arguments);if(mode==='Cash'||mode==='BTC')paymentMirror={mode,subtype:subtype||mode,allocations:[]};return r};
+ const credit=w.cbApplyCreditUpi;if(typeof credit==='function')w.cbApplyCreditUpi=function(){const detail={mode:'Credit/UPI',subtype:d.querySelector('#cupType')?.value||'UPI',amount:parseMoney(d.querySelector('#cupAmount')?.value),reference:(d.querySelector('#cupRef')?.value||'').trim()||null};const r=credit.apply(this,arguments);paymentMirror=detail;return r};
+ const openMulti=w.cbOpenMulti;if(typeof openMulti==='function')w.cbOpenMulti=function(){paymentMirror={mode:'Multi Mode',allocations:[]};return openMulti.apply(this,arguments)};
+ const renderMulti=w.cbMultiRender;if(typeof renderMulti==='function')w.cbMultiRender=function(){const r=renderMulti.apply(this,arguments);paymentMirror={mode:'Multi Mode',allocations:readMultiRows()};return r};
+ const reset=w.cbReset;if(typeof reset==='function')w.cbReset=function(){paymentMirror=null;return reset.apply(this,arguments)};
+}
 function totalsFromCart(){
  const cart=(typeof state!=='undefined'&&state.cart)||[];let gross=0;
  cart.forEach(x=>{const a=Number(x.Qty||0)*Number(x.Rate||0),g=Math.max(0,Number(x.Gst||0)),inc=String(x.TaxMode||'EXCLUSIVE').toUpperCase()==='INCLUSIVE';gross+=inc?a:a+(g? a*g/100:0)});
@@ -18,14 +30,14 @@ function btcDraft(){
  return companyId>0?{companyId,reference:sig.length>6?sig.slice(6).join('|'):''}:null;
 }
 function makeDraft(){
- const cart=(typeof state!=='undefined'&&state.cart)||[];
+ const cart=(typeof state!=='undefined'&&state.cart)||[],mode=selectedMode();
  return {
-  version:1,
+  version:2,
   savedAt:new Date().toISOString(),
   cart:JSON.parse(JSON.stringify(cart)),
   customer:{mobile:d.querySelector('#cbMobile')?.value||'',name:d.querySelector('#cbCustomer')?.value||'Walk-in Customer',gst:d.querySelector('#cbGstNo')?.value||'',remarks:d.querySelector('#cbRemarks')?.value||'',state:d.querySelector('#cbState')?.value||''},
   discount:{type:d.querySelector('#cbDiscountType')?.value||'RUPEES',value:Number(d.querySelector('#cbDiscountValue')?.value)||0},
-  payment:{mode:selectedMode(),tender:d.querySelector('#cbTender')?.textContent||''},
+  payment:{mode,tender:d.querySelector('#cbTender')?.textContent||'',detail:paymentMirror?JSON.parse(JSON.stringify(paymentMirror)):{mode,subtype:mode,allocations:[]}},
   btc:btcDraft()
  };
 }
@@ -38,14 +50,28 @@ async function refreshBadge(force){
  if(!root())return;const now=Date.now();if(!force&&now-lastCountAt<3000)return;lastCountAt=now;const rows=await fetchHolds();const badge=d.querySelector('#cbHoldCount');if(badge)badge.textContent=String(rows.length);
 }
 function patchBilling(){
- const r=root();if(!r)return;
+ const r=root();if(!r)return;installPaymentBridge();
  const btn=r.querySelector('.cb-actions .hold');
  if(btn&&btn.dataset.holdBillPatched!=='1'){
   btn.dataset.holdBillPatched='1';btn.onclick=function(ev){ev?.preventDefault();w.cbOpenHoldBills()};btn.classList.add('holdbill');btn.innerHTML='🧾⏱️ Hold Bill <span id="cbHoldCount" class="hold-count">0</span>';btn.title='Hold / Unhold bill (maximum 10)';
  }
  const f3=[...r.querySelectorAll('.cb-shortcuts span')].find(x=>/F3\s+Customer/i.test(x.textContent||''));if(f3&&f3.textContent!=='F3 Hold Bill')f3.textContent='F3 Hold Bill';
  const mobileLabel=[...r.querySelectorAll('.cb-customer .cb-label')].find(x=>/Mobile\s*\(F3\)/i.test(x.textContent||''));if(mobileLabel&&mobileLabel.textContent!=='Mobile')mobileLabel.textContent='Mobile';
- if(r!==lastRoot){lastRoot=r;lastCountAt=0;refreshBadge(true)}
+ if(r!==lastRoot){lastRoot=r;lastCountAt=0;paymentMirror=null;refreshBadge(true)}
+}
+async function restorePayment(draft){
+ const mode=draft.payment?.mode||'Cash',detail=draft.payment?.detail||{};
+ if(mode==='BTC'&&draft.btc?.companyId&&typeof w.openBtcCompanySelect==='function'){
+  await w.openBtcCompanySelect();const ref=d.querySelector('#btcBillingRef');if(ref)ref.value=draft.btc.reference||'';if(typeof w.btcChooseCompany==='function')w.btcChooseCompany(Number(draft.btc.companyId));paymentMirror={mode:'BTC',subtype:'BTC',allocations:[]};return;
+ }
+ if(mode==='Credit/UPI'&&typeof w.cbOpenCreditUpi==='function'&&typeof w.cbApplyCreditUpi==='function'){
+  w.cbOpenCreditUpi();const typ=d.querySelector('#cupType'),amt=d.querySelector('#cupAmount'),ref=d.querySelector('#cupRef');if(typ)typ.value=detail.subtype||'UPI';if(amt)amt.value=Number(detail.amount||totalsFromCart()).toFixed(2);if(ref)ref.value=detail.reference||'';w.cbApplyCreditUpi();return;
+ }
+ if(mode==='Multi Mode'&&Array.isArray(detail.allocations)&&detail.allocations.length&&typeof w.cbOpenMulti==='function'){
+  w.cbOpenMulti();for(const p of detail.allocations){const typ=d.querySelector('#mpMode'),amt=d.querySelector('#mpAmount'),ref=d.querySelector('#mpRef');if(typ)typ.value=p.Type||'Cash';if(amt)amt.value=Number(p.Amount||0).toFixed(2);if(ref)ref.value=p.ReferenceNo||'';if(typeof w.cbMultiAdd==='function')w.cbMultiAdd()}if(typeof w.cbApplyMulti==='function')w.cbApplyMulti();return;
+ }
+ if(mode==='Multi Mode'){if(typeof w.cbPaySelect==='function')w.cbPaySelect('Cash');notice('Held bill restored. Multi Mode allocation was not available in this older hold.');return}
+ if(typeof w.cbPaySelect==='function')w.cbPaySelect(mode);
 }
 w.cbOpenHoldBills=async function(){
  if(!root())return;const rows=await fetchHolds(),cart=(typeof state!=='undefined'&&state.cart)||[],total=totalsFromCart();
@@ -73,12 +99,7 @@ w.cbUnholdBill=async function(id){
   const c=draft.customer||{};const set=(sel,v)=>{const el=d.querySelector(sel);if(el)el.value=v??''};set('#cbMobile',c.mobile||'');set('#cbCustomer',c.name||'Walk-in Customer');set('#cbGstNo',c.gst||'');set('#cbRemarks',c.remarks||'');if(c.state)set('#cbState',c.state);
   const di=draft.discount||{};set('#cbDiscountType',di.type||'RUPEES');set('#cbDiscountValue',Number(di.value)||0);
   if(typeof w.cbSelectRow==='function')w.cbSelectRow(-1);
-  const mode=draft.payment?.mode||'Cash';
-  if(mode==='BTC'&&draft.btc?.companyId&&typeof w.openBtcCompanySelect==='function'){
-   await w.openBtcCompanySelect();const ref=d.querySelector('#btcBillingRef');if(ref)ref.value=draft.btc.reference||'';if(typeof w.btcChooseCompany==='function')w.btcChooseCompany(Number(draft.btc.companyId));
-  }else if(mode==='Credit/UPI'&&typeof w.cbPaySelect==='function')w.cbPaySelect('Credit/UPI','UPI');
-  else if(mode==='Multi Mode'){if(typeof w.cbPaySelect==='function')w.cbPaySelect('Cash');notice('Bill unheld. Re-select Multi Mode payment before saving.');}
-  else if(typeof w.cbPaySelect==='function')w.cbPaySelect(mode);
+  await restorePayment(draft);
   await api('/api/billing/holds/'+Number(id),{method:'DELETE'});closeModal();notice((row.HoldNo||'Bill')+' unheld');lastCountAt=0;refreshBadge(true);d.querySelector('#cbSearch')?.focus();
  }catch(e){alert(e.message||e)}
 };
