@@ -121,6 +121,39 @@ jobs:
           if(-not $program.Contains('mode=="jewellery-items"')){ throw 'Jewellery import extraction mode missing' }
           if(-not $program.Contains('p.TaxMode')){ throw 'Normal product TaxMode is not exposed' }
           if(-not $premium.Contains("sl.TaxMode='INCLUSIVE'")){ throw 'GST reports are not inclusive-tax aware' }
+      - name: Validate retail expansion points 1-12
+        shell: powershell
+        run: |
+          $backend = Get-Content 'src/SuvidhaPOS-Premium/RetailExpansionModules.cs' -Raw -Encoding UTF8
+          $ui = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/retail-masters-ui.js' -Raw -Encoding UTF8
+          $geo = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/india-locations.js' -Raw -Encoding UTF8
+          $outlet = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-master-fix.js' -Raw -Encoding UTF8
+          $sync = Get-Content 'src/SuvidhaPOS-Premium/PremiumCompletionModules.cs' -Raw -Encoding UTF8
+          $btc = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/btc-payment-receipt-flow.js' -Raw -Encoding UTF8
+          $btcBill = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/btc-settlement.js' -Raw -Encoding UTF8
+          $audit = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/audit-report-thermal.js' -Raw -Encoding UTF8
+          $auditCss = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/audit-report-thermal.css' -Raw -Encoding UTF8
+          $premium = Get-Content 'src/SuvidhaPOS-Premium/PremiumFeatureModules.cs' -Raw -Encoding UTF8
+          $counter = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/counter-billing.js' -Raw -Encoding UTF8
+          $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/retail-expansion-schema.sql' -Raw -Encoding UTF8
+          foreach($f in @('src/SuvidhaPOS-Premium/RetailExpansionModules.cs','src/SuvidhaPOS-Premium/wwwroot/js/retail-masters-ui.js','src/SuvidhaPOS-Premium/wwwroot/js/india-locations.js','src/SuvidhaPOS-Premium/wwwroot/js/audit-report-thermal.js','src/SuvidhaPOS-Premium/wwwroot/css/audit-report-thermal.css','src/SuvidhaPOS-Premium/Database/retail-expansion-schema.sql')){if(-not(Test-Path $f)){throw "Retail expansion file missing: $f"}}
+          foreach($token in @('/api/retail/opening-stock/preview','/api/retail/item-rates/preview','/api/retail/item-rates/apply','/api/retail/customer-company','/api/btc/advance','/api/reports/btc-payments','/api/reports/audit-summary')){if(-not $backend.Contains($token)){throw "Retail expansion endpoint missing: $token"}}
+          foreach($token in @('Item Entry','Category Entry','Item Import','Bulk Edit Update','Item Rate Update','Opening Stock Bulk Update','Select Visible','Post Selected Opening Stock','BTC Payment Report','Customer / Company')){if(-not $ui.Contains($token)){throw "Retail master UI missing: $token"}}
+          foreach($token in @('Andaman and Nicobar Islands','Arunachal Pradesh','Jammu and Kashmir','Ladakh','Uttar Pradesh','West Bengal','suvidhaBindIndiaLocation')){if(-not $geo.Contains($token)){throw "India State/City helper missing: $token"}}
+          foreach($token in @('id="ostate"','id="ocity"','State:','City:')){if(-not $outlet.Contains($token)){throw "Outlet State/City UI missing: $token"}}
+          foreach($token in @('State,City','S("state")','S("city")')){if(-not $sync.Contains($token)){throw "Outlet State/City central sync missing: $token"}}
+          foreach($token in @('ADVANCE RECEIPT','Advance Amount','Credit/UPI','Partial Settlement','btcPrSetSettlementKind')){if(-not $btc.Contains($token)){throw "BTC advance/partial settlement UI missing: $token"}}
+          foreach($token in @('btcBillingAdvance','btcBillingAdvanceMode','✓ Submit')){if(-not $btcBill.Contains($token)){throw "BTC billing company advance/submit flow missing: $token"}}
+          foreach($token in @('Thermal Print 80mm','Audit Report - Account Summary','Payment Break up','Cashier Report','* End of Reports *')){if(-not $audit.Contains($token)){throw "Thermal Audit Report missing: $token"}}
+          if(-not $audit.Contains('@page{size:80mm auto')){throw '80mm thermal print page rule missing'}
+          foreach($token in @('CustomerPhone','CustomerGstIn','INSERT Customers')){if(-not $premium.Contains($token)){throw "Billing customer auto-save backend missing: $token"}}
+          foreach($token in @('CustomerPhone:','CustomerGstIn:')){if(-not $counter.Contains($token)){throw "Billing customer auto-save payload missing: $token"}}
+          foreach($token in @('BtcAdvances','OutletMaster','State','City')){if(-not $schema.Contains($token)){throw "Retail expansion schema missing: $token"}}
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/retail-masters-ui.js'
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/india-locations.js'
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/btc-payment-receipt-flow.js'
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/btc-settlement.js'
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/audit-report-thermal.js'
       - name: Validate base-unit multi-unit inventory
         shell: powershell
         run: |
