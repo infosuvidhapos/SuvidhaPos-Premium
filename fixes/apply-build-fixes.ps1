@@ -4,11 +4,15 @@ $project='src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj'
 $indexPath='src/SuvidhaPOS-Premium/wwwroot/index.html'
 $desktopPath='src/SuvidhaPOS.Desktop/MainForm.cs'
 $completionUi='src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js'
+$runtimePath='src/SuvidhaPOS-Premium/wwwroot/js/runtime-fixes-6124.js'
+$runtimeNewPath='src/SuvidhaPOS-Premium/wwwroot/js/runtime-fixes-6125.js'
 $text=Get-Content $program -Raw
 $proj=Get-Content $project -Raw
 $index=Get-Content $indexPath -Raw -Encoding UTF8
 $desktop=Get-Content $desktopPath -Raw
 $completion=Get-Content $completionUi -Raw -Encoding UTF8
+$runtime=Get-Content $runtimePath -Raw -Encoding UTF8
+if(-not(Test-Path $runtimeNewPath)){throw 'runtime-fixes-6125.js missing'}
 
 # Responses API requires a data URL for input_file file_data.
 $old='contentPart = mime.StartsWith("image/") ? new {type="input_image",image_url=dataUrl,detail="high"} : new {type="input_file",filename=filename,file_data=b64};'
@@ -71,6 +75,17 @@ if(-not $completion.Contains('Code39')){
   $completion += "`r`n/* Code39 symbology: implemented by code39 pattern table + barcodeSvg renderer. */`r`n"
 }
 
+# Load post-6.12.4 runtime fixes after all normal runtime modules without rewriting index.html.
+# The new file handles direct (non-AI) Excel imports, jewellery quantity/edit rows and scoped Feature Control.
+$runtimeLoader=@'
+(function(){
+ if(document.querySelector('script[data-runtime-6125]'))return;
+ var s=document.createElement('script');s.setAttribute('data-runtime-6125','1');
+ s.src='/js/runtime-fixes-6125.js?v=6125';s.defer=false;document.head.appendChild(s);
+})();
+'@
+if(-not $runtime.Contains('runtime-fixes-6125.js')){$runtime += "`r`n"+$runtimeLoader+"`r`n"}
+
 # index.html is now committed directly in UTF-8. Do not rewrite it here.
 # This avoids Windows PowerShell 5.1 decoding UTF-8 emoji/symbols as ANSI.
 
@@ -86,4 +101,5 @@ Set-Content $program $text -Encoding UTF8
 Set-Content $project $proj -Encoding UTF8
 Set-Content $desktopPath $desktop -Encoding UTF8
 Set-Content $completionUi $completion -Encoding UTF8
+Set-Content $runtimePath $runtime -Encoding UTF8
 Write-Host 'Build fixes applied. index.html remains untouched to preserve UTF-8.'
