@@ -65,6 +65,9 @@ SELECT Id,MetalType,Purity,RatePerGram,EffectiveAt FROM r WHERE rn=1 ORDER BY Me
                 return Results.Ok(new{source="Saved rate fallback",currency="INR",unit="gram",updatedAt=(string?)null,stale=true,saved=false,warning=ex.Message,rates=fallback});
             }
         });
+
+        // Bootstrap the normal-retail BTC (Bill To Company) workflow without changing Program.cs.
+        BtcSettlementModules.Map(app);
     }
 
     static SqlParameter P(string n,object? v)=>new(n,v??DBNull.Value);
