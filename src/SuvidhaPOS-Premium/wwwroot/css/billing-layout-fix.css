@@ -1,0 +1,40 @@
+/* Counter billing alignment fix: keep every billing section inside the available viewport,
+   align left/right edges, and reserve a stable area for the item grid. */
+.counter-billing{height:calc(100dvh - 110px)!important;min-height:0!important;max-height:calc(100dvh - 110px)!important;margin:0!important;border-radius:12px 12px 0 0!important;overflow:hidden!important}
+.counter-billing .cb-head,.counter-billing .cb-shortcuts,.counter-billing .cb-inputbar,.counter-billing .cb-countbar,.counter-billing .cb-customer,.counter-billing .cb-totals,.counter-billing .cb-actions,.counter-billing .billing-print-actions{flex:0 0 auto}
+.counter-billing .cb-main{flex:1 1 auto!important;min-height:135px!important;overflow:hidden}
+.counter-billing .cb-table-wrap{height:100%;min-height:0!important}
+.counter-billing .cb-inputbar{padding:10px 12px 8px!important}
+.counter-billing .cb-countbar{padding:7px 16px!important}
+.counter-billing .cb-customer{padding:7px 12px!important}
+.counter-billing .cb-totals{padding:8px 12px 4px!important}
+.counter-billing .billing-print-actions{margin:7px 12px 0!important;padding:7px 10px!important;min-height:48px;background:#0e2032!important;border-color:#294258!important}
+.counter-billing .billing-print-actions label{padding:6px 10px!important;background:#0b1c2c!important;border-color:#294258!important;color:#e5eef6!important}
+.counter-billing .cb-actions{grid-template-columns:1fr 1fr 1fr 1.4fr 1fr!important;gap:8px!important;padding:8px 12px 10px!important}
+.counter-billing .cb-actions button{height:48px!important;min-width:0}
+.counter-billing .cb-actions .holdbill{background:#173c5b!important;display:flex;align-items:center;justify-content:center;gap:7px}
+.counter-billing .hold-count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:20px;background:#0c263d;border:1px solid #3c6f98;color:#9fd1ff;font-size:10px;font-weight:800}
+
+.hold-manager{min-width:min(820px,82vw)}
+.hold-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.hold-summary>div{display:grid;grid-template-columns:1fr auto;align-items:center;gap:3px 10px;padding:12px 14px;border:1px solid var(--line,#294258);border-radius:10px;background:var(--panel,#0e2032)}
+.hold-summary span{font-size:10px;color:var(--muted,#8fa5b8);text-transform:uppercase;letter-spacing:.5px}.hold-summary b{font-size:17px}.hold-summary small{grid-column:1/-1;color:var(--muted,#8fa5b8)}
+.hold-list{display:grid;gap:7px;max-height:430px;overflow:auto;padding-right:2px}.hold-row{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line,#294258);border-radius:10px;background:var(--panel,#0e2032)}
+.hold-slot{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:#102f49;border:1px solid #315b79;color:#8ecbff;font-weight:850}.hold-info{display:grid;gap:3px;min-width:0}.hold-info b{font-size:12px}.hold-info span,.hold-info small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted,#8fa5b8);font-size:9px}.hold-actions{display:flex;gap:6px}.hold-empty{padding:34px 18px;text-align:center;border:1px dashed var(--line,#294258);border-radius:10px;color:var(--muted,#8fa5b8)}
+
+@media(max-height:820px) and (min-width:851px){
+ .counter-billing .cb-head{height:54px!important;flex-basis:54px!important;font-size:19px!important}
+ .counter-billing .cb-shortcuts{padding:4px 10px 2px!important;gap:5px!important}
+ .counter-billing .cb-shortcuts span{padding:2px 6px!important}
+ .counter-billing .cb-inputbar{padding-top:7px!important;padding-bottom:6px!important}
+ .counter-billing .cb-field input,.counter-billing .cb-field select,.counter-billing .cb-iconbtn{height:36px!important}
+ .counter-billing .cb-customer input,.counter-billing .cb-customer select{height:31px!important}
+ .counter-billing .cb-totals{padding-top:5px!important;padding-bottom:2px!important}
+ .counter-billing .billing-print-actions{margin-top:5px!important;padding:5px 9px!important;min-height:42px!important}
+ .counter-billing .billing-print-actions label{padding:5px 8px!important}
+ .counter-billing .cb-actions{padding-top:6px!important;padding-bottom:7px!important}
+ .counter-billing .cb-actions button{height:43px!important}
+}
+@media(max-width:1250px){.hold-manager{min-width:0}.hold-row{grid-template-columns:38px 1fr}.hold-actions{grid-column:2;justify-content:flex-end}}
+@media(max-width:850px){.counter-billing{height:auto!important;max-height:none!important;min-height:calc(100dvh - 110px)!important;overflow:auto!important}.hold-summary{grid-template-columns:1fr}.hold-row{grid-template-columns:1fr}.hold-slot{display:none}.hold-actions{grid-column:auto;justify-content:stretch}.hold-actions .btn{flex:1}}
+body[data-theme="light"] .counter-billing .billing-print-actions{background:#fffdf8!important;border-color:#d9cdbb!important}body[data-theme="light"] .counter-billing .billing-print-actions label{background:#fffaf1!important;border-color:#d9cdbb!important;color:#433c34!important}body[data-theme="light"] .hold-slot{background:#f1e4cf;border-color:#c6ad84;color:#745b35}
