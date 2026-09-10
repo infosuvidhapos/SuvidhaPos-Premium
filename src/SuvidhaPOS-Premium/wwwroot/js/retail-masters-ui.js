@@ -16,7 +16,7 @@ function downloadCsv(name,headers,rows){
  const csv=[headers.map(q).join(','),...rows.map(r=>r.map(q).join(','))].join('\r\n');
  const a=d.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=name;d.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},200);
 }
-let products=[],categories=[],openingRows=[],rateRows=[],bulkRows=[],partyRows=[],outletCache=null;
+let products=[],categories=[],openingRows=[],rateRows=[],bulkRows=[],partyRows=[],outletCache=null,categoryEdit={id:0,targetId:'',oldName:''};
 const baseLoadReports=w.loadReports;
 
 /* ---------- Item Master dashboard ---------- */
@@ -64,9 +64,11 @@ w.loadCategoryMaster=async function(){
 w.retailFilterCategory=q=>{q=String(q||'').toLowerCase();d.querySelectorAll('#retailCategoryRows tr').forEach(r=>r.style.display=(r.dataset.q||'').includes(q)?'':'none')};
 w.retailCategoryEditor=async function(id=0,targetId=''){
  await loadCategories();const row=categories.find(x=>Number(x.Id)===Number(id));const old=row?.Name||'';
- modal(id?'Edit Category':'Add Category',`<label>Category Name<input id="retailCategoryName" class="input" value="${esc(old)}" autofocus></label>`,`<button class="btn" onclick="retailSaveCategory(${Number(id)},'${esc(targetId)}','${esc(old)}')">✓ Submit</button><button class="btn secondary" onclick="closeModal()">Cancel</button>`);
+ categoryEdit={id:Number(id)||0,targetId:String(targetId||''),oldName:old};
+ modal(id?'Edit Category':'Add Category',`<label>Category Name<input id="retailCategoryName" class="input" value="${esc(old)}" autofocus></label>`,`<button class="btn" onclick="retailSaveCategory()">✓ Submit</button><button class="btn secondary" onclick="closeModal()">Cancel</button>`);
 };
-w.retailSaveCategory=async function(id,targetId,oldName){
+w.retailSaveCategory=async function(){
+ const {id,targetId,oldName}=categoryEdit;
  const el=d.querySelector('#retailCategoryName'),name=(el?.value||'').trim();if(!name)return notice('Enter category name');
  try{
   if(id)await api('/api/retail/categories/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Name:name,OldName:oldName})});
