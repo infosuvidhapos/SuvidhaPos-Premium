@@ -309,7 +309,8 @@ WHERE CreatedAt>=@f AND CreatedAt<@e
                 P("@f",f),P("@e",end),P("@cashier",cashierName));
 
             decimal D(string key)=>summary.TryGetValue(key,out var v)&&v is not null&&v is not DBNull?Convert.ToDecimal(v):0m;
-            var tickets=summary.TryGetValue("TicketCount",out var tc)&&tc is not null&&tc is not DBNull?Convert.ToInt32(tc):0;
+            int I(string key)=>summary.TryGetValue(key,out var v)&&v is not null&&v is not DBNull?Convert.ToInt32(v):0;
+            var tickets=I("TicketCount");
             return Results.Ok(new{
                 outlet,
                 from=f,
@@ -324,7 +325,7 @@ WHERE CreatedAt>=@f AND CreatedAt<@e
                     netApc=tickets>0?Math.Round(D("NetSales")/tickets,2):0,
                     totalSales=D("TotalSales"),
                     totalDiscount=D("TotalDiscount"),
-                    discountTickets=summary.GetValueOrDefault("DiscountTickets") is null?0:Convert.ToInt32(summary["DiscountTickets"]),
+                    discountTickets=I("DiscountTickets"),
                     netSales=D("NetSales"),
                     totalTax=D("TotalTax"),
                     totalRoundOff=D("TotalRoundOff"),
