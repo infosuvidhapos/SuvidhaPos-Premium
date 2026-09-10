@@ -8,9 +8,6 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: suvidhapos-premium-windows-build
-  cancel-in-progress: false
 jobs:
   build-test-publish:
     runs-on: windows-latest
