@@ -22,6 +22,7 @@ public static class BtcSettlementModules
             return Results.Ok(await db.QueryAsync(@"
 SELECT c.Id,c.CompanyName,c.GstIn,c.Phone,c.Address,c.CreditLimit,c.CreditDays,c.IsActive,
  CAST(ISNULL((SELECT SUM(s.PendingAmount) FROM Sales s WHERE s.BtcCompanyId=c.Id AND s.PaymentMode='BTC' AND s.Status='Completed'),0) AS decimal(18,2)) Outstanding,
+ CAST(ISNULL((SELECT SUM(a.Amount) FROM BtcAdvances a WHERE a.CompanyId=c.Id),0) AS decimal(18,2)) AdvanceBalance,
  CAST(CASE WHEN c.CreditLimit<=0 THEN 0 ELSE c.CreditLimit-ISNULL((SELECT SUM(s.PendingAmount) FROM Sales s WHERE s.BtcCompanyId=c.Id AND s.PaymentMode='BTC' AND s.Status='Completed'),0) END AS decimal(18,2)) AvailableCredit
 FROM BtcCompanies c
 WHERE c.IsActive=1 AND (@q='' OR c.CompanyName LIKE @like OR ISNULL(c.GstIn,'') LIKE @like OR ISNULL(c.Phone,'') LIKE @like)
