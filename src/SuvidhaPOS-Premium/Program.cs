@@ -493,6 +493,7 @@ SuvidhaPOS.Premium.ReportTaxModules.Map(app);
 SuvidhaPOS.Premium.BillManagementModules.Map(app);
 SuvidhaPOS.Premium.PremiumFeatureModules.Map(app);
 SuvidhaPOS.Premium.PremiumCompletionModules.Map(app);
+SuvidhaPOS.Premium.RetailExpansionModules.Map(app);
 
 app.Run();
 
