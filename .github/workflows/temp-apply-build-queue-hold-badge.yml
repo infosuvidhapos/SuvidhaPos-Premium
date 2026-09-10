@@ -1,0 +1,61 @@
+name: TEMP Apply Build Queue and Hold Badge
+on:
+  push:
+    branches: [ fix/build-queue-hold-badge-20260910 ]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/build-queue-hold-badge-20260910
+      - name: Apply requested changes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+
+          $wfPath='.github/workflows/build.yml'
+          $wf=Get-Content $wfPath -Raw -Encoding UTF8
+          if(-not $wf.Contains('cancel-in-progress: true') -and -not $wf.Contains('cancel-in-progress: false')){ throw 'Concurrency setting not found' }
+          $wf=$wf.Replace('cancel-in-progress: true','cancel-in-progress: false')
+          Set-Content $wfPath $wf -Encoding UTF8
+
+          $jsPath='src/SuvidhaPOS-Premium/wwwroot/js/billing-hold.js'
+          $js=Get-Content $jsPath -Raw -Encoding UTF8
+          $needle="async function fetchHolds(){holdRows=await api('/api/billing/holds').catch(()=>[]);return Array.isArray(holdRows)?holdRows:[]}"
+          $helper=@"
+async function fetchHolds(){holdRows=await api('/api/billing/holds').catch(()=>[]);return Array.isArray(holdRows)?holdRows:[]}
+function setBadgeCount(count){const badge=d.querySelector('#cbHoldCount');if(!badge)return;const n=Math.max(0,Math.min(10,Number(count)||0));badge.textContent=String(n);badge.dataset.count=String(n);badge.hidden=n===0;badge.setAttribute('aria-label',n+' held bill'+(n===1?'':'s'));}
+"@
+          if(-not $js.Contains('function setBadgeCount(count)')){
+            if(-not $js.Contains($needle)){throw 'Hold badge helper insertion point not found'}
+            $js=$js.Replace($needle,$helper.TrimEnd())
+          }
+          $oldRefresh="if(!root())return;const now=Date.now();if(!force&&now-lastCountAt<3000)return;lastCountAt=now;const rows=await fetchHolds();const badge=d.querySelector('#cbHoldCount');if(badge)badge.textContent=String(rows.length);"
+          $newRefresh="if(!root())return;const now=Date.now();if(!force&&now-lastCountAt<3000)return;lastCountAt=now;const rows=await fetchHolds();setBadgeCount(rows.length);"
+          if($js.Contains($oldRefresh)){$js=$js.Replace($oldRefresh,$newRefresh)}
+          $js=$js.Replace("<span id=\"cbHoldCount\" class=\"hold-count\">0</span>","<span id=\"cbHoldCount\" class=\"hold-count\" hidden>0</span>")
+          $oldDelete="const badge=d.querySelector('#cbHoldCount');if(badge)badge.textContent=String(rows.length);notice('Held bill deleted')"
+          $newDelete="setBadgeCount(rows.length);notice('Held bill deleted')"
+          if($js.Contains($oldDelete)){$js=$js.Replace($oldDelete,$newDelete)}
+          if(-not $js.Contains('setBadgeCount(rows.length)')){throw 'Hold badge live count update missing'}
+          Set-Content $jsPath $js -Encoding UTF8
+
+          $cssPath='src/SuvidhaPOS-Premium/wwwroot/css/billing-layout-fix.css'
+          $css=Get-Content $cssPath -Raw -Encoding UTF8
+          $css=$css.Replace(".counter-billing .cb-actions .holdbill{background:#173c5b!important;display:flex;align-items:center;justify-content:center;gap:7px}",".counter-billing .cb-actions .holdbill{background:#173c5b!important;display:flex;align-items:center;justify-content:center;gap:7px;position:relative;overflow:visible!important}")
+          $oldBadge=".counter-billing .hold-count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:20px;background:#0c263d;border:1px solid #3c6f98;color:#9fd1ff;font-size:10px;font-weight:800}"
+          $newBadge=".counter-billing .hold-count{position:absolute;top:-7px;right:-7px;display:grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#e9545d;border:2px solid #173c5b;color:#fff;font-size:10px;font-weight:900;line-height:1;box-shadow:0 3px 10px #0008;z-index:3}.counter-billing .hold-count[hidden]{display:none!important}"
+          if($css.Contains($oldBadge)){$css=$css.Replace($oldBadge,$newBadge)}
+          if(-not $css.Contains('.hold-count[hidden]')){throw 'Hold notification badge CSS missing'}
+          Set-Content $cssPath $css -Encoding UTF8
+
+          Remove-Item '.github/workflows/temp-apply-build-queue-hold-badge.yml' -Force
+
+          git config user.name 'infosuvidhapos'
+          git config user.email 'info@suvidhapos.in'
+          git add .github/workflows/build.yml $jsPath $cssPath .github/workflows/temp-apply-build-queue-hold-badge.yml
+          git commit -m 'Keep builds queued and show Hold Bill count badge'
+          git push origin HEAD:fix/build-queue-hold-badge-20260910
