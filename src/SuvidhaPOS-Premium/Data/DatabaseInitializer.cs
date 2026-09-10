@@ -16,6 +16,8 @@ public sealed class DatabaseInitializer
   if(File.Exists(completionSchema)) await RunScriptAsync(completionSchema);
   var btcSchema=Path.Combine(AppContext.BaseDirectory,"Database","btc-settlement-schema.sql");
   if(File.Exists(btcSchema)) await RunScriptAsync(btcSchema);
+  var heldBillsSchema=Path.Combine(AppContext.BaseDirectory,"Database","held-bills-schema.sql");
+  if(File.Exists(heldBillsSchema)) await RunScriptAsync(heldBillsSchema);
   await RunScriptAsync(Path.Combine(AppContext.BaseDirectory,"Database","seed.sql"));
   await EnsureDefaultAdminAsync();
  }
