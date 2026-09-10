@@ -12,8 +12,9 @@
 .counter-billing .billing-print-actions label{padding:6px 10px!important;background:#0b1c2c!important;border-color:#294258!important;color:#e5eef6!important}
 .counter-billing .cb-actions{grid-template-columns:1fr 1fr 1fr 1.4fr 1fr!important;gap:8px!important;padding:8px 12px 10px!important}
 .counter-billing .cb-actions button{height:48px!important;min-width:0}
-.counter-billing .cb-actions .holdbill{background:#173c5b!important;display:flex;align-items:center;justify-content:center;gap:7px}
-.counter-billing .hold-count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:20px;background:#0c263d;border:1px solid #3c6f98;color:#9fd1ff;font-size:10px;font-weight:800}
+.counter-billing .cb-actions .holdbill{background:#173c5b!important;display:flex;align-items:center;justify-content:center;gap:7px;position:relative;overflow:visible!important}
+.counter-billing .hold-count{position:absolute;top:-7px;right:-7px;display:grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#e9545d;border:2px solid #173c5b;color:#fff;font-size:10px;font-weight:900;line-height:1;box-shadow:0 3px 10px #0008;z-index:3}
+.counter-billing .hold-count[hidden]{display:none!important}
 
 .hold-manager{min-width:min(820px,82vw)}
 .hold-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
