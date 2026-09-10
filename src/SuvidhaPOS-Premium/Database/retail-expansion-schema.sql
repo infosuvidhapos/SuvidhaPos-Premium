@@ -13,7 +13,7 @@ BEGIN
  CREATE TABLE dbo.BtcAdvances(
   Id bigint IDENTITY PRIMARY KEY,
   ReceiptNo nvarchar(80) NOT NULL,
-  CompanyId int NOT NULL REFERENCES dbo.BtcCompanies(Id),
+  CompanyId int NOT NULL CONSTRAINT FK_BtcAdvances_Companies REFERENCES dbo.BtcCompanies(Id),
   Amount decimal(18,2) NOT NULL,
   PaymentMode nvarchar(40) NOT NULL,
   ReferenceNo nvarchar(120) NULL,
