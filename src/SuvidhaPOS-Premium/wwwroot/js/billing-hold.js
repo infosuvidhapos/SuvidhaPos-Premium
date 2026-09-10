@@ -40,9 +40,11 @@ async function refreshBadge(force){
 function patchBilling(){
  const r=root();if(!r)return;
  const btn=r.querySelector('.cb-actions .hold');
- if(btn){btn.onclick=function(ev){ev?.preventDefault();w.cbOpenHoldBills()};btn.classList.add('holdbill');btn.innerHTML='🧾⏱️ Hold Bill <span id="cbHoldCount" class="hold-count">0</span>';btn.title='Hold / Unhold bill (maximum 10)';}
- const f3=[...r.querySelectorAll('.cb-shortcuts span')].find(x=>/F3\s+Customer/i.test(x.textContent||''));if(f3)f3.textContent='F3 Hold Bill';
- const mobileLabel=[...r.querySelectorAll('.cb-customer .cb-label')].find(x=>/Mobile\s*\(F3\)/i.test(x.textContent||''));if(mobileLabel)mobileLabel.textContent='Mobile';
+ if(btn&&btn.dataset.holdBillPatched!=='1'){
+  btn.dataset.holdBillPatched='1';btn.onclick=function(ev){ev?.preventDefault();w.cbOpenHoldBills()};btn.classList.add('holdbill');btn.innerHTML='🧾⏱️ Hold Bill <span id="cbHoldCount" class="hold-count">0</span>';btn.title='Hold / Unhold bill (maximum 10)';
+ }
+ const f3=[...r.querySelectorAll('.cb-shortcuts span')].find(x=>/F3\s+Customer/i.test(x.textContent||''));if(f3&&f3.textContent!=='F3 Hold Bill')f3.textContent='F3 Hold Bill';
+ const mobileLabel=[...r.querySelectorAll('.cb-customer .cb-label')].find(x=>/Mobile\s*\(F3\)/i.test(x.textContent||''));if(mobileLabel&&mobileLabel.textContent!=='Mobile')mobileLabel.textContent='Mobile';
  if(r!==lastRoot){lastRoot=r;lastCountAt=0;refreshBadge(true)}
 }
 w.cbOpenHoldBills=async function(){
