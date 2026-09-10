@@ -84,12 +84,42 @@ public static class PremiumFeatureModules
                 else if (paymentMode.Equals("Cash", StringComparison.OrdinalIgnoreCase) || paymentMode.Equals("BTC", StringComparison.OrdinalIgnoreCase))
                     paid = total;
 
+                int? customerId=x.CustomerId;
+                var customerName=string.IsNullOrWhiteSpace(x.CustomerName)?"Walk-in Customer":x.CustomerName.Trim();
+                var customerPhone=(x.CustomerPhone??"").Trim();
+                var customerGst=(x.CustomerGstIn??"").Trim();
+                var customerAddress=(x.CustomerAddress??"").Trim();
+                if(!customerId.HasValue && !customerName.Equals("Walk-in Customer",StringComparison.OrdinalIgnoreCase))
+                {
+                    var findCustomer=new SqlCommand(@"SELECT TOP 1 Id FROM Customers WITH(UPDLOCK,HOLDLOCK)
+WHERE IsActive=1 AND ((@p<>'' AND Phone=@p) OR (@g<>'' AND GstIn=@g) OR UPPER(LTRIM(RTRIM(Name)))=UPPER(@n))
+ORDER BY CASE WHEN @p<>'' AND Phone=@p THEN 0 WHEN @g<>'' AND GstIn=@g THEN 1 ELSE 2 END,Id",c,tx);
+                    findCustomer.Parameters.AddRange(new[]{P("@p",customerPhone),P("@g",customerGst),P("@n",customerName)});
+                    var existingCustomer=await findCustomer.ExecuteScalarAsync();
+                    if(existingCustomer is not null && existingCustomer is not DBNull)
+                    {
+                        customerId=Convert.ToInt32(existingCustomer);
+                        var updateCustomer=new SqlCommand(@"UPDATE Customers SET Name=@n,
+Phone=COALESCE(NULLIF(@p,''),Phone),GstIn=COALESCE(NULLIF(@g,''),GstIn),Address=COALESCE(NULLIF(@a,''),Address)
+WHERE Id=@id",c,tx);
+                        updateCustomer.Parameters.AddRange(new[]{P("@n",customerName),P("@p",customerPhone),P("@g",customerGst),P("@a",customerAddress),P("@id",customerId)});
+                        await updateCustomer.ExecuteNonQueryAsync();
+                    }
+                    else
+                    {
+                        var addCustomer=new SqlCommand(@"INSERT Customers(Name,Phone,Address,GstIn,OpeningBalance,IsActive)
+VALUES(@n,NULLIF(@p,''),NULLIF(@a,''),NULLIF(@g,''),0,1);SELECT CAST(SCOPE_IDENTITY() AS int)",c,tx);
+                        addCustomer.Parameters.AddRange(new[]{P("@n",customerName),P("@p",customerPhone),P("@a",customerAddress),P("@g",customerGst)});
+                        customerId=Convert.ToInt32(await addCustomer.ExecuteScalarAsync());
+                    }
+                }
+
                 var invoiceNo = "INV-" + DateTime.Now.ToString("yyyyMMddHHmmssfff");
                 var cmd = new SqlCommand(@"INSERT Sales(InvoiceNo,BillDate,CustomerId,CustomerName,PaymentMode,SubTotal,Discount,DiscountType,DiscountValue,Tax,GrandTotal,TotalCost,PaidAmount,Notes,CashierName)
 VALUES(@i,GETDATE(),@cid,@cn,@pm,@sub,@d,@dt,@dv,@t,@g,0,@paid,@notes,@cashier);
 SELECT CAST(SCOPE_IDENTITY() AS int);", c, tx);
                 cmd.Parameters.AddRange(new[] {
-                    P("@i",invoiceNo),P("@cid",x.CustomerId),P("@cn",x.CustomerName??"Walk-in Customer"),P("@pm",paymentMode),
+                    P("@i",invoiceNo),P("@cid",customerId),P("@cn",customerName),P("@pm",paymentMode),
                     P("@sub",sub),P("@d",discount),P("@dt",discountType),P("@dv",discountValue),P("@t",tax),P("@g",total),
                     P("@paid",Math.Min(total,Math.Max(0,paid))),P("@notes",x.Notes),P("@cashier",cashier)
                 });
@@ -298,7 +328,7 @@ ORDER BY p.Name"; break;
     public record PremiumSaleLine(int ProductId, decimal Qty, decimal SalePrice, decimal TaxRate, decimal Discount, string? UnitSold=null, decimal SoldQty=0m, decimal BaseQty=0m, decimal RatePerSoldUnit=0m, string? TaxMode="EXCLUSIVE");
     public record ResolvedPremiumSaleLine(int ProductId,decimal BaseQty,decimal BaseRate,decimal TaxRate,decimal Discount,string? UnitSold,decimal SoldQty,decimal SoldRate,decimal Factor,string TaxMode);
     public record PremiumPaymentRequest(string Mode, string? Type, decimal Amount, string? ReferenceNo);
-    public record PremiumSaleRequest(int? CustomerId,string? CustomerName,string? PaymentMode,decimal PaidAmount,string? DiscountType,decimal DiscountValue,string? Notes,List<PremiumSaleLine> Lines,List<PremiumPaymentRequest>? Payments);
+    public record PremiumSaleRequest(int? CustomerId,string? CustomerName,string? PaymentMode,decimal PaidAmount,string? DiscountType,decimal DiscountValue,string? Notes,List<PremiumSaleLine> Lines,List<PremiumPaymentRequest>? Payments,string? CustomerPhone=null,string? CustomerGstIn=null,string? CustomerAddress=null);
     public record OpeningStockLine(int ProductId,string? BatchNo,decimal Quantity,decimal CostPrice,decimal SalePrice,decimal Mrp,DateTime? ExpiryDate);
     public record OpeningStockRequest(DateTime? AsOnDate,string? Notes,List<OpeningStockLine> Lines);
 }
