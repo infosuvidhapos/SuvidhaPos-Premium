@@ -222,13 +222,14 @@ WHERE (@cid IS NULL OR a.CompanyId=@cid) ORDER BY a.Id DESC", P("@cid", companyI
             return Results.Ok(rows);
         });
 
-        app.MapGet("/api/reports/btc-payments", async (Db db, string? from, string? to, string? q, string? type) =>
+        app.MapGet("/api/reports/btc-payments", async (Db db, string? from, string? to, string? q, string? type, string? mode) =>
         {
             var f = DateTime.TryParse(from, out var fd) ? fd.Date : DateTime.Today.AddDays(-30);
             var e = DateTime.TryParse(to, out var td) ? td.Date.AddDays(1) : DateTime.Today.AddDays(1);
             var term = (q ?? "").Trim();
             var like = "%" + term + "%";
             var kind = (type ?? "ALL").Trim().ToUpperInvariant();
+            var payMode = (mode ?? "ALL").Trim().ToUpperInvariant();
             var rows = await db.QueryAsync(@"
 SELECT * FROM (
  SELECT st.SettlementDate TxnDate,'SETTLEMENT' TxnType,st.ReceiptNo,c.CompanyName,c.Phone,c.GstIn,
@@ -242,7 +243,8 @@ SELECT * FROM (
 WHERE x.TxnDate>=@f AND x.TxnDate<@e
   AND (@q='' OR x.CompanyName LIKE @l OR ISNULL(x.Phone,'') LIKE @l OR ISNULL(x.GstIn,'') LIKE @l OR x.ReceiptNo LIKE @l)
   AND (@type='ALL' OR x.TxnType=@type)
-ORDER BY x.TxnDate DESC", P("@f", f), P("@e", e), P("@q", term), P("@l", like), P("@type", kind));
+  AND (@mode='ALL' OR UPPER(ISNULL(x.PaymentMode,''))=@mode)
+ORDER BY x.TxnDate DESC", P("@f", f), P("@e", e), P("@q", term), P("@l", like), P("@type", kind), P("@mode", payMode));
             return Results.Ok(rows);
         });
 
