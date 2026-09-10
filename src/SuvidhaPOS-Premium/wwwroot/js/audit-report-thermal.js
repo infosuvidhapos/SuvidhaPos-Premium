@@ -74,7 +74,7 @@ function patchExisting(){
  nodes.forEach(el=>{
   const text=String(el.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
   const key=String(el.dataset?.reportKey||el.dataset?.report||el.dataset?.type||'').trim().toLowerCase();
-  if((text==='audit report'||text.startsWith('audit report '))||key==='audit-report'){
+  if((text==='audit report'||text.startsWith('audit report '))||key==='audit'||key==='audit-report'){
    if(el.dataset.auditThermalPatched==='1')return;el.dataset.auditThermalPatched='1';el.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();w.openAuditThermalReport()},true);
   }
  });
