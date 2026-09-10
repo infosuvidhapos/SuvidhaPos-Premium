@@ -7,7 +7,7 @@ function money(v){return Number(v||0).toLocaleString('en-IN',{minimumFractionDig
 var original=w.btcPrRecalc;
 function metric(label){return Array.from(d.querySelectorAll('#btcPrPaymentDetail .btcpr-detail-row')).find(function(r){return String(r.querySelector('span')?.textContent||'').trim()===label})}
 w.btcPrUpdateBalance=function(){
- var pendingRow=metric('Selected Pending'),balanceRow=metric('Balance Payment'),input=d.querySelector('#btcPrSettlement');
+ var pendingRow=metric('Selected Pending'),balanceRow=metric('Balance After This Receipt')||metric('Balance Payment'),input=d.querySelector('#btcPrSettlement');
  if(!balanceRow||!input)return;
  var pending=num(pendingRow?.querySelector('b')?.textContent),settle=num(input.value);
  var b=balanceRow.querySelector('b');if(b)b.textContent='₹'+money(Math.max(0,pending-settle));

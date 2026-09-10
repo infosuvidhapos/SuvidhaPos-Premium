@@ -209,11 +209,11 @@ public static class PremiumCompletionModules
                 using var http=CentralClient(cfg);
                 if(direction=="PUSH")
                 {
-                    var o=await db.QuerySingleAsync("SELECT TOP 1 OutletName,Address,Phone,Gstin FROM OutletMaster ORDER BY Id");
+                    var o=await db.QuerySingleAsync("SELECT TOP 1 OutletName,Address,Phone,Gstin,State,City FROM OutletMaster ORDER BY Id");
                     using var resp=await http.PostAsJsonAsync("api/pos/profile",new{
                         outletCode=status.OutletCode,deviceFingerprint=status.DeviceId,
                         outletName=o.GetValueOrDefault("OutletName")?.ToString()??"Main Outlet",
-                        address=o.GetValueOrDefault("Address")?.ToString(),mobile=o.GetValueOrDefault("Phone")?.ToString(),gstNo=o.GetValueOrDefault("Gstin")?.ToString()
+                        address=o.GetValueOrDefault("Address")?.ToString(),mobile=o.GetValueOrDefault("Phone")?.ToString(),gstNo=o.GetValueOrDefault("Gstin")?.ToString(),state=o.GetValueOrDefault("State")?.ToString(),city=o.GetValueOrDefault("City")?.ToString()
                     },cts.Token);
                     var msg=await resp.Content.ReadAsStringAsync(cts.Token);
                     await SyncLog(db,"POS_TO_WEB",reason,resp.IsSuccessStatusCode?"OK":"ERROR",TrimMessage(msg),sw.ElapsedMilliseconds);
@@ -227,12 +227,12 @@ public static class PremiumCompletionModules
                 var webType=CanonicalStoreType(S("storeType"));var valid=S("validUntilUtc");
                 var existing=await db.QuerySingleAsync("SELECT TOP 1 Id FROM OutletMaster ORDER BY Id");
                 if(existing.Count==0)
-                    await db.ScalarAsync("INSERT OutletMaster(OutletName,StoreType,Address,Phone,Gstin) VALUES(@n,@t,@a,@p,@g)",P("@n",S("outletName")),P("@t",webType),P("@a",S("address")),P("@p",S("mobile")),P("@g",S("gstNo")));
+                    await db.ScalarAsync("INSERT OutletMaster(OutletName,StoreType,Address,Phone,Gstin,State,City) VALUES(@n,@t,@a,@p,@g,@s,@c)",P("@n",S("outletName")),P("@t",webType),P("@a",S("address")),P("@p",S("mobile")),P("@g",S("gstNo")),P("@s",S("state")),P("@c",S("city")));
                 else
-                    await db.ScalarAsync("UPDATE OutletMaster SET OutletName=@n,StoreType=@t,Address=@a,Phone=@p,Gstin=@g,UpdatedAt=SYSDATETIME() WHERE Id=@id",
-                        P("@n",S("outletName")),P("@t",webType),P("@a",S("address")),P("@p",S("mobile")),P("@g",S("gstNo")),P("@id",existing["Id"]));
+                    await db.ScalarAsync("UPDATE OutletMaster SET OutletName=@n,StoreType=@t,Address=@a,Phone=@p,Gstin=@g,State=@s,City=@c,UpdatedAt=SYSDATETIME() WHERE Id=@id",
+                        P("@n",S("outletName")),P("@t",webType),P("@a",S("address")),P("@p",S("mobile")),P("@g",S("gstNo")),P("@s",S("state")),P("@c",S("city")),P("@id",existing["Id"]));
                 await SyncLog(db,"WEB_TO_POS",reason,"OK","Profile pulled; StoreType/Validity remain website-owned",sw.ElapsedMilliseconds);
-                return Results.Ok(new{ok=true,direction,outletName=S("outletName"),storeType=webType,validUntilUtc=valid,address=S("address"),mobile=S("mobile"),gstNo=S("gstNo")});
+                return Results.Ok(new{ok=true,direction,outletName=S("outletName"),storeType=webType,validUntilUtc=valid,address=S("address"),mobile=S("mobile"),gstNo=S("gstNo"),state=S("state"),city=S("city")});
             }
             catch(OperationCanceledException){await SyncLog(db,direction=="PUSH"?"POS_TO_WEB":"WEB_TO_POS",reason,"OFFLINE","2500ms timeout",sw.ElapsedMilliseconds);return Results.Ok(new{ok=false,offline=true,direction,message="Offline/timeout; local billing remains active"});}
             catch(Exception ex){await SyncLog(db,direction=="PUSH"?"POS_TO_WEB":"WEB_TO_POS",reason,"OFFLINE",ex.Message,sw.ElapsedMilliseconds);return Results.Ok(new{ok=false,offline=true,direction,message="Central unavailable; local billing remains active"});}
@@ -403,11 +403,11 @@ public static class PremiumCompletionModules
             string S(string n)=>root.TryGetProperty(n,out var v)&&v.ValueKind!=JsonValueKind.Null?v.ToString():"";
             var webType=CanonicalStoreType(S("storeType"));var existing=await db.QuerySingleAsync("SELECT TOP 1 Id FROM OutletMaster ORDER BY Id");
             if(existing.Count==0)
-                await db.ScalarAsync("INSERT OutletMaster(OutletName,StoreType,Address,Phone,Gstin) VALUES(@n,@t,@a,@p,@g)",P("@n",S("outletName")),P("@t",webType),P("@a",S("address")),P("@p",S("mobile")),P("@g",S("gstNo")));
+                await db.ScalarAsync("INSERT OutletMaster(OutletName,StoreType,Address,Phone,Gstin,State,City) VALUES(@n,@t,@a,@p,@g,@s,@c)",P("@n",S("outletName")),P("@t",webType),P("@a",S("address")),P("@p",S("mobile")),P("@g",S("gstNo")),P("@s",S("state")),P("@c",S("city")));
             else
-                await db.ScalarAsync("UPDATE OutletMaster SET OutletName=@n,StoreType=@t,Address=@a,Phone=@p,Gstin=@g,UpdatedAt=SYSDATETIME() WHERE Id=@id",P("@n",S("outletName")),P("@t",webType),P("@a",S("address")),P("@p",S("mobile")),P("@g",S("gstNo")),P("@id",existing["Id"]));
+                await db.ScalarAsync("UPDATE OutletMaster SET OutletName=@n,StoreType=@t,Address=@a,Phone=@p,Gstin=@g,State=@s,City=@c,UpdatedAt=SYSDATETIME() WHERE Id=@id",P("@n",S("outletName")),P("@t",webType),P("@a",S("address")),P("@p",S("mobile")),P("@g",S("gstNo")),P("@s",S("state")),P("@c",S("city")),P("@id",existing["Id"]));
             await SyncLog(db,"WEB_TO_POS",reason,"OK","Profile pulled; StoreType/Validity remain website-owned",sw.ElapsedMilliseconds);
-            return Results.Ok(new{ok=true,outletName=S("outletName"),storeType=webType,validUntilUtc=S("validUntilUtc"),address=S("address"),mobile=S("mobile"),gstNo=S("gstNo")});
+            return Results.Ok(new{ok=true,outletName=S("outletName"),storeType=webType,validUntilUtc=S("validUntilUtc"),address=S("address"),mobile=S("mobile"),gstNo=S("gstNo"),state=S("state"),city=S("city")});
         }
         catch(OperationCanceledException){await SyncLog(db,"WEB_TO_POS",reason,"OFFLINE","2500ms timeout",sw.ElapsedMilliseconds);return Results.Ok(new{ok=false,offline=true,message="Offline/timeout; local billing remains active"});}
         catch(Exception ex){await SyncLog(db,"WEB_TO_POS",reason,"OFFLINE",ex.Message,sw.ElapsedMilliseconds);return Results.Ok(new{ok=false,offline=true,message="Central unavailable; local billing remains active"});}

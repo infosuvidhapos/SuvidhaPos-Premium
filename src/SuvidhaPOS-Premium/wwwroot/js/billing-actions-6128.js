@@ -74,13 +74,18 @@ w.premiumPrintHtml=async function(html,name){
 function addCss(href,id){if(d.getElementById(id))return;var l=d.createElement('link');l.id=id;l.rel='stylesheet';l.href=href;d.head.appendChild(l)}
 function addScript(src,id){return new Promise(function(resolve,reject){if(d.getElementById(id))return resolve();var s=d.createElement('script');s.id=id;s.src=src;s.onload=resolve;s.onerror=function(){reject(new Error('Could not load '+src))};d.body.appendChild(s)})}
 async function loadRuntime(){
- addCss('/css/billing-layout-fix.css?v=6130holdbtc','billingLayoutFix6130');
- addCss('/css/btc-payment-receipt-flow.css?v=6130holdbtc','btcReceiptFlowCss6130');
+ addCss('/css/billing-layout-fix.css?v=6140mastersbtc','billingLayoutFix6130');
+ addCss('/css/btc-payment-receipt-flow.css?v=6140mastersbtc','btcReceiptFlowCss6130');
+ addCss('/css/retail-expansion.css?v=6140mastersbtc','retailExpansionCss6140');
+ addCss('/css/audit-report-thermal.css?v=6140audit','auditReportThermalCss6140');
  try{
-  await addScript('/js/btc-payment-receipt-flow.js?v=6130holdbtc','btcReceiptFlowJs6130');
-  await addScript('/js/btc-payment-receipt-input-fix.js?v=6130holdbtc','btcReceiptInputFixJs6130');
-  await addScript('/js/billing-hold.js?v=6130holdbtc','billingHoldJs6130');
- }catch(e){console.error('Suvidha billing runtime 6.13.0:',e)}
+  await addScript('/js/btc-payment-receipt-flow.js?v=6140mastersbtc','btcReceiptFlowJs6130');
+  await addScript('/js/btc-payment-receipt-input-fix.js?v=6140mastersbtc','btcReceiptInputFixJs6130');
+  await addScript('/js/billing-hold.js?v=6140mastersbtc','billingHoldJs6130');
+  await addScript('/js/india-locations.js?v=6140mastersbtc','indiaLocationsJs6140');
+  await addScript('/js/retail-masters-ui.js?v=6140mastersbtc','retailMastersUiJs6140');
+  await addScript('/js/audit-report-thermal.js?v=6140audit','auditReportThermalJs6140');
+ }catch(e){console.error('Suvidha retail/BTC runtime 6.14.0:',e)}
 }
 if(d.readyState==='complete')loadRuntime();else w.addEventListener('load',loadRuntime,{once:true});
 })(window,document);

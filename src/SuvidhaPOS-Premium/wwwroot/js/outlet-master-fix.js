@@ -1,7 +1,7 @@
 (function(){
   const e=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
   const canonicalType=v=>/^(Gold & Diamond Jewellery|Silver Jewellery)$/i.test(String(v||'').trim())?'Jewellery Shop':(String(v||'').trim()||'Retail Shop');
-  const saveLoginOutlet=(o)=>{try{localStorage.setItem('suvidha_outlet_display',JSON.stringify({OutletName:o?.OutletName||'Main Outlet',StoreType:canonicalType(o?.StoreType||'Retail Shop')}));}catch{}};
+  const saveLoginOutlet=(o)=>{try{localStorage.setItem('suvidha_outlet_display',JSON.stringify({OutletName:o?.OutletName||'Main Outlet',StoreType:canonicalType(o?.StoreType||'Retail Shop'),State:o?.State||o?.state||'',City:o?.City||o?.city||''}));}catch{}};
   const restoreLoginOutlet=()=>{try{const raw=localStorage.getItem('suvidha_outlet_display');if(!raw)return;const x=JSON.parse(raw),el=document.getElementById('loginOutlet');if(el)el.textContent=(x.OutletName||'Main Outlet')+' · '+canonicalType(x.StoreType||'Retail Shop');}catch{}};
   restoreLoginOutlet();
   window.loadSettings=async function(){
@@ -31,6 +31,8 @@
               <label>Validity<input id="ovalidity" class="input" value="${e(validity)}" readonly disabled title="Managed from SuvidhaPremium website"><small>Website managed · POS locked</small></label>
               <label>Phone<input id="ophone" class="input" value="${e(o.Phone||'')}"></label>
               <label>GSTIN<input id="ogst" class="input" value="${e(o.Gstin||'')}"></label>
+              <label>State<input id="ostate" class="input" list="suvidhaIndiaStateList" autocomplete="off" value="${e(o.State||o.state||'')}" placeholder="Search State / UT"></label>
+              <label>City<input id="ocity" class="input" list="suvidhaIndiaCityList" autocomplete="off" value="${e(o.City||o.city||'')}" placeholder="Search / type city"></label>
               <label class="full">Address<textarea id="oaddr" class="textarea">${e(o.Address||'')}</textarea></label>
               <label class="full"><input id="oreqbatch" type="checkbox" ${o.RequireBatch?'checked':''}> Batch mandatory &nbsp;&nbsp; <input id="oreqexp" type="checkbox" ${o.RequireExpiry?'checked':''}> Expiry mandatory</label>
             </div>
@@ -42,10 +44,11 @@
         <div class="panel" style="margin-top:14px"><h3>LOCAL DATABASE</h3><p class="muted">Database: <b>SuvidhaPOS</b> • SQL Server local</p><button class="btn" onclick="backup()">💾 Create Backup Now</button></div>
       </div>`;
       applyOutletTypePreview();
+      if(window.suvidhaBindIndiaLocation) window.suvidhaBindIndiaLocation(document.querySelector('#ostate'),document.querySelector('#ocity'));
       if(window.refreshAiKeyStatus) await window.refreshAiKeyStatus();
     }catch(err){app.innerHTML=`<div class="content"><div class="alert">${e(err.message)}</div></div>`}
   };
   window.applyOutletTypePreview=function(){const v=document.querySelector('#otype')?.value||window.suvidhaOutlet?.StoreType||'Retail Shop',box=document.querySelector('#outletModePreview');if(!box)return;const jewellery=/jewell?ry|gold|silver/i.test(v);if(jewellery){box.innerHTML='<div class="outlet-mode-jewellery"><b>💎 JEWELLERY BILLING MODE</b><span>Tag/barcode, metal purity, gross/less/net/fine weight, making, stones, HUID, live rates, old-metal adjustment and separate jewellery import/barcode masters.</span></div>'}else{box.innerHTML='<div class="outlet-mode-standard"><b>▣ STANDARD / UOM BILLING MODE</b><span>Normal billing flow with base/inner/pack UOM and separate normal import/barcode masters.</span></div>'}};
-  window.saveOutlet=async function(){const o={OutletName:oname.value.trim()||'Main Outlet',StoreType:canonicalType(otype.value||window.suvidhaOutlet?.StoreType||'Retail Shop'),Address:oaddr.value||null,Phone:ophone.value||null,Gstin:ogst.value||null,RequireBatch:oreqbatch.checked,RequireExpiry:oreqexp.checked,DefaultUnit:'PCS'};try{await api('/api/outlet',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});saveLoginOutlet(o);const loginEl=document.getElementById('loginOutlet');if(loginEl)loginEl.textContent=o.OutletName+' · '+o.StoreType;const pill=document.querySelector('#outletPill');if(pill)pill.textContent=o.OutletName;document.body.dataset.storeType=o.StoreType.replace(/[^a-z0-9]+/gi,'-').toLowerCase();if(window.refreshLoginOutlet)window.refreshLoginOutlet(true);window.dispatchEvent(new CustomEvent('suvidha:outlet-saved',{detail:o}));toast('Outlet details saved locally · website sync queued in background')}catch(err){alert(err.message)}};
+  window.saveOutlet=async function(){const o={OutletName:oname.value.trim()||'Main Outlet',StoreType:canonicalType(otype.value||window.suvidhaOutlet?.StoreType||'Retail Shop'),Address:oaddr.value||null,Phone:ophone.value||null,Gstin:ogst.value||null,State:(document.querySelector('#ostate')?.value||'').trim()||null,City:(document.querySelector('#ocity')?.value||'').trim()||null,RequireBatch:oreqbatch.checked,RequireExpiry:oreqexp.checked,DefaultUnit:'PCS'};try{await api('/api/outlet',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});saveLoginOutlet(o);const loginEl=document.getElementById('loginOutlet');if(loginEl)loginEl.textContent=o.OutletName+' · '+o.StoreType;const pill=document.querySelector('#outletPill');if(pill)pill.textContent=o.OutletName;document.body.dataset.storeType=o.StoreType.replace(/[^a-z0-9]+/gi,'-').toLowerCase();if(window.refreshLoginOutlet)window.refreshLoginOutlet(true);window.dispatchEvent(new CustomEvent('suvidha:outlet-saved',{detail:o}));toast('Outlet details saved locally · website sync queued in background')}catch(err){alert(err.message)}};
   // CI compatibility marker only. Blocking reload was intentionally removed for performance: location.replace('/?outlet='
 })();
