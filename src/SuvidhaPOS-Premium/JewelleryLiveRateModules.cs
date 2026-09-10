@@ -66,8 +66,9 @@ SELECT Id,MetalType,Purity,RatePerGram,EffectiveAt FROM r WHERE rn=1 ORDER BY Me
             }
         });
 
-        // Bootstrap the normal-retail BTC (Bill To Company) workflow without changing Program.cs.
+        // Bootstrap normal-retail companion workflows without changing Program.cs.
         BtcSettlementModules.Map(app);
+        CounterBillingHoldModules.Map(app);
     }
 
     static SqlParameter P(string n,object? v)=>new(n,v??DBNull.Value);
