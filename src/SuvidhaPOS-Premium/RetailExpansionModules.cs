@@ -303,14 +303,22 @@ ORDER BY CASE WHEN PaymentMode='Cash' THEN 0 WHEN PaymentMode='Credit Bill' THEN
 
             var taxes=await db.QueryAsync(@"
 SELECT sl.TaxRate,
- CAST(SUM(sl.Quantity*sl.SalePrice-sl.Discount) AS decimal(18,2)) TaxableAmount,
- CAST(SUM((sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100) AS decimal(18,2)) TaxAmount
+ CAST(SUM(CASE WHEN ISNULL(sl.TaxMode,'EXCLUSIVE')='INCLUSIVE' AND sl.TaxRate>0
+      THEN (sl.Quantity*sl.SalePrice-sl.Discount)*100/(100+sl.TaxRate)
+      ELSE (sl.Quantity*sl.SalePrice-sl.Discount) END) AS decimal(18,2)) TaxableAmount,
+ CAST(SUM(CASE WHEN sl.TaxRate<=0 THEN 0
+      WHEN ISNULL(sl.TaxMode,'EXCLUSIVE')='INCLUSIVE'
+      THEN (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/(100+sl.TaxRate)
+      ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100 END) AS decimal(18,2)) TaxAmount
 FROM SaleLines sl
 JOIN Sales s ON s.Id=sl.SaleId
 WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e
  AND (@cashier='' OR ISNULL(s.CashierName,'')=@cashier)
 GROUP BY sl.TaxRate
-HAVING ABS(SUM((sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100))>0.004
+HAVING ABS(SUM(CASE WHEN sl.TaxRate<=0 THEN 0
+      WHEN ISNULL(sl.TaxMode,'EXCLUSIVE')='INCLUSIVE'
+      THEN (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/(100+sl.TaxRate)
+      ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100 END))>0.004
 ORDER BY sl.TaxRate",
                 P("@f",f),P("@e",end),P("@cashier",cashierName));
 
