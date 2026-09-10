@@ -84,7 +84,11 @@ WHERE Id=@id AND IsActive=1", c, tx);
         app.MapDelete("/api/retail/categories/{id:int}", async (Db db, int id) =>
         {
             if (id <= 0) return Results.BadRequest(new { message = "Invalid category" });
-            var used = Convert.ToInt32(await db.ScalarAsync("SELECT COUNT(*) FROM Products WHERE IsActive=1 AND CategoryId=@id", P("@id", id)) ?? 0);
+            var cat = await db.QuerySingleAsync("SELECT TOP 1 Name FROM Categories WHERE Id=@id AND IsActive=1", P("@id", id));
+            if (cat.Count == 0) return Results.NotFound(new { message = "Category not found" });
+            var name = cat.GetValueOrDefault("Name")?.ToString() ?? "";
+            var used = Convert.ToInt32(await db.ScalarAsync(@"SELECT COUNT(*) FROM Products
+WHERE IsActive=1 AND (CategoryId=@id OR UPPER(LTRIM(RTRIM(ISNULL(Category,''))))=UPPER(@n))", P("@id", id), P("@n", name)) ?? 0);
             if (used > 0) return Results.BadRequest(new { message = $"Category is used by {used} active item(s). Reassign items first." });
             await db.ScalarAsync("UPDATE Categories SET IsActive=0 WHERE Id=@id", P("@id", id));
             return Results.Ok(new { deleted = true });
