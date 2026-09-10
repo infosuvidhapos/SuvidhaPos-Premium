@@ -70,7 +70,7 @@ w.retailSaveCategory=async function(id,targetId,oldName){
  const el=d.querySelector('#retailCategoryName'),name=(el?.value||'').trim();if(!name)return notice('Enter category name');
  try{
   if(id)await api('/api/retail/categories/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Name:name,OldName:oldName})});
-  else await api('/api/categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Name:name})});
+  else await api('/api/retail/categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Name:name,OldName:null})});
   closeModal();await loadCategories();const target=d.getElementById(targetId);if(target){target.value=name;target.focus()}else w.loadCategoryMaster();notice('Category saved');
  }catch(e){alert(e.message||e)}
 };
