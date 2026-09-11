@@ -229,6 +229,17 @@ ON t.PointerCode=s.PointerCode
 WHEN NOT MATCHED THEN INSERT(PointerCode,FeatureName,IsEnabled) VALUES(s.PointerCode,s.FeatureName,1);
 GO
 
+IF OBJECT_ID('dbo.AppFeatureAccess') IS NULL
+CREATE TABLE dbo.AppFeatureAccess(
+ FeatureKey nvarchar(60) NOT NULL PRIMARY KEY,
+ DisplayName nvarchar(160) NOT NULL,
+ Scope nvarchar(30) NOT NULL DEFAULT 'Shared',
+ IsEnabled bit NOT NULL DEFAULT 1,
+ SortOrder int NOT NULL DEFAULT 0,
+ UpdatedAt datetime2 NOT NULL DEFAULT SYSDATETIME()
+);
+GO
+
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_JewelleryItems_Huid_Completion' AND object_id=OBJECT_ID('dbo.JewelleryItems'))
 CREATE INDEX IX_JewelleryItems_Huid_Completion ON dbo.JewelleryItems(Huid) WHERE Huid IS NOT NULL AND Huid<>'';
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name='IX_JewelleryItems_DesignCode_Completion' AND object_id=OBJECT_ID('dbo.JewelleryItems'))
