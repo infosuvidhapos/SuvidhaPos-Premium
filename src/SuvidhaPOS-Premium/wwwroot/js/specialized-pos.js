@@ -206,10 +206,12 @@
     const box=document.querySelector('#modal .modalbox');if(!box)return null;
     box.classList.add('purchase-modalbox');box.style.width='min(1180px,96vw)';box.style.maxWidth='1180px';box.style.maxHeight='94vh';box.style.overflow='auto';return box
   }
-  function purchaseKeyboard(root,saveFn,focusId){
+  function purchaseKeyboard(root,saveFn,focusId,invoiceId,supplierId){
     const box=purchaseModalBox();if(!box)return;
     box.addEventListener('keydown',e=>{
       if(e.key==='F10'){e.preventDefault();saveFn();return}
+      if(e.key==='F2'&&invoiceId){e.preventDefault();document.querySelector(invoiceId)?.focus();return}
+      if(e.key==='F3'&&supplierId){e.preventDefault();document.querySelector(supplierId)?.focus();return}
       if(e.key==='F4'&&focusId){e.preventDefault();document.querySelector(focusId)?.focus();return}
       if(e.key==='Escape'){e.preventDefault();closeModal();return}
       if(e.key!=='Enter'||e.shiftKey||e.ctrlKey||e.altKey)return;
@@ -230,8 +232,8 @@
   }
   window.openUomPurchase=async function(){
     S.purLines=[];
-    modal('New Purchase — Multi Unit',`<div class="purchase-entry purchase-standard"><div class="purchase-key-hint"><span>F2 Invoice</span><span>F4 Item</span><span>Enter Next</span><span>F10 Save</span><span>Esc Close</span></div>${purchaseTopHtml('up')}<div class="purchase-add-row"><label>Item<select id="uprod" data-pur-key="1" class="select"><option value="">Select item / barcode</option>${S.items.map(x=>`<option value="${x.Id}">${esc2(x.Name)} • ${esc2(x.Barcode||'')}</option>`).join('')}</select></label><button class="btn" data-pur-key="1" onclick="addUomPurchaseLine()">＋ Add</button></div><div id="upLines" class="purchase-lines"></div>${purchaseBottomHtml('u')}</div>`,`<button class="btn" onclick="saveUomPurchase()">✓ Save Purchase (F10)</button>`);
-    purchaseKeyboard('#modal',w.saveUomPurchase,'#uprod');setTimeout(()=>document.querySelector('#upi')?.focus(),30)
+    modal('New Purchase — Multi Unit',`<div class="purchase-entry purchase-standard"><div class="purchase-key-hint"><span>F2 Invoice</span><span>F3 Supplier</span><span>F4 Item</span><span>Enter Next</span><span>F10 Save</span><span>Esc Close</span></div>${purchaseTopHtml('u')}<div class="purchase-add-row"><label>Item<select id="uprod" data-pur-key="1" class="select"><option value="">Select item / barcode</option>${S.items.map(x=>`<option value="${x.Id}">${esc2(x.Name)} • ${esc2(x.Barcode||'')}</option>`).join('')}</select></label><button class="btn" data-pur-key="1" onclick="addUomPurchaseLine()">＋ Add</button></div><div id="upLines" class="purchase-lines"></div>${purchaseBottomHtml('u')}</div>`,`<button class="btn" onclick="saveUomPurchase()">✓ Save Purchase (F10)</button>`);
+    purchaseKeyboard('#modal',w.saveUomPurchase,'#uprod','#ui','#usup');setTimeout(()=>document.querySelector('#upi')?.focus(),30)
   };
   window.addUomPurchaseLine=async function(){
     const id=Number(document.querySelector('#uprod')?.value);if(!id)return toast('Select item');
@@ -260,8 +262,8 @@
 
   window.openBarcodePurchase=async function(){
     S.barPurLines=[];
-    modal('Barcode Purchase — Keyboard Ready',`<div class="purchase-entry barcode-purchase"><div class="purchase-key-hint"><span>F2 Invoice</span><span>F4 Scan Barcode</span><span>Enter Add / Next</span><span>F10 Save</span><span>Esc Close</span></div>${purchaseTopHtml('bp')}<div class="barcode-scan-card"><label>SCAN / TYPE BARCODE<input id="bpScan" data-pur-key="1" class="input barcode-scan-input" autocomplete="off" placeholder="Scan barcode and press Enter"></label><button class="btn green" onclick="barcodePurchaseScan()">＋ Add Barcode</button></div><div id="bpLines" class="purchase-lines"></div>${purchaseBottomHtml('bp')}</div>`,`<button class="btn green" onclick="saveBarcodePurchase()">✓ Save Barcode Purchase (F10)</button>`);
-    purchaseKeyboard('#modal',w.saveBarcodePurchase,'#bpScan');setTimeout(()=>document.querySelector('#bpScan')?.focus(),30)
+    modal('Barcode Purchase — Keyboard Ready',`<div class="purchase-entry barcode-purchase"><div class="purchase-key-hint"><span>F2 Invoice</span><span>F3 Supplier</span><span>F4 Scan Barcode</span><span>Enter Add / Next</span><span>F10 Save</span><span>Esc Close</span></div>${purchaseTopHtml('bp')}<div class="barcode-scan-card"><label>SCAN / TYPE BARCODE<input id="bpScan" data-pur-key="1" class="input barcode-scan-input" autocomplete="off" placeholder="Scan barcode and press Enter"></label><button class="btn green" onclick="barcodePurchaseScan()">＋ Add Barcode</button></div><div id="bpLines" class="purchase-lines"></div>${purchaseBottomHtml('bp')}</div>`,`<button class="btn green" onclick="saveBarcodePurchase()">✓ Save Barcode Purchase (F10)</button>`);
+    purchaseKeyboard('#modal',w.saveBarcodePurchase,'#bpScan','#bpi','#bpsup');setTimeout(()=>document.querySelector('#bpScan')?.focus(),30)
   };
   window.barcodePurchaseScan=async function(){
     const input=document.querySelector('#bpScan'),q=String(input?.value||'').trim();if(!q)return;
