@@ -15,5 +15,7 @@ All changes in this branch are scoped so they can be reversed independently.
 - N-11 Inline Category create in Item Entry must stay on Item Entry and auto-select the new category.
 - N-12 AI Import, Item Import and Opening Stock remain inside Item Master only; no top-level duplicate navigation.
 - N-13 GitHub Actions: no cancellation/supersede concurrency group; validation updated to current navigation model.
+- N-14 Barcode Purchase design: use supplied screenshot only as layout reference; dense scanner grid, supplier/invoice header, editable rates/batch/expiry, totals and keyboard shortcuts.
+- N-15 Current Stock Report design: use supplied screenshot only as layout reference; As-On/category/status/search filters, item-wise qty/rates/valuation/location grid, summary totals and print/export.
 
 Final gate: restore + build + JS syntax + targeted validations + installer validation before merge.
