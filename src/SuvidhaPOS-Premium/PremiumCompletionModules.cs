@@ -26,6 +26,21 @@ public static class PremiumCompletionModules
             return Convert.ToInt32(n)==0?Results.NotFound(new{message="Feature flag not found"}):Results.Ok(new{code,isEnabled=x.IsEnabled});
         });
 
+        // Real application Feature Control: actual masters/modules, not developer pointer labels.
+        app.MapGet("/api/feature-access", async (Db db) =>
+        {
+            await EnsureFeatureAccess(db);
+            return Results.Ok(await db.QueryAsync("SELECT FeatureKey,DisplayName,Scope,IsEnabled,SortOrder,UpdatedAt FROM AppFeatureAccess ORDER BY Scope,SortOrder,DisplayName"));
+        });
+
+        app.MapPut("/api/feature-access/{key}", async (Db db,HttpContext ctx,string key,FeatureFlagRequest x) =>
+        {
+            if(!IsAdmin(ctx)) return Results.Json(new{message="Admin permission required"},statusCode:403);
+            await EnsureFeatureAccess(db); key=(key??"").Trim().ToUpperInvariant();
+            var n=await db.ScalarAsync("UPDATE AppFeatureAccess SET IsEnabled=@e,UpdatedAt=SYSDATETIME() WHERE FeatureKey=@k;SELECT @@ROWCOUNT",P("@e",x.IsEnabled),P("@k",key));
+            return Convert.ToInt32(n)==0?Results.NotFound(new{message="Feature not found"}):Results.Ok(new{featureKey=key,isEnabled=x.IsEnabled});
+        });
+
         // P-01/P-08: full Jewellery Item Master.
         app.MapGet("/api/jewellery/item-master", async (Db db, string? q) =>
         {
@@ -413,11 +428,29 @@ public static class PremiumCompletionModules
         catch(Exception ex){await SyncLog(db,"WEB_TO_POS",reason,"OFFLINE",ex.Message,sw.ElapsedMilliseconds);return Results.Ok(new{ok=false,offline=true,message="Central unavailable; local billing remains active"});}
     }
 
+    static readonly (string Key,string Name,string Scope,int Sort)[] AppFeatures = new[]{
+        ("BILLING","New Billing","Normal",10),("ITEM_MASTER","Item Master","Normal",20),("AI_IMPORT","AI Import","Normal",30),("ITEM_IMPORT","Item Import Master","Normal",40),
+        ("PURCHASES","Purchases","Shared",50),("SALES_HISTORY","Sales History","Normal",60),("BILL_MANAGEMENT","Bill Management / Reprint","Normal",70),("BTC_SETTLEMENT","BTC / Credit Settlement","Normal",80),
+        ("CUSTOMER_COMPANY","Customer / Company","Shared",90),("SUPPLIERS","Suppliers","Shared",100),("EXPIRY","Expiry","Normal",110),("RETURNS","Returns","Normal",120),("EXPENSES","Expenses","Normal",130),
+        ("TAX_MASTER","Tax Master","Normal",140),("UNIT_MASTER","Unit Master","Normal",150),("REPORTS","Reports","Shared",160),("BARCODE_PRINT","Barcode Print Master","Shared",170),("PRINT_MASTER","Print Master","Shared",180),("DATABASE_BACKUP","Database Backup","Shared",190),
+        ("JEWELLERY_BILLING","Jewellery Billing","Jewellery",210),("JEWELLERY_STOCK","Jewellery Stock","Jewellery",220),("JEWELLERY_PURCHASE","Jewellery Purchase","Jewellery",230),
+        ("JEWELLERY_ITEM_MASTER","Jewellery Item Master","Jewellery",240),("JEWELLERY_ITEM_ENTRY","Jewellery Item Entry","Jewellery",250),("JEWELLERY_ITEM_IMPORT","Jewellery Item Import Master","Jewellery",260),
+        ("JEWELLERY_BARCODE","Jewellery Barcode Print","Jewellery",270),("JEWELLERY_REPORTS","Jewellery Reports","Jewellery",280),("JEWELLERY_RATES","Gold / Silver Rates","Jewellery",290),("JEWELLERY_CUSTOMERS","Jewellery Customers","Jewellery",300),("JEWELLERY_DAY_CLOSE","Jewellery Day Closing","Jewellery",310)
+    };
+    static async Task EnsureFeatureAccess(Db db)
+    {
+        foreach(var f in AppFeatures)
+            await db.ScalarAsync(@"IF NOT EXISTS(SELECT 1 FROM AppFeatureAccess WHERE FeatureKey=@k)
+INSERT AppFeatureAccess(FeatureKey,DisplayName,Scope,IsEnabled,SortOrder) VALUES(@k,@n,@s,1,@o);
+ELSE UPDATE AppFeatureAccess SET DisplayName=@n,Scope=@s,SortOrder=@o WHERE FeatureKey=@k",
+                P("@k",f.Key),P("@n",f.Name),P("@s",f.Scope),P("@o",f.Sort));
+    }
+
     static async Task<bool> Enabled(Db db,string code){var x=await db.ScalarAsync("SELECT TOP 1 IsEnabled FROM PremiumFeatureFlags WHERE PointerCode=@c",P("@c",code));return x is null||x is DBNull||Convert.ToBoolean(x);}
     static string? Blank(string? x)=>string.IsNullOrWhiteSpace(x)?null:x.Trim();
     static string UserName(HttpContext c)=>Prop(c.Items["User"],"UserName")??"System";
     static string UserRole(HttpContext c)=>Prop(c.Items["User"],"Role")??"Cashier";
-    static bool IsAdmin(HttpContext c)=>UserRole(c).Equals("Admin",StringComparison.OrdinalIgnoreCase);
+    static bool IsAdmin(HttpContext c){var r=UserRole(c);return r.Equals("Admin",StringComparison.OrdinalIgnoreCase)||r.Equals("Administrator",StringComparison.OrdinalIgnoreCase)||r.Equals("Super Admin",StringComparison.OrdinalIgnoreCase);}
     static bool IsManager(HttpContext c)=>IsAdmin(c)||UserRole(c).Equals("Manager",StringComparison.OrdinalIgnoreCase)||UserRole(c).Equals("Administrator",StringComparison.OrdinalIgnoreCase);
     static string? Prop(object? o,string n)=>o?.GetType().GetProperty(n)?.GetValue(o)?.ToString();
     static (string Name,decimal Percent) NormalizePurity(string? p,decimal pct){var s=(p??"").Trim().ToUpperInvariant().Replace(" ","");if(s is "916" or "22CT" or "22K")return("22K",pct>0?pct:91.6m);if(s is "750" or "18CT" or "18K")return("18K",pct>0?pct:75m);if(s is "585" or "14CT" or "14K")return("14K",pct>0?pct:58.5m);if(s is "999" or "24CT" or "24K")return("24K",pct>0?pct:99.9m);if(s=="925")return("925",pct>0?pct:92.5m);return(string.IsNullOrWhiteSpace(s)?"22K":s,pct>0?pct:91.6m);}
