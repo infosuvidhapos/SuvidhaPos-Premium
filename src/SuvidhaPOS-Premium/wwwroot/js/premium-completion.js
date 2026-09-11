@@ -36,7 +36,6 @@ function ensureNav(){
    if(master){
      var wrap=d.createElement('div');wrap.setAttribute('data-premium-completion','1');
      wrap.innerHTML=(enabled('P-01')?'<button class="nav js-nav" onclick="loadJewelleryItemMaster()">◆<span>Item Master</span></button>':'')+
-       (enabled('P-05')?'<button class="nav js-nav" onclick="loadJewelleryItemImportMaster()">⇩<span>Item Import Master</span></button>':'')+
        (enabled('P-03')?'<button class="nav js-nav" onclick="loadBarcodePrintMaster()">▥<span>Barcode Print Master</span></button>':'')+
        (enabled('P-20')?'<button class="nav js-nav" onclick="loadPremiumFeatureControl()">⚑<span>Feature Control</span></button>':'');
      master.insertAdjacentElement('afterend',wrap);
