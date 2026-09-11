@@ -218,25 +218,45 @@ DELETE FROM SalePayments WHERE SaleId=@id;",c,tx);
             using var c=db.CreateConnection();await c.OpenAsync();using var tx=c.BeginTransaction();
             try
             {
-                var cmd=new SqlCommand("SELECT Status,GrandTotal,InvoiceNo,PaymentMode FROM Sales WITH(UPDLOCK,ROWLOCK) WHERE Id=@id",c,tx);
+                var cmd=new SqlCommand("SELECT Status,GrandTotal,InvoiceNo,PaymentMode,BtcCompanyId FROM Sales WITH(UPDLOCK,ROWLOCK) WHERE Id=@id",c,tx);
                 cmd.Parameters.Add(P("@id",id));
-                string status,invoice,oldMode;decimal total;
+                string status,invoice,oldMode;decimal total;int? oldBtc=null;
                 using(var rd=await cmd.ExecuteReaderAsync())
                 {
                     if(!await rd.ReadAsync()) return Results.NotFound(new{message="Bill not found"});
-                    status=rd.GetString(0);total=rd.GetDecimal(1);invoice=rd.GetString(2);oldMode=rd.GetString(3);
+                    status=rd.GetString(0);total=rd.GetDecimal(1);invoice=rd.GetString(2);oldMode=rd.GetString(3);oldBtc=rd.IsDBNull(4)?null:rd.GetInt32(4);
                 }
                 if(!status.Equals("Completed",StringComparison.OrdinalIgnoreCase)) return Results.BadRequest(new{message="Payment mode can be changed only on completed bills"});
 
-                var parts=new List<BillPaymentPart>();
-                decimal paid=0;
+                decimal settled=0;
+                if(oldMode.Equals("BTC",StringComparison.OrdinalIgnoreCase))
+                {
+                    cmd=new SqlCommand("SELECT ISNULL(SUM(Amount),0) FROM BtcSettlementAllocations WHERE SaleId=@id",c,tx);cmd.Parameters.Add(P("@id",id));
+                    settled=Convert.ToDecimal(await cmd.ExecuteScalarAsync()??0m);
+                    if(settled>0.005m && (!mode.Equals("BTC",StringComparison.OrdinalIgnoreCase)||oldBtc!=x.BtcCompanyId))
+                        return Results.BadRequest(new{message="This BTC invoice already has settlement allocation. Reverse/settle correctly before changing its company or payment mode."});
+                }
+
+                var parts=new List<BillPaymentPart>();decimal paid=0;int? btcCompanyId=null;string? btcCompanyName=null;DateTime? btcDue=null;
                 if(mode.Equals("Cash",StringComparison.OrdinalIgnoreCase))
                 {
                     parts.Add(new("Cash","Cash",total,x.ReferenceNo));paid=total;
                 }
                 else if(mode.Equals("BTC",StringComparison.OrdinalIgnoreCase))
                 {
-                    parts.Add(new("BTC","BTC",total,x.ReferenceNo));paid=total;
+                    if(!x.BtcCompanyId.HasValue||x.BtcCompanyId.Value<=0) return Results.BadRequest(new{message="Select BTC customer/company first"});
+                    btcCompanyId=x.BtcCompanyId.Value;
+                    cmd=new SqlCommand("SELECT TOP 1 CompanyName,CreditDays,CreditLimit FROM BtcCompanies WHERE Id=@id AND IsActive=1",c,tx);cmd.Parameters.Add(P("@id",btcCompanyId));
+                    int days=0;decimal limit=0;
+                    using(var rd=await cmd.ExecuteReaderAsync())
+                    {
+                        if(!await rd.ReadAsync()) return Results.BadRequest(new{message="BTC customer/company not found or inactive"});
+                        btcCompanyName=rd.GetString(0);days=rd.GetInt32(1);limit=rd.GetDecimal(2);
+                    }
+                    cmd=new SqlCommand("SELECT ISNULL(SUM(PendingAmount),0) FROM Sales WHERE BtcCompanyId=@c AND PaymentMode='BTC' AND Status='Completed' AND Id<>@id",c,tx);
+                    cmd.Parameters.AddRange(new[]{P("@c",btcCompanyId),P("@id",id)});var other=Convert.ToDecimal(await cmd.ExecuteScalarAsync()??0m);
+                    if(limit>0 && other+total>limit+0.005m) return Results.BadRequest(new{message=$"Credit limit exceeded. Available ₹{Math.Max(0,limit-other):0.00}, bill ₹{total:0.00}"});
+                    btcDue=DateTime.Today.AddDays(Math.Max(0,days));paid=0;
                 }
                 else if(mode.Equals("Credit/UPI",StringComparison.OrdinalIgnoreCase))
                 {
@@ -245,23 +265,45 @@ DELETE FROM SalePayments WHERE SaleId=@id;",c,tx);
                 }
                 else
                 {
-                    parts=(x.Payments??new List<BillPaymentPart>()).Where(p=>p.Amount>0).ToList();
+                    parts=(x.Payments??new List<BillPaymentPart>()).Where(p=>p.Amount>0&&!string.Equals(p.Type,"BTC",StringComparison.OrdinalIgnoreCase)).ToList();
                     if(parts.Count==0) return Results.BadRequest(new{message="Add at least one Multi Mode payment part"});
                     var sum=parts.Sum(p=>p.Amount);
                     if(Math.Abs(sum-total)>0.01m) return Results.BadRequest(new{message=$"Multi Mode total must equal bill total ₹{total:0.00}. Entered ₹{sum:0.00}."});
                     paid=parts.Where(p=>!string.Equals(p.Type,"Credit",StringComparison.OrdinalIgnoreCase)).Sum(p=>p.Amount);
                 }
 
-                cmd=new SqlCommand("DELETE FROM SalePayments WHERE SaleId=@id;UPDATE Sales SET PaymentMode=@m,PaidAmount=@p,ModifiedAt=SYSDATETIME(),ModifiedBy=@u,ModificationCount=ISNULL(ModificationCount,0)+1,LastModificationType='PAYMENT' WHERE Id=@id",c,tx);
-                cmd.Parameters.AddRange(new[]{P("@id",id),P("@m",mode),P("@p",Math.Min(total,Math.Max(0,paid))),P("@u",user)});await cmd.ExecuteNonQueryAsync();
+                if(oldMode.Equals("BTC",StringComparison.OrdinalIgnoreCase)&&settled<=0.005m)
+                {
+                    cmd=new SqlCommand("DELETE FROM BtcCompanyLedger WHERE ReferenceType='SALE' AND ReferenceId=@id AND EntryType='INVOICE'",c,tx);cmd.Parameters.Add(P("@id",id));await cmd.ExecuteNonQueryAsync();
+                }
+
+                cmd=new SqlCommand(@"DELETE FROM SalePayments WHERE SaleId=@id;
+UPDATE Sales SET PaymentMode=@m,PaidAmount=@p,
+ BtcCompanyId=@bc,BtcReferenceNo=CASE WHEN @bc IS NULL THEN NULL ELSE @r END,
+ BtcDueDate=@due,PendingAmount=CASE WHEN @bc IS NULL THEN 0 ELSE @pending END,
+ PaymentStatus=CASE WHEN @bc IS NOT NULL THEN 'Pending' WHEN @p>=GrandTotal THEN 'Paid' ELSE 'Pending' END,
+ CustomerName=CASE WHEN @bc IS NULL THEN CustomerName ELSE @cn END,
+ ModifiedAt=SYSDATETIME(),ModifiedBy=@u,ModificationCount=ISNULL(ModificationCount,0)+1,LastModificationType='PAYMENT'
+WHERE Id=@id",c,tx);
+                cmd.Parameters.AddRange(new[]{P("@id",id),P("@m",mode),P("@p",Math.Min(total,Math.Max(0,paid))),P("@u",user),
+                    P("@bc",btcCompanyId),P("@r",x.ReferenceNo),P("@due",btcDue),P("@pending",btcCompanyId.HasValue?total:0m),P("@cn",btcCompanyName)});
+                await cmd.ExecuteNonQueryAsync();
+
                 foreach(var p in parts)
                 {
                     cmd=new SqlCommand("INSERT SalePayments(SaleId,PaymentMode,PaymentType,Amount,ReferenceNo) VALUES(@s,@m,@t,@a,@r)",c,tx);
                     cmd.Parameters.AddRange(new[]{P("@s",id),P("@m",mode),P("@t",p.Type),P("@a",p.Amount),P("@r",p.ReferenceNo)});await cmd.ExecuteNonQueryAsync();
                 }
+                if(btcCompanyId.HasValue)
+                {
+                    cmd=new SqlCommand(@"INSERT BtcCompanyLedger(CompanyId,EntryType,ReferenceType,ReferenceId,ReferenceNo,Debit,Credit,Notes)
+VALUES(@c,'INVOICE','SALE',@id,@inv,@a,0,@n)",c,tx);
+                    cmd.Parameters.AddRange(new[]{P("@c",btcCompanyId),P("@id",id),P("@inv",invoice),P("@a",total),P("@n","BTC invoice assigned from Bill Management")});await cmd.ExecuteNonQueryAsync();
+                }
+
                 cmd=new SqlCommand("INSERT AuditLogs(UserName,Action,Entity,EntityId,Details) VALUES(@u,'BILL_PAYMENT_CHANGED','Sale',@id,@d)",c,tx);
-                cmd.Parameters.AddRange(new[]{P("@u",user),P("@id",id),P("@d",$"{invoice}: {oldMode} -> {mode}; paid={paid:0.00}; reason={x.Reason}")});await cmd.ExecuteNonQueryAsync();
-                await tx.CommitAsync();return Results.Ok(new{id,paymentMode=mode,paidAmount=paid});
+                cmd.Parameters.AddRange(new[]{P("@u",user),P("@id",id),P("@d",$"{invoice}: {oldMode} -> {mode}; BTC company={btcCompanyName}; paid={paid:0.00}; reason={x.Reason}")});await cmd.ExecuteNonQueryAsync();
+                await tx.CommitAsync();return Results.Ok(new{id,paymentMode=mode,paidAmount=paid,btcCompanyId,btcCompanyName,pending=btcCompanyId.HasValue?total:0m});
             }
             catch(Exception ex){await tx.RollbackAsync();return Results.BadRequest(new{message=ex.Message});}
         });
@@ -301,6 +343,6 @@ DELETE FROM SalePayments WHERE SaleId=@id;",c,tx);
     public record BillEditLine(int ProductId,string? UnitSold,decimal SoldQty,decimal RatePerSoldUnit,decimal TaxRate);
     public record BillResolvedLine(int ProductId,string UnitSold,decimal SoldQty,decimal Factor,decimal BaseQty,decimal SoldRate,decimal BaseRate,decimal TaxRate);
     public record BillPaymentPart(string Mode,string? Type,decimal Amount,string? ReferenceNo);
-    public record BillPaymentChangeRequest(string PaymentMode,string? PaymentType,string? ReferenceNo,string? Reason,List<BillPaymentPart>? Payments=null);
+    public record BillPaymentChangeRequest(string PaymentMode,string? PaymentType,string? ReferenceNo,string? Reason,List<BillPaymentPart>? Payments=null,int? BtcCompanyId=null);
     public record BillPaymentSync(List<BillPaymentPart> Parts,decimal Paid);
 }
