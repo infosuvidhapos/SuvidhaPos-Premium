@@ -274,7 +274,7 @@
   }
   async function bpRestoreState(saved){
     if(!saved)return;S.barPurLines=[];
-    for(const z of (saved.Lines||[])){const p=S.items.find(x=>Number(x.Id)===Number(z.ProductId));if(!p)continue;const u=await loadUom(p.Id),opts=uomChoices(p,u),o=opts.find(x=>x.unit===z.Unit)||opts.find(x=>Number(x.factor)===Number(z.Factor))||opts[0];S.barPurLines.push({ProductId:p.Id,Name:p.Name,Barcode:p.Barcode||'',Uom:u,Options:opts,Unit:o.unit,Factor:o.factor,Qty:Number(z.Qty||1),FreeQuantity:Number(z.FreeQuantity||0),Cost:Number(z.Cost??o.purchase),SalePrice:Number(z.SalePrice??o.sale),Mrp:Number(z.Mrp??o.mrp),GstRate:Number(z.GstRate??p.GstRate||0),BatchNo:z.BatchNo||'',ExpiryDate:z.ExpiryDate||''})}
+    for(const z of (saved.Lines||[])){const p=S.items.find(x=>Number(x.Id)===Number(z.ProductId));if(!p)continue;const u=await loadUom(p.Id),opts=uomChoices(p,u),o=opts.find(x=>x.unit===z.Unit)||opts.find(x=>Number(x.factor)===Number(z.Factor))||opts[0];S.barPurLines.push({ProductId:p.Id,Name:p.Name,Barcode:p.Barcode||'',Uom:u,Options:opts,Unit:o.unit,Factor:o.factor,Qty:Number(z.Qty||1),FreeQuantity:Number(z.FreeQuantity||0),Cost:Number(z.Cost??o.purchase),SalePrice:Number(z.SalePrice??o.sale),Mrp:Number(z.Mrp??o.mrp),GstRate:Number((z.GstRate??p.GstRate)||0),BatchNo:z.BatchNo||'',ExpiryDate:z.ExpiryDate||''})}
     const set=(id,v)=>{const el=document.querySelector(id);if(el)el.value=v??''};set('#bpi',saved.InvoiceNo);set('#bpsup',saved.SupplierId||'');set('#bpdisc',saved.Discount||0);set('#bppaid',saved.PaidAmount||0);set('#bpm',saved.PaymentMode||'Credit');renderBarcodePurchaseLines()
   }
   function bpSearchList(){
