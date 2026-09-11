@@ -28,6 +28,7 @@ w.loadProducts=async function(){
   <div class="retail-master-grid">
    ${masterTile('＋','Item Entry','Create / edit item with unit, tax and rates','retailOpenItemEntry()','green')}
    ${masterTile('◈','Category Entry','Create, edit and manage item categories','loadCategoryMaster()','purple')}
+   ${masterTile('✦','AI Import','AI assisted item / purchase extraction','loadAIImport()','cyan')}
    ${masterTile('⇩','Item Import','Normal Item Import Master','loadNormalItemImportMaster()','blue')}
    ${masterTile('✎','Bulk Edit Update','Select multiple items and update together','loadRetailBulkEdit()','orange')}
    ${masterTile('₹','Item Rate Update','Update MRP / Purchase / Sale through Excel or PDF','loadItemRateUpdate()','cyan')}
