@@ -3,20 +3,26 @@
 const PREFIX='Sidebar.Feature.';
 const catalog=[
  ['BILLING','New Billing / Jewellery Billing',['[data-page="billing"]'],['New Billing','Jewellery Billing']],
- ['ITEM_MASTER','Item Master',[],['Item Master','Item Entry']],
+ ['ITEM_MASTER','Item Master',['[data-page="products"]'],['Item Master','Item Entry','Items & Inventory']],
  ['STOCK','Stock / Inventory',[],['Stock']],
  ['PURCHASE','Purchases',['[data-page="purchase"]'],['Purchases','Purchase Bill']],
  ['SALES','Sales History',['[data-page="sales"]'],['Sales History']],
  ['BILL_MANAGEMENT','Bill Management',['[data-page="billmaster"]'],['Bill Management','Bill Management Master']],
- ['BTC_SETTLEMENT','BTC / Credit Settlement',[],['BTC Settlement','BTC / Credit Settlement']],
- ['CUSTOMERS','Customer / Company',['[data-page="customers"]'],['Customer / Company']],
+ ['BTC_SETTLEMENT','BTC / Credit Settlement',['#btcSettlementNav'],['BTC Settlement','BTC / Credit Settlement']],
+ ['CUSTOMERS','Customer / Company',['[data-page="customers"]'],['Customers','Customer / Company']],
  ['SUPPLIERS','Suppliers',['[data-page="suppliers"]'],['Suppliers']],
- ['USERS','Users',[],['Users']],
+ ['EXPIRY','Expiry Center',['[data-page="expiry"]'],['Expiry Center']],
+ ['RETURNS','Returns',['[data-page="returns"]'],['Returns']],
+ ['EXPENSES','Expenses',['[data-page="expenses"]'],['Expenses']],
+ ['TAX_MASTER','Tax Master',['[data-page="taxmaster"]'],['Tax Master']],
+ ['UNIT_MASTER','Unit Master',['[data-page="unitmaster"]'],['Unit Master']],
  ['REPORTS','Reports',['[data-page="reports"]'],['Reports']],
+ ['SETTINGS','Settings',[],['Settings']],
+ ['DAY_CLOSE','Day Close / Shift End',[],['Day Close','Day Closing']],
+ ['USERS','Users',[],['Users']],
  ['BARCODE','Barcode Print Master',['[data-page="barcodemaster"]','#barcodeMasterNav'],['Barcode Print Master']],
  ['PRINT_MASTER','Print Master',[],['Print Master']],
  ['DATABASE_BACKUP','Database Backup',[],['Database Backup']],
- ['DAY_CLOSE','Day Close / Shift End',[],['Day Close','Day Closing']],
  ['GIRVI','Girvi Loans',[],['Girvi Loans']],
  ['CRDR','Cr/Dr Ledger',[],['Cr/Dr Ledger']],
  ['SAVING','Saving Schemes',[],['Saving Schemes']],
@@ -62,12 +68,23 @@ function gates(){
  gate('BTC_SETTLEMENT',['loadBtcSettlement']);
  gate('CUSTOMERS',['loadCustomers']);
  gate('SUPPLIERS',['loadSuppliers']);
+ gate('EXPIRY',['loadExpiry']);
+ gate('RETURNS',['loadReturns']);
+ gate('EXPENSES',['loadExpenses']);
+ gate('TAX_MASTER',['loadTaxMaster','loadTaxmaster']);
+ gate('UNIT_MASTER',['loadUnitMaster','loadUnitmaster']);
  gate('REPORTS',['loadReports']);
+ gate('SETTINGS',['loadSettings']);
+ gate('USERS',['loadUsers']);
  gate('BARCODE',['loadBarcodePrintMaster']);
  gate('PRINT_MASTER',['loadPrintSettings']);
  gate('DATABASE_BACKUP',['loadBackupMaster']);
  gate('DAY_CLOSE',['loadDayClosing']);
  gate('JEWELLERY_ITEM_MASTER',['loadJewelleryItemMaster']);
+ const product=w.loadProducts;
+ if(typeof product==='function'&&!product.__sidebarProductGate){
+   const wrapped=function(){const key=d.body.classList.contains('jewel-suite-mode')?'STOCK':'ITEM_MASTER';if(state[key]===false){try{toast((catalog.find(x=>x[0]===key)?.[1]||key)+' is disabled in Feature Control')}catch{};return}return product.apply(this,arguments)};wrapped.__sidebarProductGate=true;w.loadProducts=wrapped;
+ }
 }
 function pulse(){apply();gates()}
 new MutationObserver(()=>pulse()).observe(d.getElementById('sidebar')||d.documentElement,{childList:true,subtree:true});
