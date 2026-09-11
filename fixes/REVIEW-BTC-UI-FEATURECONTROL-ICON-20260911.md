@@ -20,3 +20,4 @@ Requested after Build #167. Each pointer is intentionally separated so it can be
 - F-16 GitHub Actions must not use a cancellation/supersede concurrency group.
 
 Build gate: compile + JS syntax + targeted source validations + installer validation before merge.
+- F-17 Remove top-level AI Import navigation and dashboard quick action; keep AI Import inside Item Master (normal + jewellery) alongside Item Import and Opening Stock.
