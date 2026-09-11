@@ -65,7 +65,7 @@ w.retailFilterCategory=q=>{q=String(q||'').toLowerCase();d.querySelectorAll('#re
 w.retailCategoryEditor=async function(id=0,targetId=''){
  await loadCategories();const row=categories.find(x=>Number(x.Id)===Number(id));const old=row?.Name||'';
  categoryEdit={id:Number(id)||0,targetId:String(targetId||''),oldName:old};
- modal(id?'Edit Category':'Add Category',`<label>Category Name<input id="retailCategoryName" class="input" value="${esc(old)}" autofocus></label>`,`<button class="btn" onclick="retailSaveCategory()">✓ Submit</button><button class="btn secondary" onclick="closeModal()">Cancel</button>`);
+ modal(id?'Edit Category':'Add Category',`<label>Category Name<input id="retailCategoryName" class="input" value="${esc(old)}" autofocus></label>`,`<button class="btn" onclick="retailSaveCategory()">✓ Submit</button>`);
 };
 w.retailSaveCategory=async function(){
  const {id,targetId,oldName}=categoryEdit;
