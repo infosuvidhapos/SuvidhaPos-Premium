@@ -105,8 +105,7 @@
  window.stockReload=async function(){
   const asOn=document.querySelector('#stockAsOn')?.value||iso(new Date());const hiddenFrom=document.querySelector('#reportFrom'),hiddenTo=document.querySelector('#reportTo');if(hiddenFrom)hiddenFrom.value=asOn;if(hiddenTo)hiddenTo.value=asOn;
   try{
-   const q=encodeURIComponent(document.querySelector('#reportQ')?.value||'');
-   stockAllRows=await api(`/api/premium-reports/current-stock-report?from=${asOn}&to=${asOn}&q=${q}`);
+   stockAllRows=await api(`/api/premium-reports/current-stock-report?from=${asOn}&to=${asOn}&q=`);
    if(!Array.isArray(stockAllRows))stockAllRows=[];
    const sel=document.querySelector('#stockCategory'),before=sel?.value||'',cats=[...new Set(stockAllRows.map(x=>String(x.Category||'Uncategorised')).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
    if(sel){sel.innerHTML='<option value="">All Categories</option>'+cats.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(cats.includes(before))sel.value=before}
