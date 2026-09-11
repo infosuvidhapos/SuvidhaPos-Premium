@@ -84,7 +84,7 @@
  window.closeNormalReport=function(){currentRows=[];stockAllRows=[];currentDef=null;const box=document.querySelector('#normalReportWorkspace');if(box)box.innerHTML='';};
 
  async function openCurrentStockReport(){
-  currentDef=defs.find(x=>x[0]==='current-stock-report')||['current-stock-report','Current Stock Report'];
+  currentDef=defs.find(x=>x[0]==='current-stock-report')||["current-stock-report","Current Stock Report"];
   const today=iso(new Date()),box=document.querySelector('#normalReportWorkspace');if(!box)return;
   box.innerHTML=`<div class="panel normal-report-workspace stock-report-workspace">
    <div class="normal-report-workspace-head"><div><span class="normal-report-kicker">INVENTORY POSITION</span><h3>Current Stock Report</h3><p class="muted">Fast item-wise stock view with valuation, category and location filters.</p></div><button class="btn small secondary" onclick="closeNormalReport()">✕ Close</button></div>
