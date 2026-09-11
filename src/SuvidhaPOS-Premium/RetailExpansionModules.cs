@@ -24,6 +24,7 @@ public static class RetailExpansionModules
 
     public static void Map(WebApplication app)
     {
+        BtcPartyBridgeModules.Map(app);
         app.MapPost("/api/retail/opening-stock/preview", async (HttpRequest req, Db db) =>
         {
             var parsed = await ParseUploadAsync(req);
