@@ -1,7 +1,7 @@
 (function(w,d){
 'use strict';
 let billCtx=null,selectedParty=null,partyRows=[];
-const oldEditor=w.openBillEditor;
+const oldEditor=w.openBillEditor,oldSaveEdit=w.saveBillEdit;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=x=>Number(x||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 async function parties(q=''){const r=await api('/api/retail/customer-company?q='+encodeURIComponent(q||''));partyRows=Array.isArray(r)?r:[];return partyRows}
@@ -63,14 +63,73 @@ w.savePaymentChange=async function(id,total){
   closeModal();toast('Payment mode changed successfully');if(typeof w.bmRefresh==='function')await w.bmRefresh()
  }catch(e){alert(e.message||e)}
 };
+let modifyParty=null,modifyParties=[];
+async function renderModifyParty(){
+ const mode=d.querySelector('#bmModifyPayMode')?.value||'KEEP',type=d.querySelector('#bmModifyPayType')?.value||'UPI',host=d.querySelector('#bmModifyPartyBox');
+ if(!host)return;
+ const need=mode==='BTC'||(mode==='Credit/UPI'&&type==='Credit');
+ if(!need){host.style.display='none';host.innerHTML='';modifyParty=null;return}
+ host.style.display='block';modifyParties=await parties('');
+ const draw=()=>{host.innerHTML='<label>Customer / Company<input id="bmModifyPartySearch" class="input" placeholder="Search name / mobile / GSTIN"></label><div class="btc-payment-party-results">'+(modifyParties.map(x=>'<button type="button" class="'+(modifyParty&&modifyParty.PartyType===x.PartyType&&Number(modifyParty.Id)===Number(x.Id)?'selected':'')+'" data-mparty="'+esc(x.PartyType)+'" data-mid="'+Number(x.Id)+'"><span><b>'+esc(x.Name)+'</b><small>'+esc(x.PartyType)+' · '+esc(x.Phone||'-')+'</small></span><b>₹'+money(x.Balance||0)+'</b></button>').join('')||'<div class="empty">No customer/company found</div>')+'</div>';host.querySelectorAll('button[data-mparty]').forEach(b=>b.onclick=()=>{modifyParty=modifyParties.find(x=>String(x.PartyType)===b.dataset.mparty&&Number(x.Id)===Number(b.dataset.mid))||null;draw()});const q=host.querySelector('#bmModifyPartySearch');if(q)q.oninput=async()=>{modifyParty=null;modifyParties=await parties(q.value);draw()}}
+ draw()
+}
+w.bmModifyPayUi=function(){const mode=d.querySelector('#bmModifyPayMode')?.value||'KEEP',tw=d.querySelector('#bmModifyPayTypeWrap');if(tw)tw.style.display=mode==='Credit/UPI'?'grid':'none';renderModifyParty()};
+w.bmModifyPayTypeChanged=function(){renderModifyParty()};
+async function applyModifyPayment(id){
+ const mode=d.querySelector('#bmModifyPayMode')?.value||'KEEP';if(mode==='KEEP')return;
+ const type=d.querySelector('#bmModifyPayType')?.value||'UPI',ref=d.querySelector('#bmModifyPayRef')?.value||null;
+ if(mode==='BTC'){
+  if(!modifyParty)throw new Error('Select Customer / Company for BTC');
+  let cid=Number(modifyParty.Id);
+  if(String(modifyParty.PartyType).toUpperCase()==='CUSTOMER'){const r=await api('/api/btc/companies/from-customer/'+cid,{method:'POST'});cid=Number(r.id)}
+  await api('/api/btc/bill/'+Number(id)+'/payment-mode',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({PaymentMode:'BTC',CompanyId:cid,ReferenceNo:ref,Reason:'Changed during bill modification'})});
+  return
+ }
+ let customerId=null,customerName=null;
+ if(mode==='Credit/UPI'&&type==='Credit'){
+  if(!modifyParty)throw new Error('Select Customer / Company for Credit');
+  customerId=String(modifyParty.PartyType).toUpperCase()==='CUSTOMER'?Number(modifyParty.Id):null;customerName=modifyParty.Name||null
+ }
+ await api('/api/sales/'+Number(id)+'/payment-mode',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({PaymentMode:mode,PaymentType:type,ReferenceNo:ref,Reason:'Changed during bill modification',Payments:null,CustomerId:customerId,CustomerName:customerName})})
+}
 if(typeof oldEditor==='function'){
  w.openBillEditor=async function(id,action='EDIT'){
+  modifyParty=null;modifyParties=[];
   const r=await oldEditor.apply(this,arguments);
   if(String(action).toUpperCase()==='MODIFY'){
-   setTimeout(()=>{const foot=d.querySelector('#modal .toolbar:last-child');if(foot&&!foot.querySelector('[data-bm-pay]')){const b=d.createElement('button');b.className='btn secondary';b.dataset.bmPay='1';b.textContent='₹ Payment Mode…';b.onclick=()=>{closeModal();w.openPaymentChange(Number(id))};foot.insertBefore(b,foot.lastElementChild)}},30)
+   setTimeout(()=>{
+    const modalBox=d.querySelector('#modal .modalbox'),foot=d.querySelector('#modal .toolbar:last-child');if(!modalBox||!foot)return;
+    if(!d.querySelector('#bmModifyPayPanel')){
+      const panel=d.createElement('div');panel.id='bmModifyPayPanel';panel.className='panel';panel.style.marginTop='12px';
+      panel.innerHTML='<h4>PAYMENT AFTER MODIFICATION</h4><div class="formgrid"><label>Payment Mode<select id="bmModifyPayMode" class="select" onchange="bmModifyPayUi()"><option value="KEEP">Keep Current Payment</option><option>Cash</option><option>Credit/UPI</option><option>BTC</option></select></label><label id="bmModifyPayTypeWrap" style="display:none">Type<select id="bmModifyPayType" class="select" onchange="bmModifyPayTypeChanged()"><option>UPI</option><option>Card</option><option>PhonePe</option><option>Paytm</option><option>Credit</option></select></label><label>Reference / UTR<input id="bmModifyPayRef" class="input" placeholder="Optional"></label></div><div id="bmModifyPartyBox" class="btc-payment-party-box" style="display:none"></div>';
+      foot.parentElement.insertBefore(panel,foot)
+    }
+    const save=foot.querySelector('button.btn:not(.secondary)');if(save){save.textContent='✓ Save & Print';save.setAttribute('onclick','bmSaveModifyAndPrint('+Number(id)+')')}
+   },30)
   }
   return r
  }
 }
-w.bmReprint=async function(id){try{if(typeof w.printInvoice!=='function')throw new Error('Print Master is not loaded');await w.printInvoice(Number(id))}catch(e){alert('Reprint failed: '+(e.message||e))}};
+w.bmSaveModifyAndPrint=async function(id){
+ const plan={mode:d.querySelector('#bmModifyPayMode')?.value||'KEEP',type:d.querySelector('#bmModifyPayType')?.value||'UPI',ref:d.querySelector('#bmModifyPayRef')?.value||null,party:modifyParty};
+ try{
+  if(typeof oldSaveEdit!=='function')throw new Error('Bill modify save function is not loaded');
+  await oldSaveEdit(Number(id));
+  if(d.querySelector('#modal'))return;
+  modifyParty=plan.party;
+  if(plan.mode!=='KEEP'){
+   await api('/api/sales/'+Number(id)+'/edit-model').catch(()=>null);
+   if(plan.mode==='BTC'){
+    if(!modifyParty)throw new Error('Select Customer / Company for BTC');
+    let cid=Number(modifyParty.Id);if(String(modifyParty.PartyType).toUpperCase()==='CUSTOMER'){const x=await api('/api/btc/companies/from-customer/'+cid,{method:'POST'});cid=Number(x.id)}
+    await api('/api/btc/bill/'+Number(id)+'/payment-mode',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({PaymentMode:'BTC',CompanyId:cid,ReferenceNo:plan.ref,Reason:'Changed during bill modification'})})
+   }else{
+    let customerId=null,customerName=null;if(plan.mode==='Credit/UPI'&&plan.type==='Credit'){if(!modifyParty)throw new Error('Select Customer / Company for Credit');customerId=String(modifyParty.PartyType).toUpperCase()==='CUSTOMER'?Number(modifyParty.Id):null;customerName=modifyParty.Name||null}
+    await api('/api/sales/'+Number(id)+'/payment-mode',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({PaymentMode:plan.mode,PaymentType:plan.type,ReferenceNo:plan.ref,Reason:'Changed during bill modification',Payments:null,CustomerId:customerId,CustomerName:customerName})})
+   }
+  }
+  if(typeof w.printInvoice!=='function')throw new Error('Print Master is not loaded');await w.printInvoice(Number(id));toast('Bill modification saved and print sent');if(typeof w.bmRefresh==='function')await w.bmRefresh()
+ }catch(e){alert('Modify / Save & Print failed: '+(e.message||e))}
+};
+w.bmReprint=async function(id){try{if(typeof w.printInvoice!=='function')throw new Error('Print Master is not loaded');await w.printInvoice(Number(id));toast('Reprint sent to Print Master')}catch(e){alert('Reprint failed: '+(e.message||e))}};
 })(window,document);

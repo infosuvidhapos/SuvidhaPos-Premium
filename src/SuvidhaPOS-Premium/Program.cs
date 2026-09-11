@@ -495,6 +495,8 @@ SuvidhaPOS.Premium.BillManagementModules.Map(app);
 SuvidhaPOS.Premium.PremiumFeatureModules.Map(app);
 SuvidhaPOS.Premium.PremiumCompletionModules.Map(app);
 SuvidhaPOS.Premium.RetailExpansionModules.Map(app);
+SuvidhaPOS.Premium.PurchaseImportModules.Map(app);
+SuvidhaPOS.Premium.DayCloseAutomationModules.Map(app);
 
 app.Run();
 

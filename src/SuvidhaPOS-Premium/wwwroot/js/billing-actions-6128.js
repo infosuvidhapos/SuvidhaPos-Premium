@@ -75,11 +75,11 @@ function addCss(href,id){if(d.getElementById(id))return;var l=d.createElement('l
 function addScript(src,id){return new Promise(function(resolve,reject){if(d.getElementById(id))return resolve();var s=d.createElement('script');s.id=id;s.src=src;s.onload=resolve;s.onerror=function(){reject(new Error('Could not load '+src))};d.body.appendChild(s)})}
 async function loadRuntime(){
  addCss('/css/billing-layout-fix.css?v=6180','billingLayoutFix6130');
- addCss('/css/btc-payment-receipt-flow.css?v=6180','btcReceiptFlowCss6130');
+ addCss('/css/btc-payment-receipt-flow.css?v=6190','btcReceiptFlowCss6130');
  addCss('/css/retail-expansion.css?v=6180','retailExpansionCss6140');
  addCss('/css/audit-report-thermal.css?v=6180','auditReportThermalCss6140');
  try{
-  await addScript('/js/btc-payment-receipt-flow.js?v=6180','btcReceiptFlowJs6130');
+  await addScript('/js/btc-payment-receipt-flow.js?v=6190','btcReceiptFlowJs6130');
   await addScript('/js/btc-payment-receipt-input-fix.js?v=6180','btcReceiptInputFixJs6130');
   await addScript('/js/billing-hold.js?v=6180','billingHoldJs6130');
   await addScript('/js/india-locations.js?v=6180','indiaLocationsJs6140');

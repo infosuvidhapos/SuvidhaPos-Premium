@@ -35,6 +35,36 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Validate purchase BTC day-close fixes
+        shell: powershell
+        run: |
+          $purchase = Get-Content 'src/SuvidhaPOS-Premium/PurchaseImportModules.cs' -Raw -Encoding UTF8
+          $sp = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js' -Raw -Encoding UTF8
+          $btcReceipt = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/btc-settlement.js' -Raw -Encoding UTF8
+          $btcFlow = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/btc-payment-receipt-flow.js' -Raw -Encoding UTF8
+          $bill = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/bill-management-fixes-20260911.js' -Raw -Encoding UTF8
+          $features = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/sidebar-feature-control.js' -Raw -Encoding UTF8
+          $day = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/day-close-auto.js' -Raw -Encoding UTF8
+          $dayApi = Get-Content 'src/SuvidhaPOS-Premium/DayCloseAutomationModules.cs' -Raw -Encoding UTF8
+          $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
+          foreach($token in @('/api/purchase-import/preview','/api/purchase-import/commit','/api/purchase-import/template','/api/purchase-import/bill-template','HSSFWorkbook','barcode and item name match different existing items')){if(-not $purchase.Contains($token)){throw "Purchase import missing: $token"}}
+          foreach($token in @('barcode-purchase-full','Temp Save','Get Temp Data','Import Excel','Import Bill','BARCODE / SKU / ITEM NAME','Sample Bill Format','barcodePurchaseCommitImport')){if(-not $sp.Contains($token)){throw "Barcode Purchase fix missing: $token"}}
+          foreach($token in @("desktopPrintHtml(html,'DIRECT'","Print Receipt")){if(-not $btcReceipt.Contains($token)){throw "BTC receipt print fix missing: $token"}}
+          foreach($token in @('btcPrOpenCardUpi','Card / UPI Payment','btcPrUseCardUpi')){if(-not $btcFlow.Contains($token)){throw "BTC Card/UPI detail missing: $token"}}
+          foreach($token in @('bmSaveModifyAndPrint','Save & Print','bmReprint','Changed during bill modification')){if(-not $bill.Contains($token)){throw "Bill modify/reprint fix missing: $token"}}
+          foreach($token in @('New Billing / Jewellery Billing','Item Master','Purchases','Bill Management','BTC / Credit Settlement','Customer / Company','Barcode Print Master','Print Master','Database Backup')){if(-not $features.Contains($token)){throw "Sidebar Feature Control missing: $token"}}
+          foreach($token in @('Confirm Day Close & Shift End ?','DayClose.Auto','auto-run')){if(-not ($day+$dayApi).Contains($token)){throw "Day Close fix missing: $token"}}
+          foreach($token in @('/js/sidebar-feature-control.js','/js/day-close-auto.js')){if(-not $html.Contains($token)){throw "Runtime script missing: $token"}}
+          foreach($token in @('data-page="aiimport"','data-page="itemimport"','data-page="openingstock"')){if($html.Contains($token)){throw "Top-level Item Master child returned: $token"}}
+          $wf = Get-Content '.github/workflows/build.yml' -Raw -Encoding UTF8
+          if($wf -match '(?m)^concurrency:'){throw 'Workflow cancellation/supersede concurrency gate must remain removed'}
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js'
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/btc-settlement.js'
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/btc-payment-receipt-flow.js'
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/bill-management-fixes-20260911.js'
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/sidebar-feature-control.js'
+          node --check 'src/SuvidhaPOS-Premium/wwwroot/js/day-close-auto.js'
+
       - name: Restore
         run: dotnet restore SuvidhaPOS-Premium.sln
       - name: Build
