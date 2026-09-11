@@ -197,7 +197,7 @@ jobs:
           foreach($token in @('data-page="aiimport"','data-page="itemimport"','data-page="openingstock"')){ if($html.Contains($token)){ throw "Top-level navigation must not contain $token; AI Import, Item Import and Opening Stock belong inside Item Master" } }
           $retail = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/retail-masters-ui.js' -Raw -Encoding UTF8
           foreach($token in @('AI Import','Item Import','Opening Stock Bulk Update','loadAIImport','loadNormalItemImportMaster','loadOpeningStockMaster')){ if(-not $retail.Contains($token)){ throw "Item Master embedded tool missing: $token" } }
-          if(-not $ui.Contains('loadAIImport()">✦ AI Import')){ throw 'Jewellery Item Master AI Import button missing' }
+          if($ui -notmatch 'w\.loadJewelleryItemMaster=async function\(\)\{[\s\S]{0,7000}loadAIImport\(\)'){ throw 'Jewellery Item Master AI Import button missing' }
           $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
           foreach($token in @('Jewellery Billing','Item Entry','loadDayClosing()')){ if(-not $jewel.Contains($token)){ throw "Jewellery runtime menu missing: $token" } }
           $app = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
