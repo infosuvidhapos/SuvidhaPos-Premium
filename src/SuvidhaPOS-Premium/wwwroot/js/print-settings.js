@@ -183,13 +183,15 @@ ${styleCss(template,thermal)}
    if(/A4/i.test(h.PrintFormat||''))cfg.mode='A4';
    return {d:{h,l,company:c,outlet:o},cfg}
  }
- window.printInvoice=async function(id){
+ window.printInvoice=async function(id,actionOverride){
    try{
-    const x=await saleData(id),html=buildHtml(x.d,x.cfg.mode,x.cfg.template,x.cfg.width,false);
-    if(window.premiumPrintHtml)return window.premiumPrintHtml(html,x.d.h?.InvoiceNo||('Bill-'+id));
-    const w=window.open('','_blank',x.cfg.mode==='Thermal'?'width=460,height=760':'width=1000,height=800');
-    if(!w)return toast('Popup blocked');w.document.write(html);w.document.close();w.print()
-   }catch(e){alert('Print failed: '+e.message)}
+    const x=await saleData(id),html=buildHtml(x.d,x.cfg.mode,x.cfg.template,x.cfg.width,false),name=x.d.h?.InvoiceNo||('Bill-'+id);
+    const forced=String(actionOverride||'').toUpperCase();
+    if(forced&&window.desktopPrintHtml&&window.desktopPrintHtml(html,forced,name))return true;
+    if(!forced&&window.premiumPrintHtml)return window.premiumPrintHtml(html,name);
+    const pw=window.open('','_blank',x.cfg.mode==='Thermal'?'width=460,height=760':'width=1000,height=800');
+    if(!pw)return toast('Popup blocked');pw.document.write(html);pw.document.close();pw.addEventListener('load',()=>setTimeout(()=>pw.print(),100),{once:true});return true
+   }catch(e){alert('Print failed: '+e.message);return false}
  };
  window.printLastBill=window.printInvoice;
  window.printTestReceipt=window.printMasterTest;
