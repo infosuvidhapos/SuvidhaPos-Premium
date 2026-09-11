@@ -21,8 +21,7 @@
         <button class="nav js-nav active" data-page="dashboard" onclick="loadDashboard()">${icon('▦')}<span>Dashboard</span></button>
         <div class="js-section js-section-row">BILLING <span>⌄</span></div>
         <button class="nav js-nav" data-page="jewelInvoices" onclick="loadJewelInvoices()">${icon('▤')}<span>All Invoices</span></button>
-        <button class="nav js-nav" data-page="billing" onclick="loadBilling()">${icon('▣')}<span>Jewellery Billing</span></button>
-        <button class="nav js-nav" data-page="purchase" onclick="loadPurchase()">${icon('🛒')}<span>Purchase Bill</span></button>
+        <button class="nav js-nav" data-page="billing" data-feature-key="JEWELLERY_BILLING" onclick="loadBilling()">${icon('▣')}<span>Jewellery Billing</span></button>
         <button class="nav js-nav" onclick="jewelSuiteInvoice('karigar')">${icon('⚒')}<span>Karigar Bill</span></button>
         <button class="nav js-nav" onclick="jewelSuiteInvoice('exchange')">${icon('↔')}<span>Exchange</span></button>
         <button class="nav js-nav" onclick="jewelSuiteInvoice('repair')">${icon('⌕')}<span>Repair</span></button>
@@ -37,8 +36,9 @@
         <button class="nav js-nav" onclick="jewelComingSoon('Cr/Dr Ledger')">${icon('▭')}<span>Cr/Dr Ledger</span></button>
         <button class="nav js-nav" onclick="jewelComingSoon('Saving Schemes')">${icon('♧')}<span>Saving Schemes</span></button>
         <div class="js-section">INVENTORY</div>
-        <button class="nav js-nav" data-page="products" onclick="loadProducts()">${icon('◇')}<span>Stock</span></button>
-        <button class="js-section js-section-toggle" type="button" aria-expanded="false" aria-controls="jsReportsMenu" onclick="toggleJewelReports()"><span>REPORTS</span><span id="jsReportsChevron">›</span></button>
+        <button class="nav js-nav" data-page="products" data-feature-key="JEWELLERY_STOCK" onclick="loadProducts()">${icon('◇')}<span>Stock</span></button>
+        <button class="nav js-nav" data-page="purchase" data-feature-key="JEWELLERY_PURCHASE" onclick="loadPurchase()">${icon('🛒')}<span>Purchase</span></button>
+        <button class="js-section js-section-toggle" data-feature-key="JEWELLERY_REPORTS" type="button" aria-expanded="false" aria-controls="jsReportsMenu" onclick="toggleJewelReports()"><span>REPORTS</span><span id="jsReportsChevron">›</span></button>
         <div id="jsReportsMenu" class="js-report-nav">
           <button class="nav js-nav" data-page="jDaybook" onclick="loadJewelDaybook()">${icon('▣')}<span>Daybook</span></button>
           <button class="nav js-nav" data-page="jSalesReport" onclick="loadJewelSalesReport()">${icon('⌁')}<span>Sales Report</span></button>
@@ -48,16 +48,17 @@
         </div>
         <div class="js-section">MASTERS</div>
         <div data-premium-completion="1">
-          <button class="nav js-nav" data-page="jItemMaster" onclick="loadJewelleryItemMaster()">${icon('◆')}<span>Item Master</span></button>
-          <button class="nav js-nav" onclick="openPremiumJewelleryItem()">${icon('＋')}<span>Item Entry</span></button>
-          <button class="nav js-nav" data-page="jItemImport" onclick="loadJewelleryItemImportMaster()">${icon('⇩')}<span>Item Import Master</span></button>
-          <button class="nav js-nav" data-page="jBarcode" onclick="loadBarcodePrintMaster()">${icon('▥')}<span>Barcode Print Master</span></button>
+          <button class="nav js-nav" data-page="jItemMaster" data-feature-key="JEWELLERY_ITEM_MASTER" onclick="loadJewelleryItemMaster()">${icon('◆')}<span>Item Master</span></button>
+          <button class="nav js-nav" data-feature-key="JEWELLERY_ITEM_ENTRY" onclick="openPremiumJewelleryItem()">${icon('＋')}<span>Item Entry</span></button>
+          <button class="nav js-nav" data-page="jItemImport" data-feature-key="JEWELLERY_ITEM_IMPORT" onclick="loadJewelleryItemImportMaster()">${icon('⇩')}<span>Item Import Master</span></button>
+          <button class="nav js-nav" data-page="jBarcode" data-feature-key="JEWELLERY_BARCODE" onclick="loadBarcodePrintMaster()">${icon('▥')}<span>Barcode Print Master</span></button>
         </div>
-        <button class="nav js-nav" data-page="customers" onclick="loadCustomers()">${icon('♙')}<span>Customers</span></button>
-        <button class="nav js-nav" onclick="loadJewelRates()">${icon('↗')}<span>Au/Ag Rates</span></button>
+        <button class="nav js-nav" data-page="customers" data-feature-key="JEWELLERY_CUSTOMERS" onclick="loadCustomers()">${icon('♙')}<span>Customers</span></button>
+        <button class="nav js-nav" data-feature-key="JEWELLERY_RATES" onclick="loadJewelRates()">${icon('↗')}<span>Au/Ag Rates</span></button>
         <div class="js-section">SYSTEM</div>
+        <button class="nav js-nav" id="featureAccessNav" onclick="loadFeatureAccessControl()">${icon('⚙')}<span>Feature Control</span></button>
         <button class="nav js-nav" onclick="loadSettings()">${icon('⚙')}<span>Settings</span></button>
-        <button class="nav js-nav" onclick="loadDayClosing()">${icon('▣')}<span>Day Closing</span></button>
+        <button class="nav js-nav" data-feature-key="JEWELLERY_DAY_CLOSE" onclick="loadDayClosing()">${icon('▣')}<span>Day Closing</span></button>
       </div>
       <div class="js-side-user"><b>${esc(window.currentUser?.DisplayName||'Super Admin')}</b><small>${esc(window.currentUser?.Role||'Super Admin')}</small><button onclick="logout()">↪ &nbsp; Sign Out</button></div>`;
     const q=document.getElementById('jsQuickSearch');
