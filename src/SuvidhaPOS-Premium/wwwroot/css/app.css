@@ -74,3 +74,11 @@ body[data-theme="light"] .normal-report-intro,body[data-theme="light"] .normal-r
 /* 6.12.3 normal logo safe-area */
 .brandmark{overflow:visible!important;padding:5px!important}
 .brandmark img{display:block!important;width:88%!important;height:88%!important;max-width:88%!important;max-height:88%!important;object-fit:contain!important;object-position:center!important;margin:auto!important;clip-path:none!important}
+
+/* 2026-09-12 Current Stock Report design reference */
+.stock-report-workspace{min-width:0}.stock-report-filters{display:grid;grid-template-columns:170px 220px 190px minmax(260px,1fr);gap:9px;margin-bottom:10px}.stock-report-filters label{display:grid;gap:5px;color:#89a0b2;font-size:9px;text-transform:uppercase;letter-spacing:.55px}.stock-report-actions{margin-bottom:10px}
+.stock-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:9px;margin:10px 0 12px}.stock-summary-grid>div{padding:10px 12px;border:1px solid #29465d;border-radius:10px;background:#0d2032}.stock-summary-grid span{display:block;font-size:9px;color:#829caf;text-transform:uppercase;letter-spacing:.55px}.stock-summary-grid b{display:block;margin-top:4px;font-size:16px;color:#dceaf4}
+.stock-report-table-shell{max-height:58vh;overflow:auto}.stock-report-table{min-width:1380px}.stock-report-table th{position:sticky;top:0;z-index:2;background:#10283c;white-space:nowrap}.stock-report-table td{white-space:nowrap}.stock-report-table td:nth-child(3){min-width:240px;white-space:normal}.stock-report-table td:nth-child(2){min-width:150px}.stock-report-table small{display:block;color:#849caf;margin-top:3px;font-size:9px}.stock-report-table .stock-qty{text-align:right}.stock-report-table tr.stock-low{background:rgba(210,154,43,.08)}.stock-report-table tr.stock-zero{opacity:.72}.stock-report-table tr.stock-neg{background:rgba(203,72,82,.12)}
+body[data-theme="light"] .stock-summary-grid>div{background:#fffdf8;border-color:#d8cbb8}body[data-theme="light"] .stock-summary-grid b{color:#2d3a46}body[data-theme="light"] .stock-report-table th{background:#eee9df;color:#403a32}
+@media(max-width:1100px){.stock-report-filters{grid-template-columns:1fr 1fr}.stock-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.stock-report-filters,.stock-summary-grid{grid-template-columns:1fr}.stock-report-actions .btn{width:100%}}
