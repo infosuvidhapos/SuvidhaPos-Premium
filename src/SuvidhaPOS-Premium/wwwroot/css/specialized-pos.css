@@ -20,3 +20,14 @@ body[data-theme="light"] .purchase-line-card{background:#fffdfa;border-color:#dd
 .barcode-purchase-table-wrap{border:1px solid rgba(74,116,160,.28);border-radius:10px;overflow:auto;max-height:48vh;background:#091827}
 .barcode-purchase-table{min-width:1320px;margin:0}.barcode-purchase-table th{position:sticky;top:0;z-index:2;background:#10283c;white-space:nowrap;font-size:10px;letter-spacing:.35px}.barcode-purchase-table td{vertical-align:middle;padding:6px}.barcode-purchase-table .input,.barcode-purchase-table .select{height:34px;min-width:86px;padding:5px 7px;font-size:11px}.barcode-purchase-table td:nth-child(2){min-width:210px}.barcode-purchase-table td:nth-child(3){min-width:120px}.barcode-purchase-table td:nth-child(9){min-width:110px}.barcode-purchase-table td:nth-child(10){min-width:145px}.barcode-purchase-table .bp-item b,.barcode-purchase-table .bp-item small,.barcode-purchase-table .bp-amount b,.barcode-purchase-table .bp-amount small{display:block}.barcode-purchase-table .bp-item small,.barcode-purchase-table .bp-amount small{margin-top:3px;color:#8fa7bb;font-size:9px}.barcode-purchase-table .bp-amount{text-align:right;white-space:nowrap}.barcode-purchase-table tfoot td{position:sticky;bottom:0;background:#102235;border-top:1px solid #31516b}
 body[data-theme="light"] .barcode-purchase-table-wrap{background:#fff;border-color:#d8cbb7}body[data-theme="light"] .barcode-purchase-table th,body[data-theme="light"] .barcode-purchase-table tfoot td{background:#f2eee7;color:#433d34}
+
+/* 2026-09-12 full-page Barcode Purchase */
+.barcode-purchase-full{display:grid;gap:14px;min-height:calc(100vh - 128px);padding-bottom:24px}
+.barcode-purchase-full>.panel{margin:0}
+.barcode-purchase-full .barcode-purchase{min-height:calc(100vh - 250px)}
+.barcode-purchase-full .purchase-lines{max-height:none;overflow:visible}
+.barcode-purchase-full .barcode-purchase-table-wrap{max-height:calc(100vh - 490px);min-height:300px}
+.barcode-purchase-full .purchase-full-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:6px}
+.barcode-purchase-full .purchase-actions .btn{min-width:auto}
+.ok-text{color:#5fd18a}.warn-text{color:#f2bd54}.danger-text{color:#ff7b79}
+@media(max-width:900px){.barcode-purchase-full .barcode-purchase-table-wrap{max-height:52vh}.barcode-purchase-full .purchase-full-actions{flex-wrap:wrap}}
