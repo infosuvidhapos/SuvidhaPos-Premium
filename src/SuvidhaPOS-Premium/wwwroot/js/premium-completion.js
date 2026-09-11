@@ -40,7 +40,7 @@ function ensureNav(){
 new MutationObserver(function(){ensureNav()}).observe(d.getElementById('sidebar')||d.documentElement,{childList:true,subtree:true});
 
 w.loadPremiumFeatureControl=async function(){
- head('settings','Premium Feature Control','P-01 to P-20 reversible feature flags');
+ head('featurecontrol','Feature Control','Application module switches');
  if(!manager())return app.innerHTML='<div class="content"><div class="alert">Admin / Manager permission required.</div></div>';
  var rows=[];try{rows=await api('/api/premium/features')}catch(err){return app.innerHTML='<div class="content"><div class="alert">'+e(err.message)+'</div></div>'}
  app.innerHTML='<div class="content completion-page"><div class="panel completion-hero"><div><span class="completion-kicker">REVERSIBLE POINTERS</span><h2>P-01 → P-20 Feature Control</h2><p>Disable only the requested module without removing data or schema.</p></div><span class="tag">ADMIN</span></div><div class="panel"><div class="feature-grid">'+rows.map(function(x){return '<label class="feature-flag"><span><b>'+e(x.PointerCode)+'</b><strong>'+e(x.FeatureName)+'</strong></span><input type="checkbox" '+(x.IsEnabled?'checked':'')+' onchange="premiumToggleFeature(\''+e(x.PointerCode)+'\',this.checked)"></label>'}).join('')+'</div></div></div>';
