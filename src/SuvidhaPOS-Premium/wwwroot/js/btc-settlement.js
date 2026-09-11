@@ -68,7 +68,7 @@ w.btcOpenCompanyMaster=async function(editId){const rows=await loadCompanies(),c
 w.btcSaveCompany=async function(id){const body={CompanyName:d.querySelector('#bcName')?.value?.trim(),GstIn:d.querySelector('#bcGst')?.value?.trim()||null,Phone:d.querySelector('#bcPhone')?.value?.trim()||null,Address:d.querySelector('#bcAddress')?.value?.trim()||null,CreditLimit:num(d.querySelector('#bcLimit')?.value),CreditDays:Math.floor(num(d.querySelector('#bcDays')?.value))};if(!body.CompanyName)return notify('Company Name is required');await api('/api/btc/companies'+(id?'/'+id:''),{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});notify(id?'Company updated':'Company created');w.btcOpenCompanyMaster()};
 
 // Override old BTC selection: F8/button must always open Company selection first.
-w.cbPaySelect=function(mode,subtype){if(String(mode).toUpperCase()==='BTC')return w.openBtcCompanySelect();resetCompany();return oldPay?oldPay(mode,subtype):undefined};
+w.cbPaySelect=function(mode,subtype){const m=String(mode||'').toUpperCase();if(m==='BTC')return w.openBtcCompanySelect();if(m==='CREDIT/UPI'&&typeof w.cbOpenCreditUpi==='function')return w.cbOpenCreditUpi();resetCompany();return oldPay?oldPay(mode,subtype):undefined};
 d.addEventListener('keydown',function(e){if(e.key==='F8'&&d.querySelector('.counter-billing')){e.preventDefault();e.stopImmediatePropagation();w.openBtcCompanySelect()}},true);
 
 w.cbComplete=async function(){
