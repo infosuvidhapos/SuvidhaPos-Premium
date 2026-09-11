@@ -23,3 +23,21 @@ body.jewel-suite-mode .premium-print-actions{background:#fffaf0;border-color:#e1
 @media(max-width:1280px){.barcode-template-grid{grid-template-columns:repeat(3,1fr)}.stone-row{grid-template-columns:repeat(4,1fr)}.stone-row button{grid-column:auto}}
 @media(max-width:1000px){.barcode-layout{grid-template-columns:1fr}.rule-grid{grid-template-columns:1fr 1fr}.feature-grid{grid-template-columns:1fr}.premium-print-actions{grid-template-columns:1fr}.premium-print-actions>b{grid-column:auto}}
 @media(max-width:700px){.completion-hero,.completion-toolbar{align-items:flex-start;flex-direction:column}.rule-grid,.barcode-template-grid{grid-template-columns:1fr}.stone-row{grid-template-columns:1fr 1fr}}
+
+/* 2026-09-11 compact aligned Jewellery Item Master / entry */
+body.jewel-suite-mode .jewellery-item-master{max-width:100%!important;padding:16px 18px!important;margin:0!important}
+body.jewel-suite-mode .jewellery-item-master .metricrow{grid-template-columns:repeat(4,minmax(140px,1fr));gap:8px}
+body.jewel-suite-mode .jewellery-item-master .completion-toolbar{padding:12px 14px!important;gap:10px;flex-wrap:wrap}
+body.jewel-suite-mode .jewellery-item-master .completion-toolbar .toolbar{flex:1;min-width:420px;flex-wrap:wrap}
+body.jewel-suite-mode .jewellery-item-master .tablewrap{max-height:calc(100dvh - 310px);overflow:auto}
+body.jewel-suite-mode .jewellery-item-master .premium-jewel-table{min-width:1180px;font-size:10.5px}
+.modal.premium-jewellery-item-modal{display:flex!important;align-items:center!important;justify-content:center!important;padding:18px!important}
+.modal.premium-jewellery-item-modal .modalbox{width:min(1180px,96vw)!important;max-width:1180px!important;max-height:92dvh!important;overflow:auto!important;margin:auto!important;padding:16px!important;position:relative!important;inset:auto!important;transform:none!important}
+.modal.premium-jewellery-item-modal .premium-item-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal.premium-jewellery-item-modal .master-section{margin:0!important;padding:12px!important;border-radius:10px}
+.modal.premium-jewellery-item-modal .master-section h3{margin:0 0 9px;font-size:13px}
+.modal.premium-jewellery-item-modal .formgrid{gap:8px}
+.modal.premium-jewellery-item-modal .formgrid label{font-size:10px}
+.modal.premium-jewellery-item-modal .input,.modal.premium-jewellery-item-modal .select,.modal.premium-jewellery-item-modal .textarea{min-height:34px!important;padding:6px 8px!important;font-size:12px!important}
+.modal.premium-jewellery-item-modal .stone-master{grid-column:1/-1}
+@media(max-width:900px){.modal.premium-jewellery-item-modal .premium-item-form{grid-template-columns:1fr}body.jewel-suite-mode .jewellery-item-master .metricrow{grid-template-columns:1fr 1fr}}
