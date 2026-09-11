@@ -7,3 +7,13 @@
 .cb-total-lines small{display:block;color:#7290a6;margin-top:3px}
 .cb-actions{grid-template-columns:1fr 1fr 1fr 1.4fr 1fr}
 @media(max-width:1100px){.cb-inputbar{grid-template-columns:1.3fr 1.2fr 75px 82px 85px 95px 90px 40px 40px}.cb-head{font-size:18px}.cb-main{grid-template-columns:minmax(0,1fr) 120px}}
+
+/* 2026-09-11 adaptive billing alignment */
+.counter-billing{max-width:100%!important;overflow:hidden!important}
+.counter-billing .cb-main{grid-template-columns:minmax(0,1fr) minmax(190px,230px)!important;align-items:stretch!important}
+.counter-billing .cb-table-wrap{min-width:0!important;overflow:auto!important;max-height:44vh!important}
+.counter-billing .cb-table{min-width:880px!important;width:100%!important}
+.counter-billing .cb-actions{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:10px!important}
+.counter-billing .cb-actions button{min-width:0!important;white-space:normal!important}
+@media(max-width:1100px){.counter-billing .cb-main{grid-template-columns:1fr!important}.counter-billing .cb-pay{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important}}
+@media(max-width:720px){.counter-billing .cb-actions,.counter-billing .cb-pay{grid-template-columns:1fr 1fr!important}}
