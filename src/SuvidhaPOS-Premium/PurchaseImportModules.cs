@@ -36,9 +36,9 @@ public static class PurchaseImportModules
             }
             return Results.Ok(new{file=file.FileName,rows,summary=new{
                 total=parsed.Rows.Count,
-                matched=rows.Count(x=>(bool)x.GetType().GetProperty("NewItem")!.GetValue(x)!==false && (int)x.GetType().GetProperty("ProductId")!.GetValue(x)!>0),
-                newItems=rows.Count(x=>(bool)x.GetType().GetProperty("NewItem")!.GetValue(x)!),
-                conflicts=rows.Count(x=>(bool)x.GetType().GetProperty("Conflict")!.GetValue(x)!)
+                matched=rows.Count(x=>Convert.ToInt32(x.GetType().GetProperty("ProductId")!.GetValue(x)??0)>0),
+                newItems=rows.Count(x=>Convert.ToBoolean(x.GetType().GetProperty("NewItem")!.GetValue(x)??false)),
+                conflicts=rows.Count(x=>Convert.ToBoolean(x.GetType().GetProperty("Conflict")!.GetValue(x)??false))
             }});
         });
 
