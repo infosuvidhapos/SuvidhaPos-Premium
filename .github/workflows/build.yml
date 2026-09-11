@@ -194,7 +194,10 @@ jobs:
           foreach($token in @("['Barcode.Template.'+C.barcodeScope]",'AI Import','Item Import Master','w.loadNormalItemImportMaster=','w.loadJewelleryItemMaster=','w.openPremiumJewelleryItem=','w.loadBarcodePrintMaster=')){ if(-not $ui.Contains($token)){ throw "Completion runtime wiring missing: $token" } }
           if($ui.Contains('w.loadAIImport=function(){return jewel()')){ throw 'AI Import must remain separate from Item Import Master' }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
-          foreach($token in @('data-page="aiimport"','>AI Import<','data-page="itemimport"','>Item Import Master<')){ if(-not $html.Contains($token)){ throw "Separate import menu missing: $token" } }
+          foreach($token in @('data-page="aiimport"','>AI Import<')){ if(-not $html.Contains($token)){ throw "AI Import menu missing: $token" } }
+          foreach($token in @('data-page="itemimport"','data-page="openingstock"')){ if($html.Contains($token)){ throw "Top-level navigation must not contain $token; Item Import and Opening Stock belong inside Item Master" } }
+          $retail = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/retail-masters-ui.js' -Raw -Encoding UTF8
+          foreach($token in @('Item Import','Opening Stock Bulk Update','loadNormalItemImportMaster','retailOpeningStock')){ if(-not $retail.Contains($token)){ throw "Item Master embedded tool missing: $token" } }
           $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
           foreach($token in @('Jewellery Billing','Item Entry','loadDayClosing()')){ if(-not $jewel.Contains($token)){ throw "Jewellery runtime menu missing: $token" } }
           $app = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
