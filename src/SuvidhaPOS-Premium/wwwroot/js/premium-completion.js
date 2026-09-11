@@ -16,13 +16,13 @@ function notify(x){try{toast(x)}catch(_){alert(x)}}
 function ensureNav(){
  var side=d.getElementById('sidebar');if(!side)return;
  var visibility=[
-  ['[data-page="aiimport"]','P-06'],['[data-page="reports"]','P-15'],['[data-page="billmaster"]','P-16'],
+  ['[data-page="reports"]','P-15'],['[data-page="billmaster"]','P-16'],
   ['#barcodeMasterNav','P-03']
  ];
  visibility.forEach(function(v){side.querySelectorAll(v[0]).forEach(function(x){x.style.display=enabled(v[1])?'':'none'})});
  side.querySelectorAll('.sidebottom .plain').forEach(function(x){if(x.textContent.indexOf('Print Master')>=0)x.style.display=enabled('P-17')?'':'none'});
  if(!jewel()){
-   var ai=side.querySelector('[data-page="aiimport"] span');if(ai)ai.textContent='AI Import';var im=side.querySelector('[data-page="itemimport"] span');if(im)im.textContent='Item Import Master';
+   side.querySelectorAll('[data-page="aiimport"],[data-page="itemimport"],[data-page="openingstock"]').forEach(function(x){x.remove()});
    var bottom=side.querySelector('.sidebottom');
    if(bottom&&enabled('P-03')&&!d.getElementById('barcodeMasterNav')){
      var b=d.createElement('button');b.id='barcodeMasterNav';b.className='plain';b.innerHTML='▥ Barcode Print Master';b.onclick=function(){w.loadBarcodePrintMaster()};bottom.insertBefore(b,bottom.querySelector('.logoutBtn')||bottom.firstChild);
@@ -81,7 +81,7 @@ w.loadJewelleryItemMaster=async function(){
  var rows=[];try{rows=await api('/api/jewellery/item-master')}catch(err){return app.innerHTML='<div class="content"><div class="alert">'+e(err.message)+'</div></div>'}
  var stock=rows.filter(function(x){return x.Status==='IN_STOCK'}).length,wt=rows.reduce(function(a,x){return a+n(x.NetWeight)},0);
  app.innerHTML='<div class="content completion-page jewellery-item-master"><div class="metricrow"><div class="mini">Total Tags<b>'+rows.length+'</b></div><div class="mini">In Stock<b>'+stock+'</b></div><div class="mini">Net Weight<b>'+money(wt)+' g</b></div><div class="mini">HUID Tags<b>'+rows.filter(function(x){return !!x.Huid}).length+'</b></div></div>'+
- '<div class="panel completion-toolbar"><div><span class="completion-kicker">P-01 / P-08</span><h3>JEWELLERY ITEM MASTER</h3></div><div class="toolbar"><input id="pjSearch" class="input" placeholder="Tag, barcode, HUID, design, item..." oninput="premiumFilterRows(\'pjRows\',this.value)"><button class="btn" onclick="openPremiumJewelleryItem()">＋ New Jewellery Item</button><button class="btn secondary" onclick="loadJewelleryItemImportMaster()">⇩ Import</button><button class="btn secondary" onclick="loadBarcodePrintMaster()">▥ Barcode</button></div></div>'+
+ '<div class="panel completion-toolbar"><div><span class="completion-kicker">P-01 / P-08</span><h3>JEWELLERY ITEM MASTER</h3></div><div class="toolbar"><input id="pjSearch" class="input" placeholder="Tag, barcode, HUID, design, item..." oninput="premiumFilterRows(\'pjRows\',this.value)"><button class="btn" onclick="openPremiumJewelleryItem()">＋ New Jewellery Item</button><button class="btn secondary" onclick="loadAIImport()">✦ AI Import</button><button class="btn secondary" onclick="loadJewelleryItemImportMaster()">⇩ Item Import</button><button class="btn secondary" onclick="loadBarcodePrintMaster()">▥ Barcode</button></div></div>'+
  '<div class="panel"><div class="tablewrap"><table class="table premium-jewel-table"><thead><tr><th>TAG / DESIGN</th><th>ITEM</th><th>METAL</th><th>HUID / HALLMARK</th><th>GROSS</th><th>LESS</th><th>NET</th><th>FINE</th><th>STONE</th><th>MAKING</th><th>GST</th><th>LOCATION</th><th>STATUS</th><th></th></tr></thead><tbody id="pjRows">'+rows.map(function(x){return '<tr><td><b>'+e(x.TagNo)+'</b><br><small>'+e(x.DesignCode||'-')+'</small></td><td>'+e(x.ItemName)+'<br><small>'+e(x.Category||'')+'</small></td><td>'+e(x.MetalType)+' '+e(x.Purity)+'</td><td>'+e(x.Huid||'-')+'<br><small>'+e(x.HallmarkStatus||'')+'</small></td><td>'+n(x.GrossWeight).toFixed(3)+'</td><td>'+n(x.LessWeight).toFixed(3)+'</td><td>'+n(x.NetWeight).toFixed(3)+'</td><td>'+n(x.FineWeight).toFixed(3)+'</td><td>'+e(x.StoneType||'-')+' '+n(x.StoneCarat).toFixed(3)+'ct</td><td>'+e(x.MakingChargeType)+' '+money(x.MakingValue)+'</td><td>'+e(x.GstMode)+' '+n(x.GstRate)+'%</td><td>'+e(x.LocationCode||x.RackName||'-')+'</td><td><span class="status '+(x.Status==='IN_STOCK'?'ok':'info')+'">'+e(x.Status)+'</span></td><td><button class="btn small" onclick="openPremiumJewelleryItem('+x.Id+')">Edit</button></td></tr>'}).join('')+'</tbody></table></div></div></div>';
 };
 w.premiumFilterRows=function(id,q){var term=String(q||'').toLowerCase();d.querySelectorAll('#'+id+' tr').forEach(function(r){r.style.display=r.textContent.toLowerCase().includes(term)?'':'none'})};
