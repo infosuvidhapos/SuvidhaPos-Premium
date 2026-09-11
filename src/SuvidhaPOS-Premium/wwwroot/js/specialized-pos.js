@@ -201,6 +201,14 @@
     S.items=await api('/api/products?size=1000');S.suppliers=await api('/api/suppliers');
     const pharma=/pharmacy|medical/i.test(S.spec?.StoreType||''),history=await api('/api/purchases');
     app.innerHTML=`<div class="content purchase-page"><div class="panel purchase-hero"><div class="panelhead"><div><h3>PURCHASE INWARD</h3><p class="muted">Standard multi-unit entry or fast barcode-scanner purchase. Stock always posts in Base Unit.</p></div><span class="tag">${pharma?'BATCH + EXPIRY':'BASE STOCK'}</span></div><div class="purchase-actions"><button class="btn" onclick="openUomPurchase()">＋ New Purchase <small>F2</small></button><button class="btn green" onclick="openBarcodePurchase()">▥ Barcode Purchase <small>F4</small></button><span class="tag">F10 Save · Enter Next · Esc Close</span></div></div><div class="panel"><div class="panelhead"><h3>RECENT PURCHASES</h3><span class="tag">${history.length} RECORDS</span></div><div class="tablewrap"><table class="table"><thead><tr><th>INVOICE</th><th>SUPPLIER</th><th>DATE</th><th>SUBTOTAL</th><th>TAX</th><th>TOTAL</th><th>PAID</th><th>BALANCE</th></tr></thead><tbody>${history.map(x=>`<tr><td><b>${esc2(x.InvoiceNo)}</b></td><td>${esc2(x.SupplierName)}</td><td>${fmt(x.PurchaseDate)}</td><td>₹${money2(x.SubTotal)}</td><td>₹${money2(x.Tax)}</td><td><b>₹${money2(x.GrandTotal)}</b></td><td>₹${money2(x.PaidAmount||0)}</td><td>₹${money2((x.GrandTotal||0)-(x.PaidAmount||0))}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">No purchases yet</td></tr>'}</tbody></table></div></div></div>`;
+    if(!window.__purchasePageKeyboardBound){
+      window.__purchasePageKeyboardBound=true;
+      document.addEventListener('keydown',e=>{
+        if(document.querySelector('.modal.open')||!document.querySelector('.purchase-page'))return;
+        if(e.key==='F2'){e.preventDefault();openUomPurchase()}
+        if(e.key==='F4'){e.preventDefault();openBarcodePurchase()}
+      },true);
+    }
   }
   function purchaseModalBox(){
     const box=document.querySelector('#modal .modalbox');if(!box)return null;
