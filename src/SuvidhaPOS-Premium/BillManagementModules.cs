@@ -228,40 +228,76 @@ DELETE FROM SalePayments WHERE SaleId=@id;",c,tx);
                 }
                 if(!status.Equals("Completed",StringComparison.OrdinalIgnoreCase)) return Results.BadRequest(new{message="Payment mode can be changed only on completed bills"});
 
+                if(oldMode.Equals("BTC",StringComparison.OrdinalIgnoreCase) && !mode.Equals("BTC",StringComparison.OrdinalIgnoreCase))
+                {
+                    cmd=new SqlCommand("SELECT COUNT(*) FROM BtcSettlementAllocations WHERE SaleId=@id",c,tx);cmd.Parameters.Add(P("@id",id));
+                    if(Convert.ToInt32(await cmd.ExecuteScalarAsync())>0) return Results.BadRequest(new{message="BTC bill already has settlement history. Reverse/settle history before changing its payment mode."});
+                    cmd=new SqlCommand(@"DELETE FROM BtcCompanyLedger WHERE ReferenceType='SALE' AND ReferenceId=@id AND EntryType='INVOICE';
+UPDATE Sales SET BtcCompanyId=NULL,BtcReferenceNo=NULL,BtcDueDate=NULL WHERE Id=@id",c,tx);cmd.Parameters.Add(P("@id",id));await cmd.ExecuteNonQueryAsync();
+                }
+
                 var parts=new List<BillPaymentPart>();
                 decimal paid=0;
+                var type=(x.PaymentType??"UPI").Trim();
+                var creditCustomerId=x.CustomerId;
+                var creditCustomerName=(x.CustomerName??"").Trim();
+
                 if(mode.Equals("Cash",StringComparison.OrdinalIgnoreCase))
                 {
                     parts.Add(new("Cash","Cash",total,x.ReferenceNo));paid=total;
                 }
                 else if(mode.Equals("BTC",StringComparison.OrdinalIgnoreCase))
                 {
-                    parts.Add(new("BTC","BTC",total,x.ReferenceNo));paid=total;
+                    return Results.BadRequest(new{message="Select Customer / Company in the BTC flow before saving"});
                 }
                 else if(mode.Equals("Credit/UPI",StringComparison.OrdinalIgnoreCase))
                 {
-                    var type=string.Equals(x.PaymentType,"Credit",StringComparison.OrdinalIgnoreCase)?"Credit":"UPI";
-                    parts.Add(new("Credit/UPI",type,total,x.ReferenceNo));paid=type=="Credit"?0:total;
+                    var allowedTypes=new HashSet<string>(StringComparer.OrdinalIgnoreCase){"Credit","UPI","Card","PhonePe","Paytm"};
+                    if(!allowedTypes.Contains(type)) type="UPI";
+                    if(type.Equals("Credit",StringComparison.OrdinalIgnoreCase))
+                    {
+                        if(creditCustomerId.HasValue)
+                        {
+                            cmd=new SqlCommand("SELECT TOP 1 Name FROM Customers WHERE Id=@id AND IsActive=1",c,tx);cmd.Parameters.Add(P("@id",creditCustomerId));
+                            var n=await cmd.ExecuteScalarAsync();if(n is null||n is DBNull) return Results.BadRequest(new{message="Selected customer is not active"});
+                            creditCustomerName=n.ToString()??creditCustomerName;
+                        }
+                        if(string.IsNullOrWhiteSpace(creditCustomerName)) return Results.BadRequest(new{message="Select Customer / Company for Credit"});
+                    }
+                    parts.Add(new("Credit/UPI",type,total,x.ReferenceNo));paid=type.Equals("Credit",StringComparison.OrdinalIgnoreCase)?0:total;
                 }
                 else
                 {
                     parts=(x.Payments??new List<BillPaymentPart>()).Where(p=>p.Amount>0).ToList();
                     if(parts.Count==0) return Results.BadRequest(new{message="Add at least one Multi Mode payment part"});
+                    if(parts.Any(p=>string.Equals(p.Type,"BTC",StringComparison.OrdinalIgnoreCase)))
+                        return Results.BadRequest(new{message="BTC cannot be mixed silently. Use the BTC / Bill To Company flow so a company is selected."});
                     var sum=parts.Sum(p=>p.Amount);
                     if(Math.Abs(sum-total)>0.01m) return Results.BadRequest(new{message=$"Multi Mode total must equal bill total ₹{total:0.00}. Entered ₹{sum:0.00}."});
                     paid=parts.Where(p=>!string.Equals(p.Type,"Credit",StringComparison.OrdinalIgnoreCase)).Sum(p=>p.Amount);
                 }
 
-                cmd=new SqlCommand("DELETE FROM SalePayments WHERE SaleId=@id;UPDATE Sales SET PaymentMode=@m,PaidAmount=@p,ModifiedAt=SYSDATETIME(),ModifiedBy=@u,ModificationCount=ISNULL(ModificationCount,0)+1,LastModificationType='PAYMENT' WHERE Id=@id",c,tx);
-                cmd.Parameters.AddRange(new[]{P("@id",id),P("@m",mode),P("@p",Math.Min(total,Math.Max(0,paid))),P("@u",user)});await cmd.ExecuteNonQueryAsync();
+                cmd=new SqlCommand(@"DELETE FROM SalePayments WHERE SaleId=@id;
+UPDATE Sales SET PaymentMode=@m,PaidAmount=@p,
+ CustomerId=CASE WHEN @isCredit=1 THEN @customerId ELSE CustomerId END,
+ CustomerName=CASE WHEN @isCredit=1 THEN @customerName ELSE CustomerName END,
+ PaymentStatus=CASE WHEN @p>=GrandTotal-.01 THEN 'Paid' WHEN @p>0 THEN 'Partially Paid' ELSE 'Pending' END,
+ PendingAmount=CASE WHEN @p>=GrandTotal-.01 THEN 0 ELSE GrandTotal-@p END,
+ ModifiedAt=SYSDATETIME(),ModifiedBy=@u,ModificationCount=ISNULL(ModificationCount,0)+1,LastModificationType='PAYMENT'
+WHERE Id=@id",c,tx);
+                var isCredit=mode.Equals("Credit/UPI",StringComparison.OrdinalIgnoreCase)&&type.Equals("Credit",StringComparison.OrdinalIgnoreCase);
+                cmd.Parameters.AddRange(new[]{P("@id",id),P("@m",mode),P("@p",Math.Min(total,Math.Max(0,paid))),P("@u",user),
+                    P("@isCredit",isCredit?1:0),P("@customerId",creditCustomerId),P("@customerName",creditCustomerName)});
+                await cmd.ExecuteNonQueryAsync();
+
                 foreach(var p in parts)
                 {
                     cmd=new SqlCommand("INSERT SalePayments(SaleId,PaymentMode,PaymentType,Amount,ReferenceNo) VALUES(@s,@m,@t,@a,@r)",c,tx);
                     cmd.Parameters.AddRange(new[]{P("@s",id),P("@m",mode),P("@t",p.Type),P("@a",p.Amount),P("@r",p.ReferenceNo)});await cmd.ExecuteNonQueryAsync();
                 }
                 cmd=new SqlCommand("INSERT AuditLogs(UserName,Action,Entity,EntityId,Details) VALUES(@u,'BILL_PAYMENT_CHANGED','Sale',@id,@d)",c,tx);
-                cmd.Parameters.AddRange(new[]{P("@u",user),P("@id",id),P("@d",$"{invoice}: {oldMode} -> {mode}; paid={paid:0.00}; reason={x.Reason}")});await cmd.ExecuteNonQueryAsync();
-                await tx.CommitAsync();return Results.Ok(new{id,paymentMode=mode,paidAmount=paid});
+                cmd.Parameters.AddRange(new[]{P("@u",user),P("@id",id),P("@d",$"{invoice}: {oldMode} -> {mode}; type={type}; customer={creditCustomerName}; paid={paid:0.00}; reason={x.Reason}")});await cmd.ExecuteNonQueryAsync();
+                await tx.CommitAsync();return Results.Ok(new{id,paymentMode=mode,paymentType=type,paidAmount=paid,customerId=creditCustomerId,customerName=creditCustomerName});
             }
             catch(Exception ex){await tx.RollbackAsync();return Results.BadRequest(new{message=ex.Message});}
         });
@@ -301,6 +337,6 @@ DELETE FROM SalePayments WHERE SaleId=@id;",c,tx);
     public record BillEditLine(int ProductId,string? UnitSold,decimal SoldQty,decimal RatePerSoldUnit,decimal TaxRate);
     public record BillResolvedLine(int ProductId,string UnitSold,decimal SoldQty,decimal Factor,decimal BaseQty,decimal SoldRate,decimal BaseRate,decimal TaxRate);
     public record BillPaymentPart(string Mode,string? Type,decimal Amount,string? ReferenceNo);
-    public record BillPaymentChangeRequest(string PaymentMode,string? PaymentType,string? ReferenceNo,string? Reason,List<BillPaymentPart>? Payments=null);
+    public record BillPaymentChangeRequest(string PaymentMode,string? PaymentType,string? ReferenceNo,string? Reason,List<BillPaymentPart>? Payments=null,int? CustomerId=null,string? CustomerName=null);
     public record BillPaymentSync(List<BillPaymentPart> Parts,decimal Paid);
 }
