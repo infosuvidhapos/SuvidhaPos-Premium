@@ -5,9 +5,22 @@
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=x=>Number(x||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const num=x=>Math.max(0,Number(x)||0);
-let companies=[],company=null,pending=[],ledger=[],settlements=[],payMode='Cash',multi=[],lastLookup='',advancePayMode='Cash',settlementKind='FULL';
+let companies=[],parties=[],company=null,pending=[],ledger=[],settlements=[],payMode='Cash',multi=[],lastLookup='',advancePayMode='Cash',settlementKind='FULL';
 function notice(m){try{toast(m)}catch(_){}}
 async function loadCompanies(q=''){const r=await api('/api/btc/companies?q='+encodeURIComponent(q||''));return Array.isArray(r)?r:[]}
+async function loadParties(q=''){
+ const r=await api('/api/retail/customer-company?q='+encodeURIComponent(q||''));
+ return (Array.isArray(r)?r:[]).map(x=>({PartyType:String(x.PartyType||'Company'),Id:Number(x.Id),CompanyName:x.Name||x.CompanyName||'',Phone:x.Phone||'',GstIn:x.GstIn||'',Address:x.Address||'',CreditLimit:num(x.CreditLimit),CreditDays:num(x.CreditDays),Outstanding:num(x.Balance??x.Outstanding),AdvanceBalance:num(x.AdvanceBalance)}));
+}
+async function ensureCompanyParty(type,id){
+ if(String(type).toUpperCase()==='COMPANY'){
+  if(!companies.length)companies=await loadCompanies('');
+  return companies.find(x=>Number(x.Id)===Number(id))||null;
+ }
+ const r=await api('/api/btc/companies/from-customer/'+Number(id),{method:'POST'});
+ companies=await loadCompanies('');
+ return companies.find(x=>Number(x.Id)===Number(r.id))||null;
+}
 function fmtDate(v){try{return new Date(v).toLocaleDateString('en-IN')}catch{return '-'}}
 function selectedIds(){return [...d.querySelectorAll('.btcpr-pick:checked')].map(x=>Number(x.value)).filter(Boolean)}
 function selectedRows(){const ids=selectedIds();return pending.filter(x=>ids.includes(Number(x.SaleId)))}
@@ -20,7 +33,7 @@ function pendingHtml(){
  return pending.map((x,i)=>`<tr><td><input class="btcpr-pick" type="checkbox" value="${Number(x.SaleId)}" onchange="btcPrRecalc()"></td><td>${i+1}</td><td><b>${esc(x.InvoiceNo)}</b></td><td>${fmtDate(x.BillDate)}</td><td>₹${money(x.GrandTotal)}</td><td>₹${money(x.PaidAmount)}</td><td><b>₹${money(x.PendingAmount)}</b></td><td>${x.BtcDueDate?fmtDate(x.BtcDueDate):'-'}</td><td>${esc(x.BtcReferenceNo||'')}</td></tr>`).join('');
 }
 function companySummary(){
- const c=company||{},suggestions=companies.map(x=>`<option value="${esc(x.CompanyName)}">${esc(x.Phone||'')} ${esc(x.GstIn||'')}</option>`).join('');
+ const c=company||{},suggestions=parties.map(x=>`<option value="${esc(x.CompanyName)}">${esc(x.PartyType)} · ${esc(x.Phone||'')} ${esc(x.GstIn||'')}</option>`).join('');
  const advance=company?`<div class="btcpr-advance-bar"><div><span>ADVANCE RECEIPT</span><b>Advance Received ₹${money(c.AdvanceBalance||0)}</b></div><label>Advance Amount<input id="btcPrAdvanceAmount" class="input" type="number" min="0" step="0.01" placeholder="0.00"></label><div class="btcpr-advance-modes"><button class="${advancePayMode==='Cash'?'active':''}" onclick="btcPrAdvanceMode('Cash')">💵 Cash</button><button class="${advancePayMode==='Credit/UPI'?'active':''}" onclick="btcPrAdvanceMode('Credit/UPI')">💳 Credit / UPI</button></div><label class="btcpr-advance-ref">UTR / Ref (UPI optional)<input id="btcPrAdvanceRef" class="input" placeholder="Optional"></label><button class="btn green" onclick="btcPrReceiveAdvance()">Receive Advance</button></div>`:''; 
  return `<div class="btcpr-company-grid"><label>Company / Mobile No.<div class="btcpr-search"><input id="btcPrLookup" class="input" list="btcPrCompanySuggestions" value="${esc(c.Phone||lastLookup||'')}" placeholder="Search company / mobile / GSTIN" autocomplete="off"><datalist id="btcPrCompanySuggestions">${suggestions}</datalist><button class="btn secondary" onclick="btcPrSearchCompany()">Search</button><button class="btn green" onclick="btcPrNewCompany()">＋ New</button></div><small class="btcpr-search-help">Type to see customer/company suggestions, then Search or press Enter.</small></label><label>Name<input class="input" value="${esc(c.CompanyName||'')}" readonly></label><label>GSTIN<input class="input" value="${esc(c.GstIn||'')}" readonly></label><label>Tel No.<input class="input" value="${esc(c.Phone||'')}" readonly></label><label>Credit Limit<input class="input" value="${num(c.CreditLimit)>0?'₹'+money(c.CreditLimit):'Unlimited'}" readonly></label><label>Credit Days<input class="input" value="${num(c.CreditDays)}" readonly></label><label class="wide">Address<input class="input" value="${esc(c.Address||'')}" readonly></label></div>${advance}`;
 }
@@ -47,13 +60,14 @@ async function selectCompany(id){
 }
 w.loadBtcSettlement=async function(){
  if(typeof setPage==='function')setPage('btcsettlement');if(typeof title!=='undefined')title.textContent='BTC / Credit Settlement';const hp=d.querySelector('header p');if(hp)hp.textContent='Bill To Company · Customer Payment Receipt';
- companies=await loadCompanies('');const first=companies.find(x=>num(x.Outstanding)>0)||companies[0]||null;if(first)await selectCompany(first.Id);else{company=null;pending=[];ledger=[];settlements=[];renderPage()}
+ companies=await loadCompanies('');parties=await loadParties('');company=null;pending=[];ledger=[];settlements=[];lastLookup='';renderPage();
 };
 w.btcPrSearchCompany=async function(){
- const q=(d.querySelector('#btcPrLookup')?.value||'').trim();lastLookup=q;if(!q)return notice('Enter company name, mobile or GSTIN');const rows=await loadCompanies(q);if(!rows.length)return w.btcPrNewCompany(q);if(rows.length===1){companies=await loadCompanies('');return selectCompany(rows[0].Id)}
- modal('Select BTC / Credit Company',`<div class="btcpr-company-choices">${rows.map(x=>`<button onclick="btcPrPickCompany(${Number(x.Id)})"><div><b>${esc(x.CompanyName)}</b><small>${esc(x.Phone||'')} · ${esc(x.GstIn||'-')}</small></div><span>Outstanding ₹${money(x.Outstanding)}</span></button>`).join('')}</div>`,`<button class="btn secondary" onclick="closeModal()">Close</button>`);companies=await loadCompanies('');
+ const q=(d.querySelector('#btcPrLookup')?.value||'').trim();lastLookup=q;if(!q)return notice('Enter customer/company name, mobile or GSTIN');const rows=await loadParties(q);parties=rows;if(!rows.length)return w.btcPrNewCompany(q);
+ if(rows.length===1){const cc=await ensureCompanyParty(rows[0].PartyType,rows[0].Id);if(!cc)return notice('Party could not be opened');closeModal();return selectCompany(cc.Id)}
+ modal('Select Customer / Company',`<div class="btcpr-company-choices">${rows.map(x=>`<button onclick="btcPrPickParty('${esc(x.PartyType)}',${Number(x.Id)})"><div><b>${esc(x.CompanyName)}</b><small>${esc(x.PartyType)} · ${esc(x.Phone||'')} · ${esc(x.GstIn||'-')}</small></div><span>Outstanding ₹${money(x.Outstanding)}</span></button>`).join('')}</div>`);
 };
-w.btcPrPickCompany=function(id){closeModal();selectCompany(id)};
+w.btcPrPickParty=async function(type,id){try{const cc=await ensureCompanyParty(type,id);if(!cc)return notice('Party could not be opened');closeModal();await selectCompany(cc.Id)}catch(e){alert(e.message||e)}};
 w.btcPrAdvanceMode=function(mode){advancePayMode=mode==='Credit/UPI'?'Credit/UPI':'Cash';d.querySelectorAll('.btcpr-advance-modes button').forEach(b=>b.classList.toggle('active',b.textContent.includes(advancePayMode==='Cash'?'Cash':'Credit'))) };
 w.btcPrReceiveAdvance=async function(){if(!company)return notice('Select company first');const amount=num(d.querySelector('#btcPrAdvanceAmount')?.value);if(!amount)return notice('Enter advance amount');try{const r=await api('/api/btc/advance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CompanyId:Number(company.Id),Amount:amount,PaymentMode:advancePayMode,ReferenceNo:(d.querySelector('#btcPrAdvanceRef')?.value||'').trim()||null,Notes:'Advance received from BTC settlement screen'})});notice('Advance received: '+r.receiptNo);await selectCompany(company.Id)}catch(e){alert(e.message||e)}};
 w.btcPrNewCompany=function(seed){

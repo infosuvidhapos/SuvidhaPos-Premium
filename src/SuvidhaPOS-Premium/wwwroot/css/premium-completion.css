@@ -23,3 +23,14 @@ body.jewel-suite-mode .premium-print-actions{background:#fffaf0;border-color:#e1
 @media(max-width:1280px){.barcode-template-grid{grid-template-columns:repeat(3,1fr)}.stone-row{grid-template-columns:repeat(4,1fr)}.stone-row button{grid-column:auto}}
 @media(max-width:1000px){.barcode-layout{grid-template-columns:1fr}.rule-grid{grid-template-columns:1fr 1fr}.feature-grid{grid-template-columns:1fr}.premium-print-actions{grid-template-columns:1fr}.premium-print-actions>b{grid-column:auto}}
 @media(max-width:700px){.completion-hero,.completion-toolbar{align-items:flex-start;flex-direction:column}.rule-grid,.barcode-template-grid{grid-template-columns:1fr}.stone-row{grid-template-columns:1fr 1fr}}
+
+/* 2026-09-11 jewellery item master sizing */
+.jewel-suite-mode .jewellery-item-master{max-width:100%!important;padding:14px!important}
+.jewel-suite-mode .jewellery-item-master .metricrow{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.jewel-suite-mode .jewellery-item-master .tablewrap{overflow:auto!important;max-height:calc(100vh - 290px)!important}
+.modal .premium-item-form{width:100%!important}
+.modal .premium-item-form .master-section{padding:14px!important;margin-bottom:12px!important}
+.modal .premium-item-form .formgrid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:10px 12px!important}
+.modal .premium-item-form .formgrid .full{grid-column:1/-1!important}
+@media(max-width:1100px){.modal .premium-item-form .formgrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:720px){.modal .premium-item-form .formgrid{grid-template-columns:1fr!important}.jewel-suite-mode .jewellery-item-master .metricrow{grid-template-columns:1fr 1fr!important}}

@@ -85,6 +85,8 @@ async function loadRuntime(){
   await addScript('/js/india-locations.js?v=6141review12','indiaLocationsJs6140');
   await addScript('/js/retail-masters-ui.js?v=6141review12','retailMastersUiJs6140');
   await addScript('/js/audit-report-thermal.js?v=6141review12','auditReportThermalJs6140');
+  await addScript('/js/jewellery-nav-fix.js?v=6170','jewelleryNavFix6170');
+  await addScript('/js/credit-upi-click-fix.js?v=6170','creditUpiClickFix6170');
  }catch(e){console.error('Suvidha retail/BTC runtime 6.14.0:',e)}
 }
 if(d.readyState==='complete')loadRuntime();else w.addEventListener('load',loadRuntime,{once:true});

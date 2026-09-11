@@ -193,7 +193,7 @@ function openUser(){modal('Add User',`<div class="formgrid"><label>Username<inpu
 async function saveUser(){try{await api('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({UserName:un.value,DisplayName:ud.value,Password:up.value,Role:ur.value})});closeModal();loadUsers()}catch(e){alert(e.message)}}
 async function toggleUser(id){await api('/api/users/'+id+'/toggle',{method:'POST'});loadUsers()}
 
-function modal(head,body,actions=''){const m=document.createElement('div');m.className='modal open';m.id='modal';m.innerHTML=`<div class="modalbox"><div class="panelhead"><h2>${head}</h2><button class="btn small secondary" onclick="closeModal()">×</button></div>${body}<div class="toolbar" style="justify-content:flex-end;margin-top:15px">${actions}<button class="btn secondary" onclick="closeModal()">Cancel</button></div></div>`;document.body.appendChild(m);return m}
+function modal(head,body,actions=''){const m=document.createElement('div');m.className='modal open';m.id='modal';m.innerHTML=`<div class="modalbox"><div class="panelhead"><h2>${head}</h2><button class="btn small secondary" onclick="closeModal()">×</button></div>${body}<div class="toolbar" style="justify-content:flex-end;margin-top:15px">${actions}<button class="btn secondary" onclick="closeModal()">Close</button></div></div>`;document.body.appendChild(m);return m}
 function closeModal(){document.querySelectorAll('.modal').forEach(x=>x.remove())}
 
 const sidebarRoutes={
