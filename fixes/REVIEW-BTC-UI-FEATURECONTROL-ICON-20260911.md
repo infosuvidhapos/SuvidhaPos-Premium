@@ -21,3 +21,11 @@ Requested after Build #167. Each pointer is intentionally separated so it can be
 
 Build gate: compile + JS syntax + targeted source validations + installer validation before merge.
 - F-17 Remove top-level AI Import navigation and dashboard quick action; keep AI Import inside Item Master (normal + jewellery) alongside Item Import and Opening Stock.
+
+## Continuation after main commit 23ed1ae
+
+- F-18 Match sidebar labels independently of their decorative icons. Disabled Settings and Day Closing buttons now hide correctly in retail and jewellery. Match exact labels so Stock does not also hide Stock Report.
+- F-19 Separate jewellery Stock from Jewellery Item Master. The retail Item Master switch no longer claims jewellery Stock; Jewellery Item Master controls its actual menu and Item Entry. Show only the applicable Item Master switch for the active store mode.
+- F-20 Refresh the sidebar runtime asset version to 6191 and run `node fixes/test-sidebar-feature-control.cjs` in CI. The regression check fails on the previous runtime and passes on the corrected one, covering labels, independent visibility, route guards, persistence and re-enable.
+
+Validation limitation: this regression uses a small DOM fixture, not a Windows/WebView2 application session. BTC and Windows icon fixes are inherited from main; they were not rewritten in this continuation. AI Import remains inside Item Master.

@@ -67,6 +67,8 @@ jobs:
 
       - name: Restore
         run: dotnet restore SuvidhaPOS-Premium.sln
+      - name: Validate sidebar feature switch behavior
+        run: node fixes/test-sidebar-feature-control.cjs
       - name: Build
         run: dotnet build SuvidhaPOS-Premium.sln --configuration Release --no-restore
       - name: Validate source layout
