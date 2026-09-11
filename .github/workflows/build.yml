@@ -221,7 +221,8 @@ jobs:
           foreach($token in @('id="barcodeMasterNav"','loadBarcodePrintMaster()','6123runtimewire')){ if(-not $html.Contains($token)){ throw "Normal direct master missing: $token" } }
           foreach($token in @('data-page="aiimport"','data-page="itemimport"','data-page="openingstock"')){ if($html.Contains($token)){ throw "Top-level Item Master child must not return: $token" } }
           $appjs = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
-          foreach($token in @("itemimport:['loadNormalItemImportMaster','loadAIImport']",'loadNormalItemImportMaster()',"aiimport:['loadAIImport']")){ if(-not $appjs.Contains($token)){ throw "Internal import routing missing: $token" } }
+          foreach($token in @("itemimport:['loadNormalItemImportMaster','loadAIImport']","aiimport:['loadAIImport']")){ if(-not $appjs.Contains($token)){ throw "Internal import routing missing: $token" } }
+          if($html.Contains('data-page="aiimport"')){ throw 'Top-level AI Import must stay removed; open it only from Item Master' }
           $retail = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/retail-masters-ui.js' -Raw -Encoding UTF8
           foreach($token in @("'AI Import'","'Item Import'","'Opening Stock'")){ if(-not $retail.Contains($token)){ throw "Item Master consolidated tile missing: $token" } }
           $jcss = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
