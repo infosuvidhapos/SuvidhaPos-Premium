@@ -47,7 +47,8 @@ async function selectCompany(id){
 }
 w.loadBtcSettlement=async function(){
  if(typeof setPage==='function')setPage('btcsettlement');if(typeof title!=='undefined')title.textContent='BTC / Credit Settlement';const hp=d.querySelector('header p');if(hp)hp.textContent='Bill To Company · Customer Payment Receipt';
- companies=await loadCompanies('');const first=companies.find(x=>num(x.Outstanding)>0)||companies[0]||null;if(first)await selectCompany(first.Id);else{company=null;pending=[];ledger=[];settlements=[];renderPage()}
+ companies=await loadCompanies('');company=null;pending=[];ledger=[];settlements=[];lastLookup='';settlementKind='FULL';payMode='Cash';multi=[];renderPage();
+ setTimeout(()=>d.querySelector('#btcPrLookup')?.focus(),30);
 };
 w.btcPrSearchCompany=async function(){
  const q=(d.querySelector('#btcPrLookup')?.value||'').trim();lastLookup=q;if(!q)return notice('Enter company name, mobile or GSTIN');const rows=await loadCompanies(q);if(!rows.length)return w.btcPrNewCompany(q);if(rows.length===1){companies=await loadCompanies('');return selectCompany(rows[0].Id)}
