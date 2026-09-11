@@ -45,6 +45,15 @@ public static class PurchaseImportModules
         app.MapPost("/api/purchase-import/commit", async (Db db, PurchaseImportCommitRequest x) =>
         {
             if(x.Rows is null||x.Rows.Count==0) return Results.BadRequest(new{message="No purchase rows"});
+            var outlet=await db.QuerySingleAsync("SELECT TOP 1 StoreType,RequireBatch,RequireExpiry FROM OutletMaster ORDER BY Id");
+            var storeType=outlet.GetValueOrDefault("StoreType")?.ToString()??"Retail Shop";
+            var pharmacy=storeType.Contains("Pharmacy",StringComparison.OrdinalIgnoreCase)||storeType.Contains("Medical",StringComparison.OrdinalIgnoreCase);
+            var requireBatch=pharmacy||Convert.ToBoolean(outlet.GetValueOrDefault("RequireBatch")??false);
+            var requireExpiry=pharmacy||Convert.ToBoolean(outlet.GetValueOrDefault("RequireExpiry")??false);
+            foreach(var r in x.Rows){
+                if(requireBatch&&string.IsNullOrWhiteSpace(r.BatchNo))return Results.BadRequest(new{message=$"Row {r.RowNo}: Batch No is required for this outlet"});
+                if(requireExpiry&&!r.ExpiryDate.HasValue)return Results.BadRequest(new{message=$"Row {r.RowNo}: Expiry Date is required for this outlet"});
+            }
             using var c=db.CreateConnection(); await c.OpenAsync(); using var tx=c.BeginTransaction();
             try
             {
@@ -130,6 +139,16 @@ VALUES(@p,@b,'PURCHASE',@stock,'PURCHASE',@i,'Purchase Bill Excel Import')",c,tx
             for(int i=0;i<vals.Length;i++)r.CreateCell(i).SetCellValue(vals[i]);
             using var ms=new MemoryStream();wb.Write(ms,true);return Results.File(ms.ToArray(),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","SuvidhaPOS-Purchase-Import-Sample.xlsx");
         });
+
+        app.MapGet("/api/purchase-import/bill-template", () =>
+        {
+            IWorkbook wb=new XSSFWorkbook(); var sh=wb.CreateSheet("Purchase Bill Upload");
+            var headers=new[]{"Date","Vch/Bill No","Particulars","Group","Item Details","TAX RATE","HSN CODE","BCN","MRP","Disc.","Qty.","Unit","Price","Amount","Pcs.","Batch No","Expiry Date"};
+            var hr=sh.CreateRow(0); for(int i=0;i<headers.Length;i++){hr.CreateCell(i).SetCellValue(headers[i]);sh.SetColumnWidth(i,Math.Min(7000,Math.Max(2800,headers[i].Length*300)));}
+            var r=sh.CreateRow(1); var vals=new[]{"25/08/2026","BSCPL/1030/26-27","General Purchase","GST 18%","Bajaj Kettle 1.5 Ltr Stainless Steel","GST 18%","851679","8901234567890","999","0","2","PCS","700","1400","2","KTL-0826","31/08/2028"};
+            for(int i=0;i<vals.Length;i++)r.CreateCell(i).SetCellValue(vals[i]);
+            using var ms=new MemoryStream();wb.Write(ms,true);return Results.File(ms.ToArray(),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","SuvidhaPOS-Purchase-Bill-Upload-Sample.xlsx");
+        });
     }
 
     static async Task<string> ResolveUnit(SqlConnection c,SqlTransaction tx,string? unit)
@@ -174,7 +193,7 @@ ORDER BY CASE WHEN @b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b) 
                 v=G("Particulars");if(v!="")particular=v;v=G("Group","Category");if(v!="")group=v;
                 var ds=G("Date","Purchase Date");if(ds!=""){if(DateTime.TryParse(ds,CultureInfo.GetCultureInfo("en-IN"),DateTimeStyles.None,out var dt)||DateTime.TryParse(ds,out dt))date=dt;}
                 var item=G("Item Details","Item Name","Product","Description"); if(item==""&&particular!=""&&!LooksHeader(particular)) item=particular;
-                var barcode=G("BCN","Barcode","Bar Code","EAN","SKU"); var qty=D(G("Qty.","Qty","Quantity","Pcs."));
+                var barcode=G("BCN","Barcode","Bar Code","EAN","SKU"); var qty=D(G("Qty.","Qty","Quantity","Pcs.","Pcs"));
                 if(string.IsNullOrWhiteSpace(item)&&(string.IsNullOrWhiteSpace(barcode)||qty<=0))continue;
                 rows.Add(new PurchaseImportRow{RowNo=ri+1,InvoiceNo=inv,PurchaseDate=date,SupplierName=supplier,ItemName=item,Barcode=barcode,Group=group,Hsn=G("HSN CODE","HSN","HSN/SAC"),GstRate=Tax(G("TAX RATE","GST","GST %")),Mrp=D(G("MRP")),Discount=D(G("Disc.","Discount")),Qty=qty<=0?1:qty,FreeQuantity=D(G("Free Qty","Free")),Unit=G("Unit"),PurchaseRate=D(G("Price","Purchase","Purchase Rate","Rate")),SalePrice=D(G("Sale Price","Selling Price")),Amount=D(G("Amount")),BatchNo=G("Batch No","Batch"),ExpiryDate=Dt(G("Expiry Date","Expiry"))});
             }
