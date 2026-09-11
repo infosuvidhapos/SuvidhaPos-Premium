@@ -8,7 +8,7 @@ w.closeDay=async function(){
  return oldClose.apply(this,arguments)
 };
 async function readAuto(){try{const x=await api('/api/app-settings/'+encodeURIComponent(KEY));return /^true|1|on$/i.test(String(x.Value??x.value??''))}catch{return false}}
-w.saveAutoDayClose=async function(on){try{await api('/api/app-settings/'+encodeURIComponent(KEY),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:on?'true':'false'})});toast('Auto Day Close '+(on?'enabled':'disabled'));schedule()}catch(e){alert(e.message||e)}};
+w.saveAutoDayClose=async function(on){try{await api('/api/app-settings/'+encodeURIComponent(KEY),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:on?'true':'false'})});toast('Auto Day Close '+(on?'enabled':'disabled'));if(on)await runAuto();schedule()}catch(e){alert(e.message||e)}};
 async function inject(){
  const host=d.querySelector('#app .content');if(!host||d.getElementById('autoDayClosePanel'))return;
  const on=await readAuto(),status=await api('/api/day-closing/status').catch(()=>({}));
