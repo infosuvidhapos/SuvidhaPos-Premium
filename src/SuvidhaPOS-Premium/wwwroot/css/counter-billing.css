@@ -7,3 +7,21 @@
 .cb-total-lines small{display:block;color:#7290a6;margin-top:3px}
 .cb-actions{grid-template-columns:1fr 1fr 1fr 1.4fr 1fr}
 @media(max-width:1100px){.cb-inputbar{grid-template-columns:1.3fr 1.2fr 75px 82px 85px 95px 90px 40px 40px}.cb-head{font-size:18px}.cb-main{grid-template-columns:minmax(0,1fr) 120px}}
+
+/* 2026-09-11: stable adjustable billing layout as cart rows grow */
+@media(min-width:851px){
+ .counter-billing{height:calc(100dvh - 104px)!important;min-height:0!important;max-height:calc(100dvh - 104px)!important}
+ .counter-billing .cb-head,.counter-billing .cb-shortcuts,.counter-billing .cb-inputbar,.counter-billing .cb-countbar,.counter-billing .cb-customer,.counter-billing .cb-totals,.counter-billing .cb-actions,.counter-billing .billing-print-actions,.counter-billing #btcBillingCompany{flex:0 0 auto}
+ .counter-billing .cb-main{flex:1 1 220px!important;min-height:170px!important;overflow:hidden!important}
+ .counter-billing .cb-table-wrap{height:100%!important;min-height:0!important;max-height:100%!important;overflow:auto!important;overscroll-behavior:contain}
+ .counter-billing .cb-table{min-width:760px}
+ .counter-billing .cb-table thead{position:sticky;top:0;z-index:2}
+ .counter-billing .cb-pay{min-height:0;overflow:auto}
+}
+@media(max-height:760px) and (min-width:851px){
+ .counter-billing .cb-inputbar{padding-top:6px;padding-bottom:6px}
+ .counter-billing .cb-customer{padding-top:5px;padding-bottom:5px}
+ .counter-billing .cb-totals{padding-top:5px}
+ .counter-billing .cb-actions{padding-top:4px;padding-bottom:5px}
+ .counter-billing .cb-actions button{height:40px}
+}
