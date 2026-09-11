@@ -7,6 +7,8 @@ function fix(){
  const stock=nav.find(x=>x.textContent.trim()==='Stock');
  const purchase=nav.find(x=>x.textContent.includes('Purchase Bill'));
  if(stock&&purchase&&purchase.previousElementSibling!==stock)stock.insertAdjacentElement('afterend',purchase);
+ const flags=(window.__premiumCompletion&&window.__premiumCompletion.flags)||{};const on=k=>flags[k]===undefined?true:!!flags[k];
+ nav.forEach(b=>{const t=b.textContent.trim();if((t.includes('Item Master')||t.includes('Item Entry'))&&!on('P-01'))b.style.display='none';if(t.includes('Item Import Master')&&!on('P-05'))b.style.display='none';if(t.includes('Barcode Print Master')&&!on('P-03'))b.style.display='none';if(t.includes('Jewellery Billing')&&!on('P-02'))b.style.display='none'});
  const system=[...side.querySelectorAll('.js-section')].find(x=>x.textContent.trim()==='SYSTEM');
  if(system&&!d.getElementById('jFeatureControlNav')){const b=d.createElement('button');b.id='jFeatureControlNav';b.className='nav js-nav';b.innerHTML='⚑<span>Feature Control</span>';b.onclick=()=>window.loadPremiumFeatureControl&&window.loadPremiumFeatureControl();system.insertAdjacentElement('afterend',b)}
 }
