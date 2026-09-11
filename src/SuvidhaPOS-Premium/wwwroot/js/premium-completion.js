@@ -15,6 +15,12 @@ function notify(x){try{toast(x)}catch(_){alert(x)}}
 
 function ensureNav(){
  var side=d.getElementById('sidebar');if(!side)return;
+ var visibility=[
+  ['[data-page="aiimport"]','P-06'],['[data-page="reports"]','P-15'],['[data-page="billmaster"]','P-16'],
+  ['#barcodeMasterNav','P-03']
+ ];
+ visibility.forEach(function(v){side.querySelectorAll(v[0]).forEach(function(x){x.style.display=enabled(v[1])?'':'none'})});
+ side.querySelectorAll('.sidebottom .plain').forEach(function(x){if(x.textContent.indexOf('Print Master')>=0)x.style.display=enabled('P-17')?'':'none'});
  if(!jewel()){
    var ai=side.querySelector('[data-page="aiimport"] span');if(ai)ai.textContent='AI Import';var im=side.querySelector('[data-page="itemimport"] span');if(im)im.textContent='Item Import Master';
    var bottom=side.querySelector('.sidebottom');
