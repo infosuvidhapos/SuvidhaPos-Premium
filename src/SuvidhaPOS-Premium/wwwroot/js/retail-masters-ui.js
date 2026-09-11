@@ -74,7 +74,13 @@ w.retailSaveCategory=async function(){
  try{
   if(id)await api('/api/retail/categories/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Name:name,OldName:oldName})});
   else await api('/api/retail/categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Name:name,OldName:null})});
-  closeModal();await loadCategories();const target=d.getElementById(targetId);if(target){target.value=name;target.focus()}else w.loadCategoryMaster();notice('Category saved');
+  const stack=[...d.querySelectorAll('.modal')];const top=stack[stack.length-1];if(top)top.remove();
+  await loadCategories();
+  const list=d.getElementById('retailCategoryList');if(list)list.innerHTML=categories.map(x=>`<option value="${esc(x.Name)}"></option>`).join('');
+  const target=d.getElementById(targetId);
+  if(target){target.value=name;target.dispatchEvent(new Event('input',{bubbles:true}));target.dispatchEvent(new Event('change',{bubbles:true}));target.focus()}
+  else w.loadCategoryMaster();
+  notice('Category saved · '+name+' selected');
  }catch(e){alert(e.message||e)}
 };
 w.retailDeleteCategory=async id=>{if(!confirm('Delete this category?'))return;try{await api('/api/retail/categories/'+id,{method:'DELETE'});notice('Category deleted');w.loadCategoryMaster()}catch(e){alert(e.message||e)}};

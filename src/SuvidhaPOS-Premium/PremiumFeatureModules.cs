@@ -317,8 +317,7 @@ FROM Products p
 LEFT JOIN StockLedger l ON l.ProductId=p.Id
 WHERE p.IsActive=1 AND (@q='' OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like OR ISNULL(p.Sku,'') LIKE @like OR ISNULL(p.Category,'') LIKE @like)
 GROUP BY p.Id,p.Name,p.Barcode,p.Sku,p.Category,p.Unit,p.Hsn,p.GstRate,p.PurchasePrice,p.SalePrice,p.Mrp,p.LocationCode,p.RackName,p.ShelfName
-HAVING ISNULL(SUM(CASE WHEN l.CreatedAt<@e THEN l.Quantity ELSE 0 END),0)<>0
-ORDER BY p.Name"; break;
+ORDER BY ISNULL(NULLIF(p.Category,''),'Uncategorised'),p.Name"; break;
                 default: return Results.BadRequest(new { message = "Unknown premium report type" });
             }
             return Results.Ok(await db.QueryAsync(sql,P("@f",f),P("@e",e),P("@q",term),P("@like",like)));

@@ -74,19 +74,19 @@ w.premiumPrintHtml=async function(html,name){
 function addCss(href,id){if(d.getElementById(id))return;var l=d.createElement('link');l.id=id;l.rel='stylesheet';l.href=href;d.head.appendChild(l)}
 function addScript(src,id){return new Promise(function(resolve,reject){if(d.getElementById(id))return resolve();var s=d.createElement('script');s.id=id;s.src=src;s.onload=resolve;s.onerror=function(){reject(new Error('Could not load '+src))};d.body.appendChild(s)})}
 async function loadRuntime(){
- addCss('/css/billing-layout-fix.css?v=6141review12','billingLayoutFix6130');
- addCss('/css/btc-payment-receipt-flow.css?v=6141review12','btcReceiptFlowCss6130');
- addCss('/css/retail-expansion.css?v=6141review12','retailExpansionCss6140');
- addCss('/css/audit-report-thermal.css?v=6141review12','auditReportThermalCss6140');
+ addCss('/css/billing-layout-fix.css?v=6180','billingLayoutFix6130');
+ addCss('/css/btc-payment-receipt-flow.css?v=6180','btcReceiptFlowCss6130');
+ addCss('/css/retail-expansion.css?v=6180','retailExpansionCss6140');
+ addCss('/css/audit-report-thermal.css?v=6180','auditReportThermalCss6140');
  try{
-  await addScript('/js/btc-payment-receipt-flow.js?v=6141review12','btcReceiptFlowJs6130');
-  await addScript('/js/btc-payment-receipt-input-fix.js?v=6141review12','btcReceiptInputFixJs6130');
-  await addScript('/js/billing-hold.js?v=6141review12','billingHoldJs6130');
-  await addScript('/js/india-locations.js?v=6141review12','indiaLocationsJs6140');
-  await addScript('/js/retail-masters-ui.js?v=6141review12','retailMastersUiJs6140');
-  await addScript('/js/audit-report-thermal.js?v=6141review12','auditReportThermalJs6140');
-  await addScript('/js/jewellery-nav-fix.js?v=6170','jewelleryNavFix6170');
-  await addScript('/js/credit-upi-click-fix.js?v=6170','creditUpiClickFix6170');
+  await addScript('/js/btc-payment-receipt-flow.js?v=6180','btcReceiptFlowJs6130');
+  await addScript('/js/btc-payment-receipt-input-fix.js?v=6180','btcReceiptInputFixJs6130');
+  await addScript('/js/billing-hold.js?v=6180','billingHoldJs6130');
+  await addScript('/js/india-locations.js?v=6180','indiaLocationsJs6140');
+  await addScript('/js/retail-masters-ui.js?v=6180','retailMastersUiJs6140');
+  await addScript('/js/audit-report-thermal.js?v=6180','auditReportThermalJs6140');
+  await addScript('/js/jewellery-nav-fix.js?v=6180','jewelleryNavFix6170');
+  await addScript('/js/credit-upi-click-fix.js?v=6180','creditUpiClickFix6170');
  }catch(e){console.error('Suvidha retail/BTC runtime 6.14.0:',e)}
 }
 if(d.readyState==='complete')loadRuntime();else w.addEventListener('load',loadRuntime,{once:true});

@@ -1,7 +1,7 @@
 (function(w,d){
 'use strict';
 // BTC in SuvidhaPOS = Bill To Company. It is company credit, never cryptocurrency.
-let billingCompany=null,billingReference='',companyCache=[],billingRoot=null,btcSaving=false,billingAdvanceMode='Cash';
+let billingCompany=null,billingReference='',companyCache=[],billingRoot=null,btcSaving=false,billingAdvanceMode='Cash',companyMasterContext='master';
 let settlementCompanyId=0,pendingRows=[],settlementRows=[],ledgerRows=[],settleKind='FULL',settleMode='Cash',multiPayments=[];
 let patchQueued=false;
 const oldPay=w.cbPaySelect,oldComplete=w.cbComplete;
@@ -43,10 +43,31 @@ w.openBtcCompanySelect=async function(){
  const s=d.querySelector('#btcCompanySearch');if(s)s.addEventListener('input',async()=>{const r=await loadCompanies(s.value);const box=d.querySelector('#btcCompanyRows');if(box)box.innerHTML=companyRowsHtml(r)});
 };
 w.btcBillingAdvanceMode=function(mode){billingAdvanceMode=mode==='Credit/UPI'?'Credit/UPI':'Cash';d.querySelectorAll('[data-btc-advance-mode]').forEach(b=>b.classList.toggle('active',b.dataset.btcAdvanceMode===billingAdvanceMode))};
-w.btcChooseCompany=async function(id){const c=companyCache.find(x=>Number(x.Id)===Number(id));if(!c)return;const advance=num(d.querySelector('#btcBillingAdvance')?.value);try{if(advance>0){const r=await api('/api/btc/advance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CompanyId:Number(c.Id),Amount:advance,PaymentMode:billingAdvanceMode,ReferenceNo:null,Notes:'Advance received during BTC billing company selection'})});notify('Advance '+r.receiptNo+' received · ₹'+money(advance))}billingCompany=c;billingReference='';closeModal();if(oldPay)oldPay('BTC','Bill To Company');const n=d.querySelector('#cbCustomer'),g=d.querySelector('#cbGstNo'),m=d.querySelector('#cbMobile');if(n)n.value=c.CompanyName;if(g)g.value=c.GstIn||'';if(m)m.value=c.Phone||'';updateBillingCompanyUi();notify('Bill To Company selected: '+c.CompanyName)}catch(e){alert(e.message||e)}};
-function companyForm(c){c=c||{};return `<div class="formgrid btc-company-form"><label>Company Name *<input id="bcName" class="input" value="${esc(c.CompanyName||'')}"></label><label>GSTIN<input id="bcGst" class="input" value="${esc(c.GstIn||'')}"></label><label>Phone<input id="bcPhone" class="input" value="${esc(c.Phone||'')}"></label><label>Credit Limit (0 = Unlimited)<input id="bcLimit" type="number" min="0" class="input" value="${num(c.CreditLimit)}"></label><label>Credit Days<input id="bcDays" type="number" min="0" class="input" value="${num(c.CreditDays)}"></label><label class="full">Address<textarea id="bcAddress" class="textarea">${esc(c.Address||'')}</textarea></label></div>`}
-w.btcOpenCompanyMaster=async function(editId){const rows=await loadCompanies(),c=editId?rows.find(x=>Number(x.Id)===Number(editId)):null;modal('BTC / Credit Company Master',`${companyForm(c)}<div class="btc-company-master-list"><h4>Existing Companies</h4>${rows.map(x=>`<button onclick="btcOpenCompanyMaster(${x.Id})"><b>${esc(x.CompanyName)}</b><span>Outstanding ₹${money(x.Outstanding)} · Edit</span></button>`).join('')||'<div class="empty">No companies yet</div>'}</div>`,`<button class="btn" onclick="btcSaveCompany(${c?c.Id:0})">${c?'Update Company':'✓ Submit'}</button><button class="btn secondary" onclick="closeModal()">Close</button>`)};
-w.btcSaveCompany=async function(id){const body={CompanyName:d.querySelector('#bcName')?.value?.trim(),GstIn:d.querySelector('#bcGst')?.value?.trim()||null,Phone:d.querySelector('#bcPhone')?.value?.trim()||null,Address:d.querySelector('#bcAddress')?.value?.trim()||null,CreditLimit:num(d.querySelector('#bcLimit')?.value),CreditDays:Math.floor(num(d.querySelector('#bcDays')?.value))};if(!body.CompanyName)return notify('Company Name is required');await api('/api/btc/companies'+(id?'/'+id:''),{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});notify(id?'Company updated':'Company created');w.btcOpenCompanyMaster()};
+async function applyBillingCompany(c){
+ if(!c)return null;
+ billingCompany=c;billingReference='';
+ if(oldPay)oldPay('BTC','Bill To Company');
+ const n=d.querySelector('#cbCustomer'),g=d.querySelector('#cbGstNo'),m=d.querySelector('#cbMobile');
+ if(n)n.value=c.CompanyName;if(g)g.value=c.GstIn||'';if(m)m.value=c.Phone||'';
+ updateBillingCompanyUi();return c;
+}
+w.btcSetBillingCompanyById=async function(id){const rows=await loadCompanies('');const c=rows.find(x=>Number(x.Id)===Number(id));if(!c)throw new Error('Selected company was not found');return applyBillingCompany(c)};
+w.btcChooseCompany=async function(id){const c=companyCache.find(x=>Number(x.Id)===Number(id));if(!c)return;const advance=num(d.querySelector('#btcBillingAdvance')?.value);try{if(advance>0){const r=await api('/api/btc/advance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CompanyId:Number(c.Id),Amount:advance,PaymentMode:billingAdvanceMode,ReferenceNo:null,Notes:'Advance received during BTC billing company selection'})});notify('Advance '+r.receiptNo+' received · ₹'+money(advance))}await applyBillingCompany(c);closeModal();notify('Bill To Company selected: '+c.CompanyName)}catch(e){alert(e.message||e)}};
+function companyForm(c){c=c||{};return `<div class="formgrid btc-company-form"><label>Company Name *<input id="bcName" class="input" value="${esc(c.CompanyName||'')}" autofocus></label><label>GSTIN<input id="bcGst" class="input" value="${esc(c.GstIn||'')}"></label><label>Phone<input id="bcPhone" class="input" value="${esc(c.Phone||'')}"></label><label>Credit Limit (0 = Unlimited)<input id="bcLimit" type="number" min="0" class="input" value="${num(c.CreditLimit)}"></label><label>Credit Days<input id="bcDays" type="number" min="0" class="input" value="${num(c.CreditDays)}"></label><label class="full">Address<textarea id="bcAddress" class="textarea">${esc(c.Address||'')}</textarea></label></div>`}
+w.btcOpenCompanyMaster=async function(editId,returnTo='master'){
+ companyMasterContext=returnTo||'master';
+ if(companyMasterContext==='billing')closeModal();
+ const rows=await loadCompanies(),cc=editId?rows.find(x=>Number(x.Id)===Number(editId)):null;
+ modal('BTC / Credit Company Master',`${companyForm(cc)}<div class="btc-company-master-list"><h4>Existing Companies</h4>${rows.map(x=>`<button onclick="btcOpenCompanyMaster(${x.Id},'${esc(companyMasterContext)}')"><b>${esc(x.CompanyName)}</b><span>Outstanding ₹${money(x.Outstanding)} · Edit</span></button>`).join('')||'<div class="empty">No companies yet</div>'}</div>`,`<button class="btn" onclick="btcSaveCompany(${cc?cc.Id:0})">${cc?'Update Company':'✓ Submit'}</button>`);
+};
+w.btcSaveCompany=async function(id){
+ const body={CompanyName:d.querySelector('#bcName')?.value?.trim(),GstIn:d.querySelector('#bcGst')?.value?.trim()||null,Phone:d.querySelector('#bcPhone')?.value?.trim()||null,Address:d.querySelector('#bcAddress')?.value?.trim()||null,CreditLimit:num(d.querySelector('#bcLimit')?.value),CreditDays:Math.floor(num(d.querySelector('#bcDays')?.value))};
+ if(!body.CompanyName)return notify('Company Name is required');
+ const r=await api('/api/btc/companies'+(id?'/'+id:''),{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ notify(id?'Company updated':'Company created');
+ if(companyMasterContext==='billing'&&!id){const newId=Number(r.id);closeModal();companyMasterContext='master';return w.openBtcCompanySelect(newId)}
+ return w.btcOpenCompanyMaster(id||0,companyMasterContext);
+};
 
 // Override old BTC selection: F8/button must always open Company selection first.
 w.cbPaySelect=function(mode,subtype){if(String(mode).toUpperCase()==='BTC')return w.openBtcCompanySelect();resetCompany();return oldPay?oldPay(mode,subtype):undefined};

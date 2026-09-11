@@ -14,3 +14,23 @@ body[data-theme="light"] .btc-billing-advance{background:#fff9ef;border-color:#d
 .modal:has(.btc-select-company){display:flex!important;align-items:center!important;justify-content:center!important;padding:24px!important}
 .modal:has(.btc-select-company) .modalbox{width:min(920px,calc(100vw - 48px))!important;max-width:920px!important;margin:auto!important;max-height:calc(100vh - 48px)!important;overflow:auto!important}
 .btc-company-row.selected{outline:2px solid #4aa273!important;background:rgba(74,162,115,.15)!important}
+
+/* 2026-09-12 BTC billing wizard: centered, sequential and compact. */
+.modal:has(.btc-select-company),.modal:has(.btc-company-form){
+ position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:none!important;
+ display:flex!important;align-items:center!important;justify-content:center!important;padding:24px!important;
+}
+.modal:has(.btc-select-company) .modalbox{width:min(900px,calc(100vw - 48px))!important;max-width:900px!important;max-height:calc(100vh - 48px)!important;overflow:auto!important;margin:auto!important}
+.modal:has(.btc-company-form) .modalbox{width:min(1050px,calc(100vw - 48px))!important;max-width:1050px!important;max-height:calc(100vh - 48px)!important;overflow:auto!important;margin:auto!important}
+.btc-billing-flow{display:grid;gap:12px;min-width:0}
+.btc-step-title{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 2px}.btc-step-title>span{font-size:12px;color:var(--muted,#91a9bc)}
+.btc-selected-party{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 14px;border:1px solid #31516b;border-radius:10px;background:#0d2234}
+.btc-selected-party div{min-width:0}.btc-selected-party b{display:block;font-size:15px}.btc-selected-party small{display:block;margin-top:4px;color:#9eb3c4}
+.btc-advance-amount{display:grid;gap:5px;max-width:340px;font-size:11px;color:#9eb3c4;font-weight:700}
+.btc-advance-pay-panel{grid-template-columns:auto minmax(130px,1fr) minmax(160px,1fr);gap:8px;align-items:center;padding:10px;border:1px solid #31516b;border-radius:10px;background:#0b1d2d}
+.btc-advance-pay-panel>span{font-size:11px;font-weight:800;color:#a9bdcc}.btc-advance-pay-panel button{height:38px;border:1px solid #31516a;border-radius:8px;background:#10283c;color:#e7f1f7;font-weight:800;cursor:pointer}
+.btc-advance-pay-panel button.active{background:#17613f;border-color:#4bb97c;color:#fff}.btc-advance-pay-panel .full{grid-column:1/-1;color:#9fd9b9}
+.btc-flow-help{font-size:11px;color:#8fa8bb}
+.btc-credit-option-page{display:grid;gap:14px;min-width:0}
+@media(max-width:720px){.modal:has(.btc-select-company),.modal:has(.btc-company-form){padding:10px!important}.modal:has(.btc-select-company) .modalbox,.modal:has(.btc-company-form) .modalbox{width:calc(100vw - 20px)!important;max-height:calc(100vh - 20px)!important}.btc-selected-party{grid-template-columns:1fr}.btc-advance-pay-panel{grid-template-columns:1fr 1fr}.btc-advance-pay-panel>span{grid-column:1/-1}}
+body[data-theme="light"] .btc-selected-party,body[data-theme="light"] .btc-advance-pay-panel{background:#fff9ef;border-color:#d8c7a8;color:#443d34}

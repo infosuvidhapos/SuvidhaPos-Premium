@@ -197,35 +197,99 @@
 
   window.loadPurchase=async function(){await spec();if(S.mode==='jewellery')return loadJewelleryPurchase();return loadUomPurchase()};
   async function loadUomPurchase(){
-    setPage('purchase');navTitle('Purchases','Purchase in BOX / STRIP / TABLET; stock posts only in Base Unit');
-    S.items=await api('/api/products?size=500');S.suppliers=await api('/api/suppliers');
-    const pharma=/pharmacy|medical/i.test(S.spec?.StoreType||'');
-    app.innerHTML=`<div class="content"><div class="panel"><div class="panelhead"><div><h3>MULTI-UNIT PURCHASE INWARD</h3><p class="muted">Choose purchased unit on each line. Quantity and rates are converted to Base Unit before stock posting.</p></div><span class="tag">${pharma?'BATCH + EXPIRY MANDATORY':'BASE STOCK'}</span></div><div class="toolbar"><button class="btn" onclick="openUomPurchase()">＋ New Purchase</button><span class="tag">Example: 1 BOX × 10 STRIP × 10 TABLET = 100 TABLET</span></div></div><div class="panel"><h3>RECENT PURCHASES</h3><div class="tablewrap"><table class="table"><thead><tr><th>INVOICE</th><th>SUPPLIER</th><th>DATE</th><th>SUBTOTAL</th><th>TAX</th><th>TOTAL</th></tr></thead><tbody>${(await api('/api/purchases')).map(x=>`<tr><td>${esc2(x.InvoiceNo)}</td><td>${esc2(x.SupplierName)}</td><td>${fmt(x.PurchaseDate)}</td><td>₹${money2(x.SubTotal)}</td><td>₹${money2(x.Tax)}</td><td><b>₹${money2(x.GrandTotal)}</b></td></tr>`).join('')}</tbody></table></div></div></div>`
+    setPage('purchase');navTitle('Purchases','Keyboard-ready Purchase · Multi Unit · Barcode Purchase');
+    S.items=await api('/api/products?size=1000');S.suppliers=await api('/api/suppliers');
+    const pharma=/pharmacy|medical/i.test(S.spec?.StoreType||''),history=await api('/api/purchases');
+    app.innerHTML=`<div class="content purchase-page"><div class="panel purchase-hero"><div class="panelhead"><div><h3>PURCHASE INWARD</h3><p class="muted">Standard multi-unit entry or fast barcode-scanner purchase. Stock always posts in Base Unit.</p></div><span class="tag">${pharma?'BATCH + EXPIRY':'BASE STOCK'}</span></div><div class="purchase-actions"><button class="btn" onclick="openUomPurchase()">＋ New Purchase <small>F2</small></button><button class="btn green" onclick="openBarcodePurchase()">▥ Barcode Purchase <small>F4</small></button><span class="tag">F10 Save · Enter Next · Esc Close</span></div></div><div class="panel"><div class="panelhead"><h3>RECENT PURCHASES</h3><span class="tag">${history.length} RECORDS</span></div><div class="tablewrap"><table class="table"><thead><tr><th>INVOICE</th><th>SUPPLIER</th><th>DATE</th><th>SUBTOTAL</th><th>TAX</th><th>TOTAL</th><th>PAID</th><th>BALANCE</th></tr></thead><tbody>${history.map(x=>`<tr><td><b>${esc2(x.InvoiceNo)}</b></td><td>${esc2(x.SupplierName)}</td><td>${fmt(x.PurchaseDate)}</td><td>₹${money2(x.SubTotal)}</td><td>₹${money2(x.Tax)}</td><td><b>₹${money2(x.GrandTotal)}</b></td><td>₹${money2(x.PaidAmount||0)}</td><td>₹${money2((x.GrandTotal||0)-(x.PaidAmount||0))}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">No purchases yet</td></tr>'}</tbody></table></div></div></div>`;
+    if(!window.__purchasePageKeyboardBound){
+      window.__purchasePageKeyboardBound=true;
+      document.addEventListener('keydown',e=>{
+        if(document.querySelector('.modal.open')||!document.querySelector('.purchase-page'))return;
+        if(e.key==='F2'){e.preventDefault();openUomPurchase()}
+        if(e.key==='F4'){e.preventDefault();openBarcodePurchase()}
+      },true);
+    }
+  }
+  function purchaseModalBox(){
+    const box=document.querySelector('#modal .modalbox');if(!box)return null;
+    box.classList.add('purchase-modalbox');box.style.width='min(1180px,96vw)';box.style.maxWidth='1180px';box.style.maxHeight='94vh';box.style.overflow='auto';return box
+  }
+  function purchaseKeyboard(root,saveFn,focusId,invoiceId,supplierId){
+    const box=purchaseModalBox();if(!box)return;
+    box.addEventListener('keydown',e=>{
+      if(e.key==='F10'){e.preventDefault();saveFn();return}
+      if(e.key==='F2'&&invoiceId){e.preventDefault();document.querySelector(invoiceId)?.focus();return}
+      if(e.key==='F3'&&supplierId){e.preventDefault();document.querySelector(supplierId)?.focus();return}
+      if(e.key==='F4'&&focusId){e.preventDefault();document.querySelector(focusId)?.focus();return}
+      if(e.key==='Escape'){e.preventDefault();closeModal();return}
+      if(e.key!=='Enter'||e.shiftKey||e.ctrlKey||e.altKey)return;
+      const tag=(e.target.tagName||'').toLowerCase();if(!['input','select','button'].includes(tag))return;
+      e.preventDefault();
+      if(e.target.id==='uprod'){addUomPurchaseLine();return}
+      if(e.target.id==='bpScan'){barcodePurchaseScan();return}
+      const all=[...box.querySelectorAll('[data-pur-key="1"]')].filter(x=>!x.disabled&&x.offsetParent!==null);
+      const i=all.indexOf(e.target);if(i>=0&&i<all.length-1){all[i+1].focus();if(all[i+1].select)all[i+1].select()}
+      else if(focusId)document.querySelector(focusId)?.focus()
+    });
+  }
+  function purchaseTopHtml(prefix){
+    return `<div class="purchase-top-grid"><label>Invoice No<input id="${prefix}i" data-pur-key="1" class="input" autocomplete="off"></label><label>Supplier<select id="${prefix}sup" data-pur-key="1" class="select"><option value="">Walk-in Supplier</option>${(S.suppliers||[]).map(x=>`<option value="${x.Id}">${esc2(x.Name)}</option>`).join('')}</select></label></div>`
+  }
+  function purchaseBottomHtml(prefix){
+    return `<div class="purchase-bottom-grid"><label>Discount<input id="${prefix}disc" data-pur-key="1" class="input" type="number" value="0" min="0" step=".01"></label><label>Paid Amount<input id="${prefix}paid" data-pur-key="1" class="input" type="number" value="0" min="0" step=".01"></label><label>Payment<select id="${prefix}m" data-pur-key="1" class="select"><option>Credit</option><option>Cash</option><option>UPI</option><option>Card</option></select></label></div>`
   }
   window.openUomPurchase=async function(){
     S.purLines=[];
-    modal('New Purchase — Multi Unit',`<div class="formgrid"><label>Invoice No<input id="upi" class="input"></label><label>Supplier<select id="usup" class="select"><option value="">Walk-in Supplier</option>${(S.suppliers||[]).map(x=>`<option value="${x.Id}">${esc2(x.Name)}</option>`).join('')}</select></label></div><div class="toolbar" style="margin-top:12px"><select id="uprod" class="select" style="flex:1"><option value="">Select item</option>${S.items.map(x=>`<option value="${x.Id}">${esc2(x.Name)} • ${esc2(x.Barcode||'')}</option>`).join('')}</select><button class="btn" onclick="addUomPurchaseLine()">Add</button></div><div id="upLines"></div><div class="formgrid" style="margin-top:12px"><label>Discount<input id="udisc" class="input" type="number" value="0"></label><label>Paid Amount<input id="upaid" class="input" type="number" value="0"></label><label>Payment<select id="upm" class="select"><option>Credit</option><option>Cash</option><option>UPI</option><option>Card</option></select></label></div>`,`<button class="btn" onclick="saveUomPurchase()">Save Purchase</button>`)
+    modal('New Purchase — Multi Unit',`<div class="purchase-entry purchase-standard"><div class="purchase-key-hint"><span>F2 Invoice</span><span>F3 Supplier</span><span>F4 Item</span><span>Enter Next</span><span>F10 Save</span><span>Esc Close</span></div>${purchaseTopHtml('u')}<div class="purchase-add-row"><label>Item<select id="uprod" data-pur-key="1" class="select"><option value="">Select item / barcode</option>${S.items.map(x=>`<option value="${x.Id}">${esc2(x.Name)} • ${esc2(x.Barcode||'')}</option>`).join('')}</select></label><button class="btn" data-pur-key="1" onclick="addUomPurchaseLine()">＋ Add</button></div><div id="upLines" class="purchase-lines"></div>${purchaseBottomHtml('u')}</div>`,`<button class="btn" onclick="saveUomPurchase()">✓ Save Purchase (F10)</button>`);
+    purchaseKeyboard('#modal',w.saveUomPurchase,'#uprod','#ui','#usup');setTimeout(()=>document.querySelector('#upi')?.focus(),30)
   };
   window.addUomPurchaseLine=async function(){
-    const id=Number(uprod.value);if(!id)return;
+    const id=Number(document.querySelector('#uprod')?.value);if(!id)return toast('Select item');
     const p=S.items.find(x=>x.Id===id),u=await loadUom(id),opts=uomChoices(p,u),def=opts.slice().sort((a,b)=>b.factor-a.factor)[0];
-    S.purLines.push({ProductId:id,Name:p.Name,Uom:u,Options:opts,Unit:def.unit,Factor:def.factor,Qty:1,FreeQuantity:0,Cost:def.purchase,SalePrice:def.sale,Mrp:def.mrp,GstRate:+p.GstRate,BatchNo:'',ExpiryDate:''});renderUomPurchaseLines()
+    S.purLines.push({ProductId:id,Name:p.Name,Barcode:p.Barcode||'',Uom:u,Options:opts,Unit:def.unit,Factor:def.factor,Qty:1,FreeQuantity:0,Cost:def.purchase,SalePrice:def.sale,Mrp:def.mrp,GstRate:+p.GstRate,BatchNo:'',ExpiryDate:''});renderUomPurchaseLines();
+    const s=document.querySelector('#uprod');if(s)s.value='';setTimeout(()=>document.querySelector('#upLines .purchase-line-card:last-child input[data-field="Qty"]')?.focus(),20)
   };
   window.setPurchaseUom=function(i,unit){const x=S.purLines[i],o=x.Options.find(a=>a.unit===unit);if(!o)return;x.Unit=o.unit;x.Factor=o.factor;x.Cost=o.purchase;x.SalePrice=o.sale;x.Mrp=o.mrp;renderUomPurchaseLines()};
-  function renderUomPurchaseLines(){const el=document.querySelector('#upLines');if(!el)return;el.innerHTML=S.purLines.map((x,i)=>`<div class="uom-line"><div><b>${esc2(x.Name)}</b><br><span class="tag">Base: ${esc2(x.Uom.BaseUnit)} • Stock + ${money2((+x.Qty+(+x.FreeQuantity||0))*x.Factor)} ${esc2(x.Uom.BaseUnit)}</span></div><label>Purchase Unit<select class="select" onchange="setPurchaseUom(${i},this.value)">${x.Options.map(o=>`<option value="${esc2(o.unit)}" ${o.unit===x.Unit?'selected':''}>${esc2(o.unit)} (×${o.factor})</option>`).join('')}</select></label><label>Qty<input class="input" type="number" min="0.001" step="0.001" value="${x.Qty}" onchange="S2(${i},'Qty',this.value)"></label><label>Free<input class="input" type="number" min="0" step="0.001" value="${x.FreeQuantity}" onchange="S2(${i},'FreeQuantity',this.value)"></label><label>Rate / ${esc2(x.Unit)}<input class="input" type="number" value="${x.Cost}" onchange="S2(${i},'Cost',this.value)"></label><label>Sale / ${esc2(x.Unit)}<input class="input" type="number" value="${x.SalePrice}" onchange="S2(${i},'SalePrice',this.value)"></label><label>MRP / ${esc2(x.Unit)}<input class="input" type="number" value="${x.Mrp}" onchange="S2(${i},'Mrp',this.value)"></label><label>Batch<input class="input" value="${esc2(x.BatchNo)}" onchange="S2(${i},'BatchNo',this.value)"></label><label>Expiry<input class="input" type="date" value="${x.ExpiryDate}" onchange="S2(${i},'ExpiryDate',this.value)"></label><div class="uom-result">Base Qty ${money2(x.Qty*x.Factor)} ${esc2(x.Uom.BaseUnit)}<br>Base Cost ₹${money2(x.Cost/x.Factor)}<br>Total ₹${money2(x.Qty*x.Cost)}</div><button class="btn small danger" onclick="S.purLines.splice(${i},1);renderUomPurchaseLines()">×</button></div>`).join('')};
-  window.renderUomPurchaseLines=renderUomPurchaseLines;
-  window.S2=(i,k,v)=>{S.purLines[i][k]=['Qty','FreeQuantity','Cost','SalePrice','Mrp'].includes(k)?+v:v;renderUomPurchaseLines()};
-  window.saveUomPurchase=async function(){
-    if(!S.purLines.length)return toast('Add purchase items');
-    const pharma=/pharmacy|medical/i.test(S.spec?.StoreType||'');
-    if(pharma&&S.purLines.some(x=>!String(x.BatchNo||'').trim()))return toast('Batch No is mandatory for Pharmacy / Medical Store');
-    if(S.purLines.some(x=>!x.ExpiryDate))return toast('Expiry date is required for every batch');
-    try{
-      const sid=Number(usup.value)||null,sup=(S.suppliers||[]).find(x=>x.Id===sid);
-      await api('/api/purchases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({InvoiceNo:upi.value||null,SupplierId:sid,SupplierName:sup?.Name||'Walk-in Supplier',PaymentMode:upm.value,PaidAmount:+upaid.value,Discount:+udisc.value,Notes:'Multi-unit purchase; inventory posted in base units',Lines:S.purLines.map(x=>({ProductId:x.ProductId,Qty:x.Qty*x.Factor,FreeQuantity:x.FreeQuantity*x.Factor,Cost:x.Cost/x.Factor,SalePrice:x.SalePrice/x.Factor,Mrp:x.Mrp/x.Factor,TaxRate:x.GstRate,BatchNo:x.BatchNo||null,ManufactureDate:null,ExpiryDate:x.ExpiryDate,UnitPurchased:x.Unit,PurchasedQty:x.Qty,TotalBaseQty:x.Qty*x.Factor,RatePerPurchasedUnit:x.Cost}))})});
-      closeModal();toast('Purchase saved — stock converted to '+S.purLines[0].Uom.BaseUnit);loadPurchase()
-    }catch(e){alert(e.message)}
+  function lineSummary(x){return `Base Qty <b>${money2((+x.Qty+(+x.FreeQuantity||0))*x.Factor)} ${esc2(x.Uom.BaseUnit)}</b> · Base Cost <b>₹${money2(x.Cost/x.Factor)}</b> · Line Total <b>₹${money2(x.Qty*x.Cost)}</b>`}
+  function renderUomPurchaseLines(){
+    const el=document.querySelector('#upLines');if(!el)return;
+    el.innerHTML=S.purLines.map((x,i)=>`<div class="purchase-line-card" data-index="${i}"><div class="purchase-line-head"><div><b>${esc2(x.Name)}</b><small>${esc2(x.Barcode||'')} · Base ${esc2(x.Uom.BaseUnit)}</small></div><button class="btn small danger" onclick="S.purLines.splice(${i},1);renderUomPurchaseLines()">×</button></div><div class="purchase-line-fields"><label>Purchase Unit<select data-pur-key="1" class="select" onchange="setPurchaseUom(${i},this.value)">${x.Options.map(o=>`<option value="${esc2(o.unit)}" ${o.unit===x.Unit?'selected':''}>${esc2(o.unit)} ×${o.factor}</option>`).join('')}</select></label><label>Qty<input data-pur-key="1" data-field="Qty" class="input" type="number" min=".001" step=".001" value="${x.Qty}" oninput="S2(${i},'Qty',this.value)"></label><label>Free<input data-pur-key="1" class="input" type="number" min="0" step=".001" value="${x.FreeQuantity}" oninput="S2(${i},'FreeQuantity',this.value)"></label><label>Purchase / ${esc2(x.Unit)}<input data-pur-key="1" class="input" type="number" min="0" step=".01" value="${x.Cost}" oninput="S2(${i},'Cost',this.value)"></label><label>Sale / ${esc2(x.Unit)}<input data-pur-key="1" class="input" type="number" min="0" step=".01" value="${x.SalePrice}" oninput="S2(${i},'SalePrice',this.value)"></label><label>MRP / ${esc2(x.Unit)}<input data-pur-key="1" class="input" type="number" min="0" step=".01" value="${x.Mrp}" oninput="S2(${i},'Mrp',this.value)"></label><label>Batch<input data-pur-key="1" class="input" value="${esc2(x.BatchNo)}" oninput="S2(${i},'BatchNo',this.value)"></label><label>Expiry<input data-pur-key="1" class="input" type="date" value="${x.ExpiryDate}" onchange="S2(${i},'ExpiryDate',this.value)"></label></div><div class="purchase-line-summary" id="purSummary${i}">${lineSummary(x)}</div></div>`).join('')
   };
+  window.renderUomPurchaseLines=renderUomPurchaseLines;
+  window.S2=(i,k,v)=>{if(!S.purLines[i])return;S.purLines[i][k]=['Qty','FreeQuantity','Cost','SalePrice','Mrp'].includes(k)?+v:v;const s=document.querySelector('#purSummary'+i);if(s)s.innerHTML=lineSummary(S.purLines[i])};
+  async function postPurchase(lines,prefix,note){
+    if(!lines.length){toast('Add purchase items');return false;}
+    const pharma=/pharmacy|medical/i.test(S.spec?.StoreType||'');
+    if(pharma&&lines.some(x=>!String(x.BatchNo||'').trim())){toast('Batch No is mandatory for Pharmacy / Medical Store');return false;}
+    if(lines.some(x=>!x.ExpiryDate)){toast('Expiry date is required for every batch');return false;}
+    const sid=Number(document.querySelector('#'+prefix+'sup')?.value)||null,sup=(S.suppliers||[]).find(x=>x.Id===sid);
+    const body={InvoiceNo:document.querySelector('#'+prefix+'i')?.value||null,SupplierId:sid,SupplierName:sup?.Name||'Walk-in Supplier',PaymentMode:document.querySelector('#'+prefix+'m')?.value||'Credit',PaidAmount:+(document.querySelector('#'+prefix+'paid')?.value||0),Discount:+(document.querySelector('#'+prefix+'disc')?.value||0),Notes:note,Lines:lines.map(x=>({ProductId:x.ProductId,Qty:x.Qty*x.Factor,FreeQuantity:x.FreeQuantity*x.Factor,Cost:x.Cost/x.Factor,SalePrice:x.SalePrice/x.Factor,Mrp:x.Mrp/x.Factor,TaxRate:x.GstRate,BatchNo:x.BatchNo||null,ManufactureDate:null,ExpiryDate:x.ExpiryDate,UnitPurchased:x.Unit,PurchasedQty:x.Qty,TotalBaseQty:x.Qty*x.Factor,RatePerPurchasedUnit:x.Cost}))};
+    await api('/api/purchases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return true
+  }
+  window.saveUomPurchase=async function(){try{if(!await postPurchase(S.purLines,'u','Multi-unit purchase; inventory posted in base units'))return;closeModal();toast('Purchase saved — stock converted to base units');loadPurchase()}catch(e){alert(e.message||e)}};
+
+  window.openBarcodePurchase=async function(){
+    S.barPurLines=[];
+    modal('Barcode Purchase — Keyboard Ready',`<div class="purchase-entry barcode-purchase"><div class="purchase-key-hint"><span>F2 Invoice</span><span>F3 Supplier</span><span>F4 Scan Barcode</span><span>Enter Add / Next</span><span>F10 Save</span><span>Esc Close</span></div>${purchaseTopHtml('bp')}<div class="barcode-scan-card"><label>SCAN / TYPE BARCODE<input id="bpScan" data-pur-key="1" class="input barcode-scan-input" autocomplete="off" placeholder="Scan barcode and press Enter"></label><button class="btn green" onclick="barcodePurchaseScan()">＋ Add Barcode</button></div><div id="bpLines" class="purchase-lines"></div>${purchaseBottomHtml('bp')}</div>`,`<button class="btn green" onclick="saveBarcodePurchase()">✓ Save Barcode Purchase (F10)</button>`);
+    purchaseKeyboard('#modal',w.saveBarcodePurchase,'#bpScan','#bpi','#bpsup');setTimeout(()=>document.querySelector('#bpScan')?.focus(),30)
+  };
+  window.barcodePurchaseScan=async function(){
+    const input=document.querySelector('#bpScan'),q=String(input?.value||'').trim();if(!q)return;
+    const key=q.toLowerCase(),p=S.items.find(x=>String(x.Barcode||'').toLowerCase()===key||String(x.Sku||'').toLowerCase()===key);
+    if(!p){toast('Barcode not found: '+q);input?.select();return}
+    let row=S.barPurLines.find(x=>x.ProductId===p.Id);
+    if(row){row.Qty+=1}else{const u=await loadUom(p.Id),opts=uomChoices(p,u),def=opts.find(o=>Number(o.factor)===1)||opts[0];row={ProductId:p.Id,Name:p.Name,Barcode:p.Barcode||'',Uom:u,Options:opts,Unit:def.unit,Factor:def.factor,Qty:1,FreeQuantity:0,Cost:def.purchase,SalePrice:def.sale,Mrp:def.mrp,GstRate:+p.GstRate,BatchNo:'',ExpiryDate:''};S.barPurLines.push(row)}
+    if(input){input.value='';input.focus()}renderBarcodePurchaseLines()
+  };
+  window.barcodePurchaseUom=function(i,unit){const x=S.barPurLines[i],o=x?.Options.find(a=>a.unit===unit);if(!o)return;x.Unit=o.unit;x.Factor=o.factor;x.Cost=o.purchase;x.SalePrice=o.sale;x.Mrp=o.mrp;renderBarcodePurchaseLines()};
+  window.barcodePurchaseSet=function(i,k,v){const x=S.barPurLines[i];if(!x)return;x[k]=['Qty','FreeQuantity','Cost','SalePrice','Mrp'].includes(k)?+v:v;const s=document.querySelector('#bpSummary'+i);if(s)s.innerHTML=lineSummary(x)};
+  function renderBarcodePurchaseLines(){
+    const el=document.querySelector('#bpLines');if(!el)return;
+    const rows=S.barPurLines||[],totalQty=rows.reduce((a,x)=>a+Number(x.Qty||0),0),total=rows.reduce((a,x)=>a+Number(x.Qty||0)*Number(x.Cost||0),0);
+    el.innerHTML=`<div class="barcode-purchase-table-wrap"><table class="table barcode-purchase-table"><thead><tr><th>#</th><th>BARCODE / ITEM</th><th>UNIT</th><th>QTY</th><th>FREE</th><th>PURCHASE</th><th>SALE</th><th>MRP</th><th>BATCH</th><th>EXPIRY</th><th>AMOUNT</th><th></th></tr></thead><tbody>${rows.map((x,i)=>`<tr data-index="${i}"><td>${i+1}</td><td class="bp-item"><b>${esc2(x.Barcode||'-')}</b><small>${esc2(x.Name)} · Base ${esc2(x.Uom.BaseUnit)}</small></td><td><select data-pur-key="1" class="select" onchange="barcodePurchaseUom(${i},this.value)">${x.Options.map(o=>`<option value="${esc2(o.unit)}" ${o.unit===x.Unit?'selected':''}>${esc2(o.unit)} ×${o.factor}</option>`).join('')}</select></td><td><input data-pur-key="1" class="input" type="number" min=".001" step=".001" value="${x.Qty}" oninput="barcodePurchaseSet(${i},'Qty',this.value)"></td><td><input data-pur-key="1" class="input" type="number" min="0" step=".001" value="${x.FreeQuantity}" oninput="barcodePurchaseSet(${i},'FreeQuantity',this.value)"></td><td><input data-pur-key="1" class="input" type="number" min="0" step=".01" value="${x.Cost}" oninput="barcodePurchaseSet(${i},'Cost',this.value)"></td><td><input data-pur-key="1" class="input" type="number" min="0" step=".01" value="${x.SalePrice}" oninput="barcodePurchaseSet(${i},'SalePrice',this.value)"></td><td><input data-pur-key="1" class="input" type="number" min="0" step=".01" value="${x.Mrp}" oninput="barcodePurchaseSet(${i},'Mrp',this.value)"></td><td><input data-pur-key="1" class="input" value="${esc2(x.BatchNo)}" oninput="barcodePurchaseSet(${i},'BatchNo',this.value)"></td><td><input data-pur-key="1" class="input" type="date" value="${x.ExpiryDate}" onchange="barcodePurchaseSet(${i},'ExpiryDate',this.value)"></td><td class="bp-amount"><b>₹${money2(Number(x.Qty||0)*Number(x.Cost||0))}</b><small id="bpSummary${i}">Base Qty ${money2((Number(x.Qty||0)+Number(x.FreeQuantity||0))*Number(x.Factor||1))}</small></td><td><button class="btn small danger" title="Remove line" onclick="S.barPurLines.splice(${i},1);renderBarcodePurchaseLines()">×</button></td></tr>`).join('')||'<tr><td colspan="12" class="empty">Scan a barcode to begin purchase entry</td></tr>'}</tbody><tfoot><tr><td colspan="3"><b>Purchase Totals</b></td><td><b>${money2(totalQty)}</b></td><td colspan="6"></td><td class="bp-amount"><b>₹${money2(total)}</b></td><td></td></tr></tfoot></table></div>`
+  }
+  window.renderBarcodePurchaseLines=renderBarcodePurchaseLines;
+  window.saveBarcodePurchase=async function(){try{if(!await postPurchase(S.barPurLines,'bp','Barcode purchase; keyboard/scanner entry; inventory posted in base units'))return;closeModal();toast('Barcode Purchase saved and stock updated');loadPurchase()}catch(e){alert(e.message||e)}};
 
   // Counter Billing (loaded later) is the primary retail/pharma sale UI.
   window.loadBilling=async function(){await spec();if(S.mode==='jewellery')return loadJewelleryBilling();if(window.loadCounterBillingUom)return window.loadCounterBillingUom();return loadUomBillingFallback()};
