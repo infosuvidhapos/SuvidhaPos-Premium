@@ -82,17 +82,33 @@ FROM ProductUoms WHERE ProductId=@p",P("@p",l.ProductId));
             using var c=db.CreateConnection(); await c.OpenAsync(); using var tx=c.BeginTransaction();
             try
             {
-                var cmd=new SqlCommand("SELECT Status,InvoiceNo,PaymentMode,PaidAmount,GrandTotal FROM Sales WITH(UPDLOCK,ROWLOCK) WHERE Id=@id",c,tx);
+                var cmd=new SqlCommand("SELECT Status,InvoiceNo,PaymentMode,PaidAmount,GrandTotal,BtcCompanyId FROM Sales WITH(UPDLOCK,ROWLOCK) WHERE Id=@id",c,tx);
                 cmd.Parameters.Add(P("@id",id));
-                string? status=null,invoiceNo=null,paymentMode=null;decimal oldPaid=0,oldTotal=0;
+                string? status=null,invoiceNo=null,paymentMode=null;decimal oldPaid=0,oldTotal=0;int? currentBtcCompanyId=null;
                 using(var rd=await cmd.ExecuteReaderAsync())
                 {
                     if(!await rd.ReadAsync()) return Results.NotFound(new{message="Bill not found"});
                     status=rd.GetString(0);invoiceNo=rd.GetString(1);paymentMode=rd.GetString(2);
-                    oldPaid=rd.GetDecimal(3);oldTotal=rd.GetDecimal(4);
+                    oldPaid=rd.GetDecimal(3);oldTotal=rd.GetDecimal(4);currentBtcCompanyId=rd.IsDBNull(5)?null:rd.GetInt32(5);
                 }
                 if(!string.Equals(status,"Completed",StringComparison.OrdinalIgnoreCase))
                     return Results.BadRequest(new{message="Only completed bills can be edited or modified"});
+
+                int? editBtcCompanyId=null;string? editBtcCompanyName=null;int editBtcDays=0;decimal editBtcLimit=0;
+                if(string.Equals(paymentMode,"BTC",StringComparison.OrdinalIgnoreCase))
+                {
+                    editBtcCompanyId=x.BtcCompanyId??currentBtcCompanyId;
+                    if(!editBtcCompanyId.HasValue||editBtcCompanyId.Value<=0) return Results.BadRequest(new{message="Select BTC customer/company before editing or modifying this BTC bill"});
+                    cmd=new SqlCommand("SELECT ISNULL(SUM(Amount),0) FROM BtcSettlementAllocations WHERE SaleId=@id",c,tx);cmd.Parameters.Add(P("@id",id));
+                    var alreadySettled=Convert.ToDecimal(await cmd.ExecuteScalarAsync()??0m);
+                    if(alreadySettled>0.005m) return Results.BadRequest(new{message="A settled/part-settled BTC bill cannot be edited or modified. Keep settlement history intact."});
+                    cmd=new SqlCommand("SELECT TOP 1 CompanyName,CreditDays,CreditLimit FROM BtcCompanies WHERE Id=@id AND IsActive=1",c,tx);cmd.Parameters.Add(P("@id",editBtcCompanyId));
+                    using(var rd=await cmd.ExecuteReaderAsync())
+                    {
+                        if(!await rd.ReadAsync()) return Results.BadRequest(new{message="BTC customer/company not found or inactive"});
+                        editBtcCompanyName=rd.GetString(0);editBtcDays=rd.GetInt32(1);editBtcLimit=rd.GetDecimal(2);
+                    }
+                }
 
                 // Step 1: restore every old batch quantity exactly.
                 cmd=new SqlCommand("SELECT ProductId,BatchId,Quantity FROM SaleLines WHERE SaleId=@id",c,tx);
@@ -173,18 +189,39 @@ VALUES(@p,@b,@m,-@q,'SALE',@s,@n)",c,tx);
                 using(var rd=await cmd.ExecuteReaderAsync())
                     while(await rd.ReadAsync()) payRows.Add(new BillPaymentPart(rd.GetString(0),rd.IsDBNull(1)?null:rd.GetString(1),rd.GetDecimal(2),rd.IsDBNull(3)?null:rd.GetString(3)));
                 var synced=SyncExistingPayments(paymentMode??"Cash",total,payRows,oldPaid);
+                if(editBtcCompanyId.HasValue)
+                {
+                    cmd=new SqlCommand("SELECT ISNULL(SUM(PendingAmount),0) FROM Sales WHERE BtcCompanyId=@c AND PaymentMode='BTC' AND Status='Completed' AND Id<>@id",c,tx);
+                    cmd.Parameters.AddRange(new[]{P("@c",editBtcCompanyId),P("@id",id)});var other=Convert.ToDecimal(await cmd.ExecuteScalarAsync()??0m);
+                    if(editBtcLimit>0 && other+total>editBtcLimit+0.005m) return Results.BadRequest(new{message=$"BTC credit limit exceeded. Available ₹{Math.Max(0,editBtcLimit-other):0.00}, revised bill ₹{total:0.00}"});
+                    synced=new BillPaymentSync(new List<BillPaymentPart>(),0);
+                }
 
                 cmd=new SqlCommand(@"UPDATE Sales SET CustomerId=@cid,CustomerName=@cn,SubTotal=@sub,Discount=@d,DiscountType=@dt,
 DiscountValue=@dv,Tax=@tax,GrandTotal=@g,TotalCost=@cost,PaidAmount=@paid,Notes=@notes,
+BtcCompanyId=CASE WHEN @bc IS NULL THEN BtcCompanyId ELSE @bc END,
+BtcDueDate=CASE WHEN @bc IS NULL THEN BtcDueDate ELSE DATEADD(day,@bd,CAST(GETDATE() AS date)) END,
+PendingAmount=CASE WHEN @bc IS NULL THEN PendingAmount ELSE @g END,
+PaymentStatus=CASE WHEN @bc IS NULL THEN PaymentStatus ELSE 'Pending' END,
 ModifiedAt=SYSDATETIME(),ModifiedBy=@u,ModificationCount=ISNULL(ModificationCount,0)+1,LastModificationType=@act
 WHERE Id=@id;
 DELETE FROM SalePayments WHERE SaleId=@id;",c,tx);
                 cmd.Parameters.AddRange(new[]{
-                    P("@cid",x.CustomerId),P("@cn",string.IsNullOrWhiteSpace(x.CustomerName)?"Walk-in Customer":x.CustomerName.Trim()),
+                    P("@cid",x.CustomerId),P("@cn",editBtcCompanyName??(string.IsNullOrWhiteSpace(x.CustomerName)?"Walk-in Customer":x.CustomerName.Trim())),
                     P("@sub",sub),P("@d",discount),P("@dt",discountType),P("@dv",discountValue),P("@tax",tax),P("@g",total),
-                    P("@cost",cost),P("@paid",synced.Paid),P("@notes",x.Notes),P("@u",user),P("@act",action),P("@id",id)
+                    P("@cost",cost),P("@paid",synced.Paid),P("@notes",x.Notes),P("@u",user),P("@act",action),P("@id",id),
+                    P("@bc",editBtcCompanyId),P("@bd",editBtcDays)
                 });
                 await cmd.ExecuteNonQueryAsync();
+                if(editBtcCompanyId.HasValue)
+                {
+                    cmd=new SqlCommand(@"UPDATE BtcCompanyLedger SET CompanyId=@c,Debit=@a,Notes=@n
+WHERE ReferenceType='SALE' AND ReferenceId=@id AND EntryType='INVOICE';
+IF @@ROWCOUNT=0 INSERT BtcCompanyLedger(CompanyId,EntryType,ReferenceType,ReferenceId,ReferenceNo,Debit,Credit,Notes)
+VALUES(@c,'INVOICE','SALE',@id,@inv,@a,0,@n)",c,tx);
+                    cmd.Parameters.AddRange(new[]{P("@c",editBtcCompanyId),P("@a",total),P("@id",id),P("@inv",invoiceNo),P("@n","BTC invoice revised from Bill Management")});
+                    await cmd.ExecuteNonQueryAsync();
+                }
 
                 foreach(var p in synced.Parts)
                 {
@@ -313,7 +350,7 @@ VALUES(@c,'INVOICE','SALE',@id,@inv,@a,0,@n)",c,tx);
     {
         var parts=new List<BillPaymentPart>();decimal paid=0;
         if(mode.Equals("Cash",StringComparison.OrdinalIgnoreCase)){parts.Add(new("Cash","Cash",total,null));paid=total;}
-        else if(mode.Equals("BTC",StringComparison.OrdinalIgnoreCase)){parts.Add(new("BTC","BTC",total,null));paid=total;}
+        else if(mode.Equals("BTC",StringComparison.OrdinalIgnoreCase)){paid=0;}
         else if(mode.Equals("Credit/UPI",StringComparison.OrdinalIgnoreCase))
         {
             var credit=existing.Any(p=>string.Equals(p.Type,"Credit",StringComparison.OrdinalIgnoreCase));
@@ -339,7 +376,7 @@ VALUES(@c,'INVOICE','SALE',@id,@inv,@a,0,@n)",c,tx);
         return new(parts,Math.Min(total,Math.Max(0,paid)));
     }
 
-    public record BillEditRequest(string? Action,int? CustomerId,string? CustomerName,string? DiscountType,decimal DiscountValue,string? Notes,List<BillEditLine> Lines);
+    public record BillEditRequest(string? Action,int? CustomerId,string? CustomerName,string? DiscountType,decimal DiscountValue,string? Notes,List<BillEditLine> Lines,int? BtcCompanyId=null);
     public record BillEditLine(int ProductId,string? UnitSold,decimal SoldQty,decimal RatePerSoldUnit,decimal TaxRate);
     public record BillResolvedLine(int ProductId,string UnitSold,decimal SoldQty,decimal Factor,decimal BaseQty,decimal SoldRate,decimal BaseRate,decimal TaxRate);
     public record BillPaymentPart(string Mode,string? Type,decimal Amount,string? ReferenceNo);
