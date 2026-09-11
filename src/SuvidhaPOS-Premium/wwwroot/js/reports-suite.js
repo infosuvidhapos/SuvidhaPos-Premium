@@ -21,7 +21,7 @@
  ['gstr1','GSTR1'],
  ['current-stock-report','Current Stock Report']
  ];
- let currentRows=[],currentDef=null;
+ let currentRows=[],currentDef=null,stockAllRows=[];
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const money=x=>Number(x||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
  const iso=d=>{const x=new Date(d);return new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,10)};
@@ -66,6 +66,7 @@
  };
 
  window.openNormalReport=async function(type){
+  if(type==='current-stock-report')return openCurrentStockReport();
   currentDef=defs.find(x=>x[0]===type)||defs[0];
   const sel=document.querySelector('#reportType');if(sel)sel.value=currentDef[0];
   const today=iso(new Date()),from=iso(new Date(Date.now()-29*86400000));
@@ -80,7 +81,63 @@
   box.scrollIntoView({behavior:'smooth',block:'start'});
   await runReport();
  };
- window.closeNormalReport=function(){currentRows=[];currentDef=null;const box=document.querySelector('#normalReportWorkspace');if(box)box.innerHTML='';};
+ window.closeNormalReport=function(){currentRows=[];stockAllRows=[];currentDef=null;const box=document.querySelector('#normalReportWorkspace');if(box)box.innerHTML='';};
+
+ async function openCurrentStockReport(){
+  currentDef=defs.find(x=>x[0]==='current-stock-report')||['current-stock-report','Current Stock Report'];
+  const today=iso(new Date()),box=document.querySelector('#normalReportWorkspace');if(!box)return;
+  box.innerHTML=`<div class="panel normal-report-workspace stock-report-workspace">
+   <div class="normal-report-workspace-head"><div><span class="normal-report-kicker">INVENTORY POSITION</span><h3>Current Stock Report</h3><p class="muted">Fast item-wise stock view with valuation, category and location filters.</p></div><button class="btn small secondary" onclick="closeNormalReport()">✕ Close</button></div>
+   <input id="reportFrom" type="hidden" value="${today}"><input id="reportTo" type="hidden" value="${today}">
+   <div class="stock-report-filters">
+    <label>As On Date<input id="stockAsOn" class="input" type="date" value="${today}" onchange="stockReload()"></label>
+    <label>Category<select id="stockCategory" class="select" onchange="stockApplyFilters()"><option value="">All Categories</option></select></label>
+    <label>Stock Status<select id="stockStatus" class="select" onchange="stockApplyFilters()"><option value="ALL">All Stock</option><option value="POSITIVE">In Stock</option><option value="LOW">Low Stock ≤ 5</option><option value="ZERO">Zero Stock</option><option value="NEGATIVE">Negative Stock</option></select></label>
+    <label class="stock-search">Search<input id="reportQ" class="input" placeholder="Item / barcode / SKU / category / rack..." oninput="stockApplyFilters()" onkeydown="if(event.key==='Enter'){event.preventDefault();stockApplyFilters()}"></label>
+   </div>
+   <div class="toolbar stock-report-actions"><button class="btn" onclick="stockReload()">↻ Generate / Refresh</button><button class="btn secondary" onclick="exportReportExcel()">⬇ Export Excel</button><button class="btn secondary" onclick="printCurrentStockReport()">🖨 Print / PDF</button></div>
+   <div id="stockSummary" class="stock-summary-grid"></div>
+   <div id="reportMeta" class="muted normal-report-meta">Loading current stock…</div>
+   <div class="normal-report-table-shell stock-report-table-shell"><div class="tablewrap"><table class="table stock-report-table" id="reportTable"><thead></thead><tbody><tr><td class="empty">Loading stock…</td></tr></tbody></table></div></div>
+  </div>`;
+  box.scrollIntoView({behavior:'smooth',block:'start'});await stockReload()
+ }
+ window.stockReload=async function(){
+  const asOn=document.querySelector('#stockAsOn')?.value||iso(new Date());const hiddenFrom=document.querySelector('#reportFrom'),hiddenTo=document.querySelector('#reportTo');if(hiddenFrom)hiddenFrom.value=asOn;if(hiddenTo)hiddenTo.value=asOn;
+  try{
+   const q=encodeURIComponent(document.querySelector('#reportQ')?.value||'');
+   stockAllRows=await api(`/api/premium-reports/current-stock-report?from=${asOn}&to=${asOn}&q=${q}`);
+   if(!Array.isArray(stockAllRows))stockAllRows=[];
+   const sel=document.querySelector('#stockCategory'),before=sel?.value||'',cats=[...new Set(stockAllRows.map(x=>String(x.Category||'Uncategorised')).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+   if(sel){sel.innerHTML='<option value="">All Categories</option>'+cats.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(cats.includes(before))sel.value=before}
+   stockApplyFilters()
+  }catch(e){const table=document.querySelector('#reportTable');if(table)table.innerHTML=`<tbody><tr><td class="alert">${esc(e.message||e)}</td></tr></tbody>`}
+ };
+ window.stockApplyFilters=function(){
+  const cat=document.querySelector('#stockCategory')?.value||'',status=document.querySelector('#stockStatus')?.value||'ALL',q=String(document.querySelector('#reportQ')?.value||'').trim().toLowerCase();
+  currentRows=(stockAllRows||[]).filter(r=>{
+   const qty=Number(r.CurrentStock||0),rq=[r.ItemName,r.Barcode,r.SKU,r.Category,r.Unit,r.HSN,r.LocationCode,r.RackName,r.ShelfName].join(' ').toLowerCase();
+   if(cat&&String(r.Category||'')!==cat)return false;if(q&&!rq.includes(q))return false;
+   if(status==='POSITIVE'&&qty<=0)return false;if(status==='LOW'&&(qty<=0||qty>5))return false;if(status==='ZERO'&&Math.abs(qty)>.0001)return false;if(status==='NEGATIVE'&&qty>=0)return false;return true
+  });
+  renderCurrentStock()
+ };
+ function renderCurrentStock(){
+  const rows=currentRows||[],table=document.querySelector('#reportTable');if(!table)return;
+  const qty=rows.reduce((a,r)=>a+Number(r.CurrentStock||0),0),cost=rows.reduce((a,r)=>a+Number(r.StockCostValue||0),0),sale=rows.reduce((a,r)=>a+Number(r.StockSaleValue||0),0),mrp=rows.reduce((a,r)=>a+Number(r.CurrentStock||0)*Number(r.MRP||0),0);
+  const sum=document.querySelector('#stockSummary');if(sum)sum.innerHTML=`<div><span>Items</span><b>${rows.length}</b></div><div><span>Total Qty</span><b>${money(qty)}</b></div><div><span>Cost Value</span><b>₹${money(cost)}</b></div><div><span>Sale Value</span><b>₹${money(sale)}</b></div><div><span>MRP Value</span><b>₹${money(mrp)}</b></div>`;
+  table.querySelector('thead').innerHTML='<tr><th>#</th><th>BARCODE / SKU</th><th>ITEM</th><th>CATEGORY</th><th>UOM</th><th>QTY</th><th>PURCHASE</th><th>SALE</th><th>MRP</th><th>COST VALUE</th><th>SALE VALUE</th><th>LOCATION</th></tr>';
+  table.querySelector('tbody').innerHTML=rows.map((r,i)=>{const qty=Number(r.CurrentStock||0),cls=qty<0?'stock-neg':qty===0?'stock-zero':qty<=5?'stock-low':'';return `<tr class="${cls}"><td>${i+1}</td><td><b>${esc(r.Barcode||'-')}</b><small>${esc(r.SKU||'')}</small></td><td><b>${esc(r.ItemName||'')}</b><small>HSN ${esc(r.HSN||'-')} · GST ${esc(r.GSTPercent||0)}%</small></td><td>${esc(r.Category||'Uncategorised')}</td><td>${esc(r.Unit||'PCS')}</td><td class="stock-qty"><b>${money(qty)}</b></td><td>₹${money(r.PurchasePrice)}</td><td>₹${money(r.SalePrice)}</td><td>₹${money(r.MRP)}</td><td>₹${money(r.StockCostValue)}</td><td>₹${money(r.StockSaleValue)}</td><td>${esc([r.LocationCode,r.RackName,r.ShelfName].filter(Boolean).join(' / ')||'-')}</td></tr>`}).join('')||'<tr><td colspan="12" class="empty">No stock records match the filters</td></tr>';
+  const meta=document.querySelector('#reportMeta'),asOn=document.querySelector('#stockAsOn')?.value||'';if(meta)meta.textContent=`Current Stock Report · As on ${asOn} · ${rows.length} items · Qty ${money(qty)} · Cost ₹${money(cost)}`
+ }
+ window.printCurrentStockReport=function(){
+  if(!currentRows.length)return toast('No stock data to print');
+  const asOn=document.querySelector('#stockAsOn')?.value||'',cat=document.querySelector('#stockCategory')?.value||'All Categories',status=document.querySelector('#stockStatus')?.value||'ALL';
+  const qty=currentRows.reduce((a,r)=>a+Number(r.CurrentStock||0),0),cost=currentRows.reduce((a,r)=>a+Number(r.StockCostValue||0),0),sale=currentRows.reduce((a,r)=>a+Number(r.StockSaleValue||0),0);
+  const body=currentRows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.Barcode||'')}</td><td>${esc(r.ItemName||'')}</td><td>${esc(r.Category||'')}</td><td>${esc(r.Unit||'')}</td><td class="num">${money(r.CurrentStock)}</td><td class="num">${money(r.PurchasePrice)}</td><td class="num">${money(r.SalePrice)}</td><td class="num">${money(r.MRP)}</td><td class="num">${money(r.StockCostValue)}</td><td>${esc([r.LocationCode,r.RackName].filter(Boolean).join(' / '))}</td></tr>`).join('');
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Current Stock Report</title><style>@page{size:A4 landscape;margin:7mm}body{font-family:Arial,sans-serif;color:#111;font-size:8.5px}h1{font-size:17px;margin:0}p{margin:4px 0 8px;color:#444}.sum{display:flex;gap:12px;margin:8px 0}.sum b{border:1px solid #999;padding:5px 8px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #777;padding:4px;vertical-align:top}th{background:#eee;font-size:8px}.num{text-align:right;white-space:nowrap}tfoot td{font-weight:bold;background:#f4f4f4}</style></head><body><h1>SuvidhaPOS Premium — Current Stock Report</h1><p>As on ${esc(asOn)} · Category ${esc(cat)} · Status ${esc(status)}</p><div class="sum"><b>Items ${currentRows.length}</b><b>Qty ${money(qty)}</b><b>Cost ₹${money(cost)}</b><b>Sale ₹${money(sale)}</b></div><table><thead><tr><th>#</th><th>Barcode</th><th>Item</th><th>Category</th><th>UOM</th><th>Qty</th><th>Purchase</th><th>Sale</th><th>MRP</th><th>Cost Value</th><th>Location</th></tr></thead><tbody>${body}</tbody></table><script>window.onload=function(){window.print()}<\/script></body></html>`;
+  const pw=window.open('','_blank','width=1200,height=850');if(!pw)return toast('Allow popups for Print / PDF');pw.document.write(html);pw.document.close()
+ };
 
  window.runReport=async function(){const type=currentDef?.[0]||document.querySelector('#reportType')?.value;if(!type)return;currentDef=defs.find(x=>x[0]===type)||defs[0];const from=document.querySelector('#reportFrom')?.value||iso(new Date(Date.now()-29*86400000)),to=document.querySelector('#reportTo')?.value||iso(new Date()),q=encodeURIComponent(document.querySelector('#reportQ')?.value||'');try{currentRows=await api(`/api/premium-reports/${type}?from=${from}&to=${to}&q=${q}`);render()}catch(e){const table=document.querySelector('#reportTable');if(table)table.innerHTML=`<tbody><tr><td class="alert">${esc(e.message)}</td></tr></tbody>`}};
 
