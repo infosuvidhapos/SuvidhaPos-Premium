@@ -20,6 +20,7 @@ public sealed class DatabaseInitializer
   if(File.Exists(heldBillsSchema)) await RunScriptAsync(heldBillsSchema);
   var retailExpansionSchema=Path.Combine(AppContext.BaseDirectory,"Database","retail-expansion-schema.sql");
   if(File.Exists(retailExpansionSchema)) await RunScriptAsync(retailExpansionSchema);
+  await RunScriptAsync(Path.Combine(AppContext.BaseDirectory,"Database","jewellery-registers-schema.sql"));
   await RunScriptAsync(Path.Combine(AppContext.BaseDirectory,"Database","seed.sql"));
   await EnsureDefaultAdminAsync();
  }

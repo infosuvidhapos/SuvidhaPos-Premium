@@ -69,6 +69,8 @@ jobs:
         run: dotnet restore SuvidhaPOS-Premium.sln
       - name: Build
         run: dotnet build SuvidhaPOS-Premium.sln --configuration Release --no-restore
+      - name: Validate jewellery workflow rules
+        run: dotnet run --project fixes/JewelleryWorkflowChecks --configuration Release
       - name: Validate source layout
         shell: powershell
         run: |
@@ -480,7 +482,7 @@ jobs:
           & $sqlcmd.FullName -I -S $server -E -b -Q "SELECT @@VERSION; SELECT SERVERPROPERTY('ProductVersion') AS ProductVersion, SERVERPROPERTY('ProductLevel') AS ProductLevel, SERVERPROPERTY('Edition') AS Edition;"
           if($LASTEXITCODE -ne 0){throw 'SQL Server 2019 connection failed'}
           New-Item -ItemType Directory -Force -Path database-artifact | Out-Null
-          foreach($script in @('schema.sql','specialized-schema.sql','print-schema.sql','seed.sql')){
+          foreach($script in @('schema.sql','specialized-schema.sql','print-schema.sql','jewellery-registers-schema.sql','seed.sql')){
             & $sqlcmd.FullName -I -S $server -E -b -i "src/SuvidhaPOS-Premium/Database/$script"
             if($LASTEXITCODE -ne 0){throw "$script failed on SQL Server 2019"}
           }
@@ -490,6 +492,8 @@ jobs:
           & $sqlcmd.FullName -I -S $server -E -b -Q "RESTORE HEADERONLY FROM DISK=N'$bak';"
           if($LASTEXITCODE -ne 0){throw 'Backup header validation failed'}
           Copy-Item $bak 'publish/desktop/win-x64/Database/SuvidhaPos.bak' -Force
+      - name: Validate jewellery register transactions on isolated SQL database
+        run: dotnet run --project fixes/JewelleryWorkflowChecks --configuration Release -- "Server=.\SQLEXPRESS2019;Integrated Security=true;TrustServerCertificate=true"
       - name: Validate administrator setup and Program Files install
         shell: powershell
         run: |

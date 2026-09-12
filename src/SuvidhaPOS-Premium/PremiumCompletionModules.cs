@@ -279,6 +279,10 @@ public static class PremiumCompletionModules
         try
         {
             int itemId=id;
+            if(id>0){
+                using var lockItem=new SqlCommand("SELECT Status FROM JewelleryItems WITH(UPDLOCK,HOLDLOCK) WHERE Id=@id",c,tx);lockItem.Parameters.Add(P("@id",id));
+                if((await lockItem.ExecuteScalarAsync())?.ToString()=="WORKSHOP_ISSUED")throw new ArgumentException("Return this tag through Issue Register before editing it");
+            }
             if(id==0)
             {
                 var cmd=new SqlCommand(@"INSERT JewelleryItems(TagNo,Barcode,ItemName,Category,DesignCode,SubCategory,CollectionName,BrandName,SupplierName,KarigarName,

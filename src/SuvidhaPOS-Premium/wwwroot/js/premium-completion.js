@@ -45,6 +45,8 @@ function ensureNav(){
 new MutationObserver(function(){ensureNav()}).observe(d.getElementById('sidebar')||d.documentElement,{childList:true,subtree:true});
 
 w.loadPremiumFeatureControl=async function(){
+ if(jewel()&&w.loadJewelleryFeatureControl)return w.loadJewelleryFeatureControl();
+
  head('featurecontrol','Feature Control','Application module switches');
  if(!manager())return app.innerHTML='<div class="content"><div class="alert">Admin / Manager permission required.</div></div>';
  var rows=[];try{rows=await api('/api/premium/features')}catch(err){return app.innerHTML='<div class="content"><div class="alert">'+e(err.message)+'</div></div>'}
@@ -75,8 +77,8 @@ w.premiumPurityChange=function(){
 w.premiumJewelleryCalc=jewelCalc;
 
 w.loadJewelleryItemMaster=async function(){
- if(!enabled('P-01'))return notify('P-01 is disabled');
- head('products','Jewellery Item Master','Premium tag, HUID, metal, stone, making, tax and inventory master');
+ if(!jewel()&&!enabled('P-01'))return notify('P-01 is disabled');
+ head(jewel()?'jItemMaster':'products','Jewellery Item Master','Premium tag, HUID, metal, stone, making, tax and inventory master');
  var rows=[];try{rows=await api('/api/jewellery/item-master')}catch(err){return app.innerHTML='<div class="content"><div class="alert">'+e(err.message)+'</div></div>'}
  var stock=rows.filter(function(x){return x.Status==='IN_STOCK'}).length,wt=rows.reduce(function(a,x){return a+n(x.NetWeight)},0);
  app.innerHTML='<div class="content completion-page jewellery-item-master"><div class="metricrow"><div class="mini">Total Tags<b>'+rows.length+'</b></div><div class="mini">In Stock<b>'+stock+'</b></div><div class="mini">Net Weight<b>'+money(wt)+' g</b></div><div class="mini">HUID Tags<b>'+rows.filter(function(x){return !!x.Huid}).length+'</b></div></div>'+
@@ -102,7 +104,7 @@ w.openPremiumJewelleryItem=async function(id){
  '<div class="master-section"><h3>MAKING / TAX / PRICING</h3><div class="formgrid"><label>Making Type<select id="pjMakingType" class="select"><option>PER_GRAM</option><option>PERCENTAGE</option><option>FLAT</option><option>PER_PIECE</option></select></label><label>Making Value<input id="pjMaking" class="input" type="number" step="0.01" value="'+n(x.MakingValue)+'"></label><label>Labour Charge<input id="pjLabour" class="input" type="number" step="0.01" value="'+n(x.LabourCharge)+'"></label><label>Hallmark Charge<input id="pjHallCharge" class="input" type="number" step="0.01" value="'+n(x.HallmarkCharge)+'"></label><label>Other Charge<input id="pjOther" class="input" type="number" step="0.01" value="'+n(x.OtherCharge)+'"></label><label>HSN<input id="pjHsn" class="input" value="'+e(x.HsnCode||'7113')+'"></label><label>GST Mode<select id="pjGstMode" class="select"><option value="EXCLUSIVE">Exclusive</option><option value="INCLUSIVE">Inclusive</option></select></label><label>GST %<input id="pjGst" class="input" type="number" step="0.01" value="'+n(x.GstRate||3)+'"></label><label>MRP<input id="pjMrp" class="input" type="number" step="0.01" value="'+n(x.Mrp)+'"></label><label>Purchase Price<input id="pjPurchase" class="input" type="number" step="0.01" value="'+n(x.PurchasePrice)+'"></label><label>Retail Sale Price<input id="pjSale" class="input" type="number" step="0.01" value="'+n(x.SalePrice)+'"></label><label>Wholesale Price<input id="pjWholesale" class="input" type="number" step="0.01" value="'+n(x.WholesalePrice)+'"></label><label>Minimum Sale Price<input id="pjMinSale" class="input" type="number" step="0.01" value="'+n(x.MinSalePrice)+'"></label></div></div>'+
  '<div class="master-section"><h3>INVENTORY / LOCATION</h3><div class="formgrid"><label>Opening Qty<input id="pjOpeningQty" class="input" type="number" step="0.001" value="'+n(x.OpeningQty||1)+'"></label><label>Status<select id="pjStatus" class="select"><option>IN_STOCK</option><option>APPROVAL</option><option>KARIGAR_WORK</option><option>REPAIR</option><option>RESERVED</option><option>SOLD</option></select></label><label>Location Code<input id="pjLocation" class="input" value="'+e(x.LocationCode||'')+'"></label><label>Rack<input id="pjRack" class="input" value="'+e(x.RackName||'')+'"></label><label>Tray<input id="pjTray" class="input" value="'+e(x.TrayName||'')+'"></label><label>Box<input id="pjBox" class="input" value="'+e(x.BoxName||'')+'"></label><label>Image Path<input id="pjImage" class="input" value="'+e(x.ImagePath||'')+'"></label><label class="full">Notes<textarea id="pjNotes" class="textarea">'+e(x.Notes||'')+'</textarea></label></div></div></div>';
  modal((id?'Edit':'New')+' Premium Jewellery Item',html,'<button class="btn" onclick="savePremiumJewelleryItem('+(id||0)+')">Save Jewellery Item</button>');
- var box=d.querySelector('#modal .modalbox');if(box){box.style.width='96vw';box.style.maxWidth='1500px'}
+ var box=d.querySelector('#modal .modalbox');if(box){if(jewel())box.classList.add('jewellery-entry-dialog');else{box.style.width='96vw';box.style.maxWidth='1500px'}}
  if(d.getElementById('pjMetal'))d.getElementById('pjMetal').value=x.MetalType||'Gold';
  if(d.getElementById('pjPurity'))d.getElementById('pjPurity').value=x.Purity||'22K';
  if(d.getElementById('pjHallmark'))d.getElementById('pjHallmark').value=x.HallmarkStatus||'HALLMARKED';
@@ -120,7 +122,7 @@ w.savePremiumJewelleryItem=async function(id){
 };
 
 var baseProducts=w.loadProducts;
-if(typeof baseProducts==='function')w.loadProducts=function(){return jewel()&&enabled('P-01')?w.loadJewelleryItemMaster():baseProducts.apply(this,arguments)};
+if(typeof baseProducts==='function')w.loadProducts=function(){return jewel()?w.loadJewelleryStock():baseProducts.apply(this,arguments)};
 
 function downloadXls(name,headers,row){
  var html='<html><head><meta charset="utf-8"></head><body><table><tr>'+headers.map(function(h){return '<th>'+e(h)+'</th>'}).join('')+'</tr><tr>'+row.map(function(v){return '<td>'+e(v)+'</td>'}).join('')+'</tr></table></body></html>';
