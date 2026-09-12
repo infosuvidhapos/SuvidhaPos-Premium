@@ -8,6 +8,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const locked=new Set(['FEATURE_CONTROL','SIGN_OUT']);
 let settings={},loaded=false,loading=null,entries=[];
 function label(button){
+ if(button.classList.contains('js-section')&&!button.matches('button'))return [...button.childNodes].filter(x=>x.nodeType===3).map(x=>x.textContent).join(' ').trim();
  const span=button.querySelector('span:not(.js-icon):not(#jsReportsChevron)');
  return String(span?span.textContent:button.textContent).replace(/^[^\p{L}\p{N}]+/u,'').replace(/\s+/g,' ').trim();
 }
@@ -42,6 +43,10 @@ function collect(){
  installRouteGuards();apply();
 }
 function routeEntries(fn,args){
+ if(['loadJewelleryRegister','jregNew','jregOpen'].includes(fn)){
+  const keys={ESTIMATE:['ESTIMATES'],ISSUE:['ISSUE_REGISTER'],KARIGAR:['KARIGAR'],JOB:['KARIGAR_JOBS'],REPAIR:['REPAIR','REPAIRS'],GIRVI:['GIRVI_LOANS'],LEDGER:['CR_DR_LEDGER'],SCHEME:['SAVING_SCHEMES']}[args[0]]||[];
+  return entries.filter(e=>keys.includes(e.key));
+ }
  if(fn==='loadProducts'||fn==='loadJewelleryStock')return entries.filter(e=>e.key==='STOCK');
  if(fn==='loadReports'||fn==='loadJewelReports'||fn==='toggleJewelReports')return entries.filter(e=>e.key==='REPORTS');
  return entries.filter(e=>e.route?.fn===fn&&(e.route.arg===undefined||e.route.arg===String(args[0])));
@@ -49,7 +54,7 @@ function routeEntries(fn,args){
 function installRouteGuards(){
  if(!isJewellery())return;
  const names=new Set(entries.map(e=>e.route?.fn).filter(Boolean));
- ['loadProducts','loadJewelleryStock','loadReports','loadJewelReports'].forEach(name=>names.add(name));
+ ['loadProducts','loadJewelleryStock','loadReports','loadJewelReports','loadJewelleryRegister','jregNew','jregOpen'].forEach(name=>names.add(name));
  names.forEach(name=>{
   if(['logout','loadJewelleryFeatureControl','toggleJewelReports'].includes(name))return;
   const base=w[name];if(typeof base!=='function'||base.__jewelleryAccess)return;

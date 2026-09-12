@@ -14,16 +14,34 @@ public static class JewelleryRegisterModules
  static string Kind(string value){value=value.ToUpperInvariant();JewelleryRegisterRules.ValidateKind(value);return value;}
  static async Task<IResult> Safe(Func<Task<IResult>> work){try{return await work();}catch(ArgumentException e){return Results.BadRequest(new{message=e.Message});}catch(DBConcurrencyException e){return Results.Conflict(new{message=e.Message});}}
  public sealed record CreateRequest(Guid RequestId,JewelleryRegisterData Data);
+ public static async Task<bool> IsJewelleryMode(Db db){
+  var type=LicenseGuardModules.GetStatus().StoreType;
+  if(string.IsNullOrWhiteSpace(type))type=(await db.QuerySingleAsync("SELECT TOP 1 StoreType FROM OutletMaster ORDER BY Id")).GetValueOrDefault("StoreType")?.ToString();
+  return new[]{"Jewellery Shop","Gold & Diamond Jewellery","Silver Jewellery"}.Contains(type??"",StringComparer.OrdinalIgnoreCase);
+ }
  public static void Map(WebApplication app)
  {
   var group=app.MapGroup("/api/jewellery/registers");
   group.AddEndpointFilter(async (context,next)=>{
    var db=context.HttpContext.RequestServices.GetRequiredService<Db>();
-   var type=LicenseGuardModules.GetStatus().StoreType;
-   if(string.IsNullOrWhiteSpace(type))type=(await db.QuerySingleAsync("SELECT TOP 1 StoreType FROM OutletMaster ORDER BY Id")).GetValueOrDefault("StoreType")?.ToString();
-   if(!new[]{"Jewellery Shop","Gold & Diamond Jewellery","Silver Jewellery"}.Contains(type??"",StringComparer.OrdinalIgnoreCase))return Results.Json(new{message="This register is available in Jewellery mode only"},statusCode:403);
+   if(!await IsJewelleryMode(db))return Results.Json(new{message="This register is available in Jewellery mode only"},statusCode:403);
    return await next(context);
   });
+  group.MapGet("/report/girvi",async(Db db,string? q,string? status)=>await Safe(async()=>{
+   var query=(q??"").Trim();var filter=(status??"ALL").ToUpperInvariant();
+   if(!new[]{"ALL","ACTIVE","OVERDUE","CLOSED"}.Contains(filter))throw new ArgumentException("Invalid loan status filter");
+   var rows=await db.QueryAsync("SELECT Id,PartyName,Title,RecordDate,Status,Amount,PaidAmount,Details FROM JewelleryRegisters WHERE Kind='GIRVI' AND (@q='' OR PartyName LIKE @like OR Title LIKE @like OR CAST(Id AS nvarchar(20))=@q) ORDER BY RecordDate DESC,Id DESC",P("@q",query),P("@like","%"+query+"%"));
+   foreach(var row in rows){
+    var data=JsonSerializer.Deserialize<JewelleryRegisterData>(row["Details"]!.ToString()!,Json)!;var active=data.Status=="ACTIVE";
+    var due=active?JewelleryRegisterRules.LoanDue(data,DateTime.Today):0;
+    row["Principal"]=active?data.PrincipalOutstanding:0;row["Interest"]=active?JewelleryRegisterRules.Money(due-data.PrincipalOutstanding):0;
+    row["Due"]=due;row["Weight"]=data.Weight;row["Metal"]=data.Metal;row["DueDate"]=data.DueDate;
+    row["Overdue"]=active&&data.DueDate.HasValue&&data.DueDate.Value.Date<DateTime.Today;
+    row.Remove("Details");
+   }
+   var filtered=rows.Where(r=>filter=="ALL"||(filter=="OVERDUE"?Convert.ToBoolean(r["Overdue"]):r["Status"]?.ToString()==filter)).ToList();
+   return Results.Ok(new{rows=filtered,active=filtered.Count(r=>r["Status"]?.ToString()=="ACTIVE"),overdue=filtered.Count(r=>Convert.ToBoolean(r["Overdue"])),closed=filtered.Count(r=>r["Status"]?.ToString()=="CLOSED"),principal=filtered.Sum(r=>Convert.ToDecimal(r["Principal"])),interest=filtered.Sum(r=>Convert.ToDecimal(r["Interest"])),due=filtered.Sum(r=>Convert.ToDecimal(r["Due"]))});
+  }));
   group.MapGet("/{kind}",async (Db db,string kind,string? q,int? page)=>await Safe(async()=>{
    kind=Kind(kind);var number=Math.Max(1,page??1);var query=(q??"").Trim();
    var rows=await db.QueryAsync(@"SELECT Id,Kind,PartyName,Title,RecordDate,Status,Amount,PaidAmount,Details,Revision FROM JewelleryRegisters
@@ -55,7 +73,7 @@ FROM JewelleryRegisters WHERE Kind='LEDGER' AND TRY_CONVERT(int,JSON_VALUE(Detai
    if(kind=="ISSUE"||kind=="JOB"){
     using var karigar=Cmd(c,tx,"SELECT PartyName FROM JewelleryRegisters WHERE Id=@id AND Kind='KARIGAR' AND Status='ACTIVE'",P("@id",data.KarigarId));
     var name=await karigar.ExecuteScalarAsync();if(name==null)throw new ArgumentException("Select an active Karigar");
-    if(kind=="ISSUE")data.PartyName=name.ToString()!;
+    data.KarigarName=name.ToString()!;if(kind=="ISSUE")data.PartyName=data.KarigarName;
    }
    if(kind=="ISSUE"){
     using var tag=Cmd(c,tx,"UPDATE JewelleryItems WITH(UPDLOCK) SET Status='WORKSHOP_ISSUED' WHERE Id=@id AND Status='IN_STOCK' AND ABS(GrossWeight-@w)<=0.0001; SELECT @@ROWCOUNT",P("@id",data.ItemId),P("@w",data.Weight));

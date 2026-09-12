@@ -11,6 +11,7 @@ public sealed class JewelleryRegisterData
  public DateTime Date {get;set;}=DateTime.Today;
  public DateTime? DueDate {get;set;}
  public int? KarigarId {get;set;}
+ public string KarigarName {get;set;}="";
  public int? ItemId {get;set;}
  public string Metal {get;set;}="Gold";
  public decimal Weight {get;set;}
@@ -68,7 +69,8 @@ public static class JewelleryRegisterRules
   d.Phone??="";d.Address??="";d.Notes??="";d.ReferenceNo??="";
   Need(d.PartyName.Length is >0 and <=200,"Enter a party/customer name (up to 200 characters)");
   Need(d.Title.Length is >0 and <=200,"Enter an item/description (up to 200 characters)");
-  Need(d.Phone.Length<=40&&d.Address.Length<=500&&d.Notes.Length<=500,"Phone, address or notes are too long");
+  Need(d.Phone.Length<=40&&d.Address.Length<=500&&d.Notes.Length<=500&&d.ReferenceNo.Length<=100,"Phone, address, reference or notes are too long");
+  Need(new[]{"Cash","UPI","Card","Bank","Cheque"}.Contains(d.PaymentMode),"Choose a valid payment mode");
   Need(d.Date.Date<=today.Date&&d.Date.Year>=2000,"Enter a valid record date, not in the future");
   Need(d.DueDate==null||d.DueDate.Value.Date>=d.Date.Date,"Due date cannot precede the record date");
   Need(d.Amount>=0&&d.Amount<=999999999m&&d.PaidAmount>=0&&d.Weight>=0,"Amounts and weight must not be negative");
@@ -99,8 +101,9 @@ public static class JewelleryRegisterRules
    d.PrincipalOutstanding=d.Amount;d.PaidAmount=0;
   }
   if(kind=="SCHEME"){
-   Need(d.Instalment>0&&d.Months is >0 and <=120,"Enter a positive instalment and 1 to 120 months");
+   Need(d.Instalment>=0.01m&&d.Instalment<=999999999m&&d.Months is >0 and <=120,"Enter a positive instalment and 1 to 120 months");
    d.Instalment=Money(d.Instalment);d.Amount=Money(d.Instalment*d.Months);d.PaidAmount=0;d.DueDate=d.Date.AddMonths(d.Months);
+   Need(d.Amount<=999999999m,"Scheme target is too large");
   }
   if(kind=="LEDGER"){
    Need(d.CustomerId>0&&d.Amount>0&&(d.Direction=="DR"||d.Direction=="CR"),"Select customer, DR/CR and a positive amount");d.PaidAmount=0;

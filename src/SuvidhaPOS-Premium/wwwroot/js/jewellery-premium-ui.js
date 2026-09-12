@@ -34,7 +34,7 @@ w.loadJewelReports=function(){
   '<button class="js-report-tile" onclick="loadJewelSalesReport()"><i>⌁</i><b>Sales Report</b><span>Revenue trend, invoices and top customers</span></button>'+
   '<button class="js-report-tile" onclick="loadJewelGstReport()"><i>%</i><b>GST Report</b><span>Taxable value with CGST / SGST breakup</span></button>'+
   '<button class="js-report-tile" onclick="loadJewelStockReport()"><i>◇</i><b>Stock Report</b><span>Tag-wise stock, weight and valuation</span></button>'+
-  '<button class="js-report-tile" onclick="loadJewelGirviReport()"><i>⚖</i><b>Girvi Report</b><span>Loan-book report area without fabricated entries</span></button></div></div>';
+  '<button class="js-report-tile" onclick="loadJewelGirviReport()"><i>⚖</i><b>Girvi Report</b><span>Loan balances, interest and overdue accounts</span></button></div></div>';
 };
 
 w.loadJewelDaybook=async function(day){
@@ -85,12 +85,18 @@ async function stockPage(q,metal,inventory){
   '<div class="js-report-two"><div class="js-card js-report-card"><div class="js-report-card-head"><b>Stock By Group</b></div><table class="js-clean-table"><thead><tr><th>Metal</th><th>Category</th><th>Items</th><th>Weight</th><th>Valuation</th></tr></thead><tbody>'+(rows.map(x=>'<tr><td><span class="js-metal-tag '+String(x.metal).toLowerCase()+'">'+esc(x.metal)+'</span></td><td>'+esc(x.category)+'</td><td>'+x.items+'</td><td>'+money(x.weight)+' g</td><td class="js-gold-text">₹'+money(x.value)+'</td></tr>').join('')||empty(5,'No jewellery stock available'))+'</tbody></table></div><div class="js-card js-report-card"><div class="js-report-card-head"><b>Tag-wise Stock Detail</b></div><div class="js-report-table-wrap"><table class="js-clean-table"><thead><tr><th>Tag</th><th>Item</th><th>Metal</th><th>Purity</th><th>Gross</th><th>Net</th><th>HUID</th><th>Rack</th><th>Valuation</th></tr></thead><tbody>'+(detail||empty(9,'No stock tags match this filter'))+'</tbody></table></div></div></div></div>';
 };
 
-w.loadJewelGirviReport=async function(){
+w.loadJewelGirviReport=async function(status='ALL',q=''){
+  if(!d.body.classList.contains('jewel-suite-mode'))return;
   activate('jGirviReport');
-  app().innerHTML='<div class="js-content js-report-page">'+head('Girvi Report','Loan-book exposure — real entries only',actions('jewellery-girvi'))+
-  '<div class="js-report-filter"><label>STATUS<select id="jsGirviStatus"><option>All</option><option>Active</option><option>Overdue</option><option>Closed</option></select></label><label>SEARCH<input id="jsGirviSearch" placeholder="Client / voucher"></label><button class="js-gold" onclick="loadJewelGirviReport()">Apply</button></div>'+
-  '<div class="js-report-metrics four">'+metric('ACTIVE LOANS','0')+metric('OVERDUE','0')+metric('OUTSTANDING PRINCIPAL','₹0.00')+metric('TOTAL OUTSTANDING','₹0.00')+'</div>'+
-  '<div class="js-report-two"><div class="js-card js-report-card"><div class="js-report-card-head"><b>Book Composition</b></div><div class="js-composition"><div><span>CLOSED LOANS</span><b>0</b></div><div><span>ACCRUED INTEREST</span><b>₹0.00</b></div><div><span>COLLATERAL WEIGHT</span><b>0.000 g</b></div></div></div><div class="js-card js-risk"><h3>Risk Snapshot</h3><div>Active <b>0</b></div><div>Overdue <b>0</b></div><div>Closed <b>0</b></div><hr><div>Outstanding <strong>₹0.00</strong></div></div></div>'+
-  '<div class="js-card js-report-card"><div class="js-report-card-head"><b>Girvi Register</b></div><table class="js-clean-table"><thead><tr><th>Voucher</th><th>Client</th><th>Date</th><th>Collateral</th><th>Weight</th><th>Principal</th><th>Interest</th><th>Status</th></tr></thead><tbody>'+empty(8,'Girvi transactions are not enabled yet in this database; no sample or fabricated loan data is shown.')+'</tbody></table></div></div>';
+  app().innerHTML='<div class="js-content"><div class="js-card">Loading loan report…</div></div>';
+  try{
+    const report=await api('/api/jewellery/registers/report/girvi?status='+encodeURIComponent(status)+'&q='+encodeURIComponent(q));
+    app().innerHTML='<div class="js-content js-report-page">'+head('Girvi Report','Loan balances and interest as of '+safeDate(new Date()),actions('jewellery-girvi'))+
+    '<div class="js-report-filter"><label>STATUS<select id="jsGirviStatus">'+['ALL','ACTIVE','OVERDUE','CLOSED'].map(x=>'<option '+(x===status?'selected':'')+'>'+x+'</option>').join('')+'</select></label><label>SEARCH<input id="jsGirviSearch" placeholder="Client / voucher" value="'+esc(q)+'"></label><button id="jsGirviApply" class="js-gold">Apply</button></div>'+
+    '<div class="js-report-metrics four">'+metric('ACTIVE LOANS',report.active)+metric('OVERDUE',report.overdue)+metric('OUTSTANDING PRINCIPAL','₹'+money(report.principal))+metric('TOTAL OUTSTANDING','₹'+money(report.due))+'</div>'+
+    '<div class="js-card js-report-card"><div class="js-report-card-head"><b>Girvi Register</b><span>Accrued interest ₹'+money(report.interest)+' · Closed '+report.closed+'</span></div><div class="js-report-table-wrap"><table class="js-clean-table"><thead><tr><th>Voucher</th><th>Client</th><th>Date</th><th>Collateral</th><th>Weight</th><th>Principal</th><th>Interest</th><th>Total Due</th><th>Status</th></tr></thead><tbody>'+
+    (report.rows.map(row=>'<tr><td>GIR-'+row.Id+'</td><td>'+esc(row.PartyName)+'</td><td>'+safeDate(row.RecordDate)+'</td><td>'+esc(row.Title)+' · '+esc(row.Metal)+'</td><td>'+Number(row.Weight).toFixed(4)+' g</td><td>₹'+money(row.Principal)+'</td><td>₹'+money(row.Interest)+'</td><td>₹'+money(row.Due)+'</td><td>'+esc(row.Overdue?'OVERDUE':row.Status)+'</td></tr>').join('')||empty(9,'No loans match this filter.'))+'</tbody></table></div></div></div>';
+    d.getElementById('jsGirviApply').onclick=()=>w.loadJewelGirviReport(d.getElementById('jsGirviStatus').value,d.getElementById('jsGirviSearch').value);
+  }catch(error){app().innerHTML='<div class="js-content"><div class="js-card">'+esc(error.message||'Unable to load loan report')+'</div></div>'}
 };
 })(window,document);

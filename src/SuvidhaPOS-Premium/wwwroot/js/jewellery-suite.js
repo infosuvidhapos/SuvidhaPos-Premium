@@ -25,17 +25,17 @@
         <button class="nav js-nav" data-page="purchase" onclick="loadPurchase()">${icon('🛒')}<span>Purchase Bill</span></button>
         <button class="nav js-nav" onclick="jewelSuiteInvoice('karigar')">${icon('⚒')}<span>Karigar Bill</span></button>
         <button class="nav js-nav" onclick="jewelSuiteInvoice('exchange')">${icon('↔')}<span>Exchange</span></button>
-        <button class="nav js-nav" onclick="loadJewelRepairs()">${icon('⌕')}<span>Repair</span></button>
-        <button class="nav js-nav" onclick="loadJewelEstimates()">${icon('▤')}<span>Estimates</span></button>
+        <button class="nav js-nav" data-page="jregREPAIR" onclick="loadJewelRepairs()">${icon('⌕')}<span>Repair</span></button>
+        <button class="nav js-nav" data-page="jregESTIMATE" onclick="loadJewelEstimates()">${icon('▤')}<span>Estimates</span></button>
         <div class="js-section">WORKSHOP</div>
-        <button class="nav js-nav" onclick="loadJewelIssueRegister()">${icon('▤')}<span>Issue Register</span></button>
-        <button class="nav js-nav" onclick="loadJewelKarigars()">${icon('⚒')}<span>Karigar</span></button>
-        <button class="nav js-nav" onclick="loadJewelJobs()">${icon('▥')}<span>Karigar Jobs</span></button>
-        <button class="nav js-nav" onclick="loadJewelRepairs()">${icon('⌕')}<span>Repairs</span></button>
+        <button class="nav js-nav" data-page="jregISSUE" onclick="loadJewelIssueRegister()">${icon('▤')}<span>Issue Register</span></button>
+        <button class="nav js-nav" data-page="jregKARIGAR" onclick="loadJewelKarigars()">${icon('⚒')}<span>Karigar</span></button>
+        <button class="nav js-nav" data-page="jregJOB" onclick="loadJewelJobs()">${icon('▥')}<span>Karigar Jobs</span></button>
+        <button class="nav js-nav" data-page="jregREPAIR" onclick="loadJewelRepairs()">${icon('⌕')}<span>Repairs</span></button>
         <div class="js-section">FINANCE</div>
-        <button class="nav js-nav" onclick="loadJewelGirviLoans()">${icon('⚖')}<span>Girvi Loans</span></button>
-        <button class="nav js-nav" onclick="loadJewelLedger()">${icon('▭')}<span>Cr/Dr Ledger</span></button>
-        <button class="nav js-nav" onclick="loadJewelSavingSchemes()">${icon('♧')}<span>Saving Schemes</span></button>
+        <button class="nav js-nav" data-page="jregGIRVI" onclick="loadJewelGirviLoans()">${icon('⚖')}<span>Girvi Loans</span></button>
+        <button class="nav js-nav" data-page="jregLEDGER" onclick="loadJewelLedger()">${icon('▭')}<span>Cr/Dr Ledger</span></button>
+        <button class="nav js-nav" data-page="jregSCHEME" onclick="loadJewelSavingSchemes()">${icon('♧')}<span>Saving Schemes</span></button>
         <div class="js-section">INVENTORY</div>
         <button class="nav js-nav" data-page="products" onclick="loadProducts()">${icon('◇')}<span>Stock</span></button>
         <button class="js-section js-section-toggle" type="button" aria-expanded="false" aria-controls="jsReportsMenu" onclick="toggleJewelReports()"><span>REPORTS</span><span id="jsReportsChevron">›</span></button>
