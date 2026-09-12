@@ -83,9 +83,9 @@ async function loadRuntime(){
   await addScript('/js/btc-payment-receipt-input-fix.js?v=6180','btcReceiptInputFixJs6130');
   await addScript('/js/billing-hold.js?v=6180','billingHoldJs6130');
   await addScript('/js/india-locations.js?v=6180','indiaLocationsJs6140');
-  await addScript('/js/retail-masters-ui.js?v=6180','retailMastersUiJs6140');
+  await addScript('/js/retail-masters-ui.js?v=6200','retailMastersUiJs6140');
   await addScript('/js/audit-report-thermal.js?v=6180','auditReportThermalJs6140');
-  await addScript('/js/jewellery-nav-fix.js?v=6180','jewelleryNavFix6170');
+  await addScript('/js/jewellery-nav-fix.js?v=6200','jewelleryNavFix6170');
   await addScript('/js/credit-upi-click-fix.js?v=6180','creditUpiClickFix6170');
  }catch(e){console.error('Suvidha retail/BTC runtime 6.14.0:',e)}
 }

@@ -45,6 +45,8 @@ function ensureNav(){
 new MutationObserver(function(){ensureNav()}).observe(d.getElementById('sidebar')||d.documentElement,{childList:true,subtree:true});
 
 w.loadPremiumFeatureControl=async function(){
+ if(jewel()&&w.loadJewelleryFeatureControl)return w.loadJewelleryFeatureControl();
+
  head('featurecontrol','Feature Control','Application module switches');
  if(!manager())return app.innerHTML='<div class="content"><div class="alert">Admin / Manager permission required.</div></div>';
  var rows=[];try{rows=await api('/api/premium/features')}catch(err){return app.innerHTML='<div class="content"><div class="alert">'+e(err.message)+'</div></div>'}
@@ -75,8 +77,8 @@ w.premiumPurityChange=function(){
 w.premiumJewelleryCalc=jewelCalc;
 
 w.loadJewelleryItemMaster=async function(){
- if(!enabled('P-01'))return notify('P-01 is disabled');
- head('products','Jewellery Item Master','Premium tag, HUID, metal, stone, making, tax and inventory master');
+ if(!jewel()&&!enabled('P-01'))return notify('P-01 is disabled');
+ head(jewel()?'jItemMaster':'products','Jewellery Item Master','Premium tag, HUID, metal, stone, making, tax and inventory master');
  var rows=[];try{rows=await api('/api/jewellery/item-master')}catch(err){return app.innerHTML='<div class="content"><div class="alert">'+e(err.message)+'</div></div>'}
  var stock=rows.filter(function(x){return x.Status==='IN_STOCK'}).length,wt=rows.reduce(function(a,x){return a+n(x.NetWeight)},0);
  app.innerHTML='<div class="content completion-page jewellery-item-master"><div class="metricrow"><div class="mini">Total Tags<b>'+rows.length+'</b></div><div class="mini">In Stock<b>'+stock+'</b></div><div class="mini">Net Weight<b>'+money(wt)+' g</b></div><div class="mini">HUID Tags<b>'+rows.filter(function(x){return !!x.Huid}).length+'</b></div></div>'+
@@ -102,7 +104,7 @@ w.openPremiumJewelleryItem=async function(id){
  '<div class="master-section"><h3>MAKING / TAX / PRICING</h3><div class="formgrid"><label>Making Type<select id="pjMakingType" class="select"><option>PER_GRAM</option><option>PERCENTAGE</option><option>FLAT</option><option>PER_PIECE</option></select></label><label>Making Value<input id="pjMaking" class="input" type="number" step="0.01" value="'+n(x.MakingValue)+'"></label><label>Labour Charge<input id="pjLabour" class="input" type="number" step="0.01" value="'+n(x.LabourCharge)+'"></label><label>Hallmark Charge<input id="pjHallCharge" class="input" type="number" step="0.01" value="'+n(x.HallmarkCharge)+'"></label><label>Other Charge<input id="pjOther" class="input" type="number" step="0.01" value="'+n(x.OtherCharge)+'"></label><label>HSN<input id="pjHsn" class="input" value="'+e(x.HsnCode||'7113')+'"></label><label>GST Mode<select id="pjGstMode" class="select"><option value="EXCLUSIVE">Exclusive</option><option value="INCLUSIVE">Inclusive</option></select></label><label>GST %<input id="pjGst" class="input" type="number" step="0.01" value="'+n(x.GstRate||3)+'"></label><label>MRP<input id="pjMrp" class="input" type="number" step="0.01" value="'+n(x.Mrp)+'"></label><label>Purchase Price<input id="pjPurchase" class="input" type="number" step="0.01" value="'+n(x.PurchasePrice)+'"></label><label>Retail Sale Price<input id="pjSale" class="input" type="number" step="0.01" value="'+n(x.SalePrice)+'"></label><label>Wholesale Price<input id="pjWholesale" class="input" type="number" step="0.01" value="'+n(x.WholesalePrice)+'"></label><label>Minimum Sale Price<input id="pjMinSale" class="input" type="number" step="0.01" value="'+n(x.MinSalePrice)+'"></label></div></div>'+
  '<div class="master-section"><h3>INVENTORY / LOCATION</h3><div class="formgrid"><label>Opening Qty<input id="pjOpeningQty" class="input" type="number" step="0.001" value="'+n(x.OpeningQty||1)+'"></label><label>Status<select id="pjStatus" class="select"><option>IN_STOCK</option><option>APPROVAL</option><option>KARIGAR_WORK</option><option>REPAIR</option><option>RESERVED</option><option>SOLD</option></select></label><label>Location Code<input id="pjLocation" class="input" value="'+e(x.LocationCode||'')+'"></label><label>Rack<input id="pjRack" class="input" value="'+e(x.RackName||'')+'"></label><label>Tray<input id="pjTray" class="input" value="'+e(x.TrayName||'')+'"></label><label>Box<input id="pjBox" class="input" value="'+e(x.BoxName||'')+'"></label><label>Image Path<input id="pjImage" class="input" value="'+e(x.ImagePath||'')+'"></label><label class="full">Notes<textarea id="pjNotes" class="textarea">'+e(x.Notes||'')+'</textarea></label></div></div></div>';
  modal((id?'Edit':'New')+' Premium Jewellery Item',html,'<button class="btn" onclick="savePremiumJewelleryItem('+(id||0)+')">Save Jewellery Item</button>');
- var box=d.querySelector('#modal .modalbox');if(box){box.style.width='96vw';box.style.maxWidth='1500px'}
+ var box=d.querySelector('#modal .modalbox');if(box){if(jewel())box.classList.add('jewellery-entry-dialog');else{box.style.width='96vw';box.style.maxWidth='1500px'}}
  if(d.getElementById('pjMetal'))d.getElementById('pjMetal').value=x.MetalType||'Gold';
  if(d.getElementById('pjPurity'))d.getElementById('pjPurity').value=x.Purity||'22K';
  if(d.getElementById('pjHallmark'))d.getElementById('pjHallmark').value=x.HallmarkStatus||'HALLMARKED';
@@ -120,7 +122,7 @@ w.savePremiumJewelleryItem=async function(id){
 };
 
 var baseProducts=w.loadProducts;
-if(typeof baseProducts==='function')w.loadProducts=function(){return jewel()&&enabled('P-01')?w.loadJewelleryItemMaster():baseProducts.apply(this,arguments)};
+if(typeof baseProducts==='function')w.loadProducts=function(){return jewel()?w.loadJewelleryStock():baseProducts.apply(this,arguments)};
 
 function downloadXls(name,headers,row){
  var html='<html><head><meta charset="utf-8"></head><body><table><tr>'+headers.map(function(h){return '<th>'+e(h)+'</th>'}).join('')+'</tr><tr>'+row.map(function(v){return '<td>'+e(v)+'</td>'}).join('')+'</tr></table></body></html>';
@@ -144,7 +146,7 @@ function importShell(titleText,sub,badge,extra){
  head('aiimport',titleText,sub);app.innerHTML='<div class="content completion-page item-import-master"><div class="panel completion-hero"><div><span class="completion-kicker">'+e(badge)+'</span><h2>'+e(titleText)+'</h2><p>'+e(sub)+'</p></div><span class="tag">EXCEL • PDF • CSV • IMAGE</span></div>'+extra+'<div class="panel"><label>Source File<input id="imFile" class="input" type="file" accept=".pdf,.xlsx,.xls,.csv,.txt,image/*"></label><label style="display:block;margin-top:10px">Notes / Pasted Messy Data<textarea id="imMessage" class="textarea" placeholder="Paste unstructured item rows, WhatsApp list, invoice text or column hints..."></textarea></label><div class="toolbar" style="margin-top:12px"><button id="imExtractBtn" class="btn"></button><button id="imSampleBtn" class="btn secondary">Download Sample Excel</button></div></div><div id="imPreview" style="margin-top:14px"></div></div>';
 }
 w.loadNormalItemImportMaster=function(){
- if(!enabled('P-05'))return notify('P-05 is disabled');
+ if(!jewel()&&!enabled('P-05'))return notify('P-05 is disabled');
  importShell('Normal Item Import Master','Normal billing fields only. Jewellery Metal/Purity/HUID/Gram fields are intentionally excluded.','P-05 NORMAL','<div class="panel import-rules"><div class="formgrid"><label>Default GST Mode<select id="nimGstMode" class="select"><option value="EXCLUSIVE">Exclusive Tax</option><option value="INCLUSIVE">Inclusive Tax</option></select></label><label>Default GST %<select id="nimGst" class="select"><option>0</option><option>3</option><option>5</option><option>12</option><option>18</option><option>28</option></select></label></div><div class="rule-grid"><div><b>Units</b><span>PCS / BOX / PACK / STRIP / KG / LTR</span></div><div><b>Tax</b><span>Inclusive / Exclusive, HSN, GST%, MRP</span></div><div><b>Inventory</b><span>Location, Rack, Shelf, Minimum Stock</span></div><div><b>Conflict</b><span>Skip / Update Existing / Create Copy</span></div></div></div>');
  d.getElementById('imExtractBtn').textContent='Extract & Clean Normal Items';d.getElementById('imExtractBtn').onclick=w.runNormalItemImport;d.getElementById('imSampleBtn').onclick=w.downloadNormalItemSample;
 };
@@ -160,7 +162,7 @@ function renderNormalPreview(){
 w.commitNormalItemImport=async function(){try{var file=d.getElementById('imFile')&&d.getElementById('imFile').files[0];var r=await api('/api/import/normal/commit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({SourceFileName:file?file.name:null,Rows:C.normalRows})});notify('Normal import: '+r.added+' added, '+r.updated+' updated, '+r.skipped+' skipped');w.loadNormalItemImportMaster()}catch(err){alert(err.message)}};
 
 w.loadJewelleryItemImportMaster=function(){
- if(!enabled('P-05'))return notify('P-05 is disabled');
+ if(!jewel()&&!enabled('P-05'))return notify('P-05 is disabled');
  importShell('Jewellery Item Import Master','Jewellery-only Tag, HUID, metal, purity, gram weight, making, wastage and tax mapping.','P-05 JEWELLERY','<div class="panel"><div class="formgrid"><label>Default Metal<select id="jimMetal" class="select"><option>Gold</option><option>Silver</option><option>Platinum</option></select></label><label>GST Mode<select id="jimGstMode" class="select"><option value="EXCLUSIVE">Exclusive Tax</option><option value="INCLUSIVE">Inclusive Tax</option></select></label><label>Default GST %<select id="jimGst" class="select"><option>0</option><option selected>3</option><option>5</option><option>12</option><option>18</option></select></label><label>Weight Unit<input class="input" value="GRAM (G)" disabled></label></div><div class="rule-grid"><div><b>Purity Cleanup</b><span>916→22K, 750→18K, 585→14K, 925 Silver</span></div><div><b>Weight Cleanup</b><span>Gross − Less = Net; Fine Weight auto</span></div><div><b>Tax</b><span>Inclusive / Exclusive + per-item GST%</span></div><div><b>Conflict</b><span>Tag / Barcode / HUID duplicate resolver</span></div></div></div>');
  d.getElementById('imExtractBtn').textContent='Extract & Normalize Jewellery';d.getElementById('imExtractBtn').onclick=w.runJewelleryItemImport;d.getElementById('imSampleBtn').onclick=w.downloadJewelleryItemSample;
 };
@@ -204,7 +206,7 @@ function labelHtml(x,scope,template){
  return '<div class="barcode-label normal-label '+template+'"><b>'+e(name)+'</b><span>'+e(x.Sku||x.Category||'')+'</span>'+barcodeSvg(code)+'<small>MRP ₹'+money(x.Mrp)+' · Sale ₹'+money(x.SalePrice)+'</small></div>';
 }
 w.loadBarcodePrintMaster=async function(){
- if(!enabled('P-03'))return notify('P-03 is disabled');
+ if(!jewel()&&!enabled('P-03'))return notify('P-03 is disabled');
  C.barcodeScope=jewel()?'JEWELLERY':'NORMAL';head('settings','Barcode Print Master',(C.barcodeScope==='JEWELLERY'?'10 Jewellery':'20 Normal')+' barcode label formats');
  try{C.barcodeItems=C.barcodeScope==='JEWELLERY'?await api('/api/jewellery/item-master'):await api('/api/products?size=1000')}catch(err){return app.innerHTML='<div class="content"><div class="alert">'+e(err.message)+'</div></div>'}
  var templates=C.barcodeScope==='JEWELLERY'?jewelTemplates:normalTemplates;C.barcodeTemplate=templates[0][0];

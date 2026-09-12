@@ -29,7 +29,7 @@ public static class PremiumCompletionModules
         // P-01/P-08: full Jewellery Item Master.
         app.MapGet("/api/jewellery/item-master", async (Db db, string? q) =>
         {
-            if(!await Enabled(db,"P-01")) return Results.Ok(Array.Empty<object>());
+            if(!await JewelleryRegisterModules.IsJewelleryMode(db)&&!await Enabled(db,"P-01")) return Results.Ok(Array.Empty<object>());
             q=(q??"").Trim();
             return Results.Ok(await db.QueryAsync(@"SELECT j.*,
  (SELECT COUNT(*) FROM JewelleryItemStones s WHERE s.JewelleryItemId=j.Id) StoneRows
@@ -63,7 +63,7 @@ public static class PremiumCompletionModules
         // discount permission, multi-payment and old-metal rows in one transaction.
         app.MapPost("/api/jewellery/sales/complete", async (Db db,HttpContext ctx,CompleteJewellerySaleRequest x) =>
         {
-            if(!await Enabled(db,"P-02"))return Results.BadRequest(new{message="P-02 Jewellery Billing is disabled"});
+            if(!await JewelleryRegisterModules.IsJewelleryMode(db)&&!await Enabled(db,"P-02"))return Results.BadRequest(new{message="P-02 Jewellery Billing is disabled"});
             if(x.Lines is null||x.Lines.Count==0)return Results.BadRequest(new{message="Add jewellery item first"});
             var role=UserRole(ctx);var user=UserName(ctx);
             var overrideNeeded=x.Discount>0;
@@ -279,6 +279,10 @@ public static class PremiumCompletionModules
         try
         {
             int itemId=id;
+            if(id>0){
+                using var lockItem=new SqlCommand("SELECT Status FROM JewelleryItems WITH(UPDLOCK,HOLDLOCK) WHERE Id=@id",c,tx);lockItem.Parameters.Add(P("@id",id));
+                if((await lockItem.ExecuteScalarAsync())?.ToString()=="WORKSHOP_ISSUED")throw new ArgumentException("Return this tag through Issue Register before editing it");
+            }
             if(id==0)
             {
                 var cmd=new SqlCommand(@"INSERT JewelleryItems(TagNo,Barcode,ItemName,Category,DesignCode,SubCategory,CollectionName,BrandName,SupplierName,KarigarName,
@@ -426,7 +430,7 @@ public static class PremiumCompletionModules
     static string TrimMessage(string x)=>x.Length>900?x[..900]:x;
     static Task SyncLog(Db db,string dir,string reason,string status,string message,long ms)=>db.ScalarAsync("INSERT OutletSyncLog(Direction,Reason,Status,Message,DurationMs) VALUES(@d,@r,@s,@m,@ms)",P("@d",dir),P("@r",reason),P("@s",status),P("@m",message),P("@ms",(int)Math.Min(int.MaxValue,ms)));
     static async Task<decimal> LatestRateAsync(SqlConnection c,SqlTransaction tx,string metal,string purity){var cmd=new SqlCommand("SELECT TOP 1 RatePerGram FROM JewelleryMetalRates WHERE IsActive=1 AND MetalType=@m AND Purity=@p ORDER BY EffectiveAt DESC,Id DESC",c,tx);cmd.Parameters.AddRange(new[]{P("@m",metal),P("@p",purity)});var v=await cmd.ExecuteScalarAsync();return v is null||v is DBNull?0:Convert.ToDecimal(v);}
-    static async Task UpdateItemStatus(SqlConnection c,SqlTransaction tx,int id,string status){var cmd=new SqlCommand("UPDATE JewelleryItems SET Status=@s,UpdatedAt=SYSDATETIME() WHERE Id=@id",c,tx);cmd.Parameters.AddRange(new[]{P("@s",status),P("@id",id)});await cmd.ExecuteNonQueryAsync();}
+    static async Task UpdateItemStatus(SqlConnection c,SqlTransaction tx,int id,string status){var cmd=new SqlCommand("UPDATE JewelleryItems SET Status=@s,UpdatedAt=SYSDATETIME() WHERE Id=@id AND Status<>'WORKSHOP_ISSUED';SELECT @@ROWCOUNT",c,tx);cmd.Parameters.AddRange(new[]{P("@s",status),P("@id",id)});if(Convert.ToInt32(await cmd.ExecuteScalarAsync())!=1)throw new ArgumentException("Tag is unavailable or issued to the workshop; return it through Issue Register first");}
 
     sealed record SalePrepared(JewellerySaleLineInput Input,string Tag,string Name,string Metal,string Purity,decimal NetWeight,decimal FineWeight,decimal WastagePercent,decimal Rate,decimal MetalAmount,decimal StoneAmount,decimal MakingAmount,string GstMode,decimal ItemGstRate,decimal Extras);
 }

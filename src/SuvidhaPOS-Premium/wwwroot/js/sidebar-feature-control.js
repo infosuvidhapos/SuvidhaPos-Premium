@@ -38,7 +38,7 @@ async function load(){
 function textButtons(){return [...d.querySelectorAll('#sidebar button,#sidebar .nav,#sidebar .plain')]}
 function matchesText(el,names){const t=String(el.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();return names.some(n=>t===String(n).toLowerCase()||t.startsWith(String(n).toLowerCase()+' '))}
 function apply(){
- if(!loaded)return;
+ if(!loaded||d.body.classList.contains('jewel-suite-mode'))return;
  const side=d.getElementById('sidebar');if(!side)return;
  catalog.forEach(([key,,selectors,names])=>{
   const on=state[key]!==false,nodes=new Set();
@@ -48,6 +48,8 @@ function apply(){
  });
 }
 w.loadPremiumFeatureControl=async function(){
+ if(d.body.classList.contains('jewel-suite-mode')&&w.loadJewelleryFeatureControl)return w.loadJewelleryFeatureControl();
+
  if(typeof setPage==='function')setPage('featurecontrol');if(typeof title!=='undefined')title.textContent='Feature Control';const hp=d.querySelector('header p');if(hp)hp.textContent='Sidebar masters and modules access';
  if(!admin()){app.innerHTML='<div class="content"><div class="alert">Admin / Manager permission required.</div></div>';return}
  if(!loaded)await load();
@@ -57,10 +59,10 @@ w.loadPremiumFeatureControl=async function(){
 w.sidebarFeatureToggle=async function(key,on){try{await api('/api/app-settings/'+encodeURIComponent(PREFIX+key),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:on?'true':'false'})});state[key]=!!on;apply();toast((on?'Enabled: ':'Disabled: ')+(catalog.find(x=>x[0]===key)?.[1]||key))}catch(e){alert(e.message||e)}};
 const original={};
 function gate(key,names){
- names.forEach(name=>{const fn=w[name];if(typeof fn!=='function'||fn.__sidebarFeatureGate===key)return;if(!original[name]||original[name].__sidebarFeatureGate)original[name]=fn;const base=fn;const wrap=function(){if(state[key]===false){try{toast((catalog.find(x=>x[0]===key)?.[1]||key)+' is disabled in Feature Control')}catch{};return}return base.apply(this,arguments)};wrap.__sidebarFeatureGate=key;w[name]=wrap})
+ names.forEach(name=>{const fn=w[name];if(typeof fn!=='function'||fn.__sidebarFeatureGate===key)return;if(!original[name]||original[name].__sidebarFeatureGate)original[name]=fn;const base=fn;const wrap=function(){if(!d.body.classList.contains('jewel-suite-mode')&&state[key]===false){try{toast((catalog.find(x=>x[0]===key)?.[1]||key)+' is disabled in Feature Control')}catch{};return}return base.apply(this,arguments)};wrap.__sidebarFeatureGate=key;w[name]=wrap})
 }
 function gates(){
- if(!loaded)return;
+ if(!loaded||d.body.classList.contains('jewel-suite-mode'))return;
  gate('BILLING',['loadBilling']);
  gate('PURCHASE',['loadPurchase']);
  gate('SALES',['loadSales']);
@@ -83,7 +85,7 @@ function gates(){
  gate('JEWELLERY_ITEM_MASTER',['loadJewelleryItemMaster']);
  const product=w.loadProducts;
  if(typeof product==='function'&&!product.__sidebarProductGate){
-   const wrapped=function(){const key=d.body.classList.contains('jewel-suite-mode')?'STOCK':'ITEM_MASTER';if(state[key]===false){try{toast((catalog.find(x=>x[0]===key)?.[1]||key)+' is disabled in Feature Control')}catch{};return}return product.apply(this,arguments)};wrapped.__sidebarProductGate=true;w.loadProducts=wrapped;
+   const wrapped=function(){if(d.body.classList.contains('jewel-suite-mode'))return product.apply(this,arguments);const key='ITEM_MASTER';if(state[key]===false){try{toast((catalog.find(x=>x[0]===key)?.[1]||key)+' is disabled in Feature Control')}catch{};return}return product.apply(this,arguments)};wrapped.__sidebarProductGate=true;w.loadProducts=wrapped;
  }
 }
 function pulse(){apply();gates()}

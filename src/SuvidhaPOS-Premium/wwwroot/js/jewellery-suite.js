@@ -25,17 +25,17 @@
         <button class="nav js-nav" data-page="purchase" onclick="loadPurchase()">${icon('🛒')}<span>Purchase Bill</span></button>
         <button class="nav js-nav" onclick="jewelSuiteInvoice('karigar')">${icon('⚒')}<span>Karigar Bill</span></button>
         <button class="nav js-nav" onclick="jewelSuiteInvoice('exchange')">${icon('↔')}<span>Exchange</span></button>
-        <button class="nav js-nav" onclick="jewelSuiteInvoice('repair')">${icon('⌕')}<span>Repair</span></button>
-        <button class="nav js-nav" onclick="jewelComingSoon('Estimates')">${icon('▤')}<span>Estimates</span></button>
+        <button class="nav js-nav" data-page="jregREPAIR" onclick="loadJewelRepairs()">${icon('⌕')}<span>Repair</span></button>
+        <button class="nav js-nav" data-page="jregESTIMATE" onclick="loadJewelEstimates()">${icon('▤')}<span>Estimates</span></button>
         <div class="js-section">WORKSHOP</div>
-        <button class="nav js-nav" onclick="jewelComingSoon('Issue Register')">${icon('▤')}<span>Issue Register</span></button>
-        <button class="nav js-nav" onclick="jewelComingSoon('Karigar Master')">${icon('⚒')}<span>Karigar</span></button>
-        <button class="nav js-nav" onclick="jewelComingSoon('Karigar Jobs')">${icon('▥')}<span>Karigar Jobs</span></button>
-        <button class="nav js-nav" onclick="jewelSuiteInvoice('repair')">${icon('⌕')}<span>Repairs</span></button>
+        <button class="nav js-nav" data-page="jregISSUE" onclick="loadJewelIssueRegister()">${icon('▤')}<span>Issue Register</span></button>
+        <button class="nav js-nav" data-page="jregKARIGAR" onclick="loadJewelKarigars()">${icon('⚒')}<span>Karigar</span></button>
+        <button class="nav js-nav" data-page="jregJOB" onclick="loadJewelJobs()">${icon('▥')}<span>Karigar Jobs</span></button>
+        <button class="nav js-nav" data-page="jregREPAIR" onclick="loadJewelRepairs()">${icon('⌕')}<span>Repairs</span></button>
         <div class="js-section">FINANCE</div>
-        <button class="nav js-nav" onclick="loadJewelGirviReport()">${icon('⚖')}<span>Girvi Loans</span></button>
-        <button class="nav js-nav" onclick="jewelComingSoon('Cr/Dr Ledger')">${icon('▭')}<span>Cr/Dr Ledger</span></button>
-        <button class="nav js-nav" onclick="jewelComingSoon('Saving Schemes')">${icon('♧')}<span>Saving Schemes</span></button>
+        <button class="nav js-nav" data-page="jregGIRVI" onclick="loadJewelGirviLoans()">${icon('⚖')}<span>Girvi Loans</span></button>
+        <button class="nav js-nav" data-page="jregLEDGER" onclick="loadJewelLedger()">${icon('▭')}<span>Cr/Dr Ledger</span></button>
+        <button class="nav js-nav" data-page="jregSCHEME" onclick="loadJewelSavingSchemes()">${icon('♧')}<span>Saving Schemes</span></button>
         <div class="js-section">INVENTORY</div>
         <button class="nav js-nav" data-page="products" onclick="loadProducts()">${icon('◇')}<span>Stock</span></button>
         <button class="js-section js-section-toggle" type="button" aria-expanded="false" aria-controls="jsReportsMenu" onclick="toggleJewelReports()"><span>REPORTS</span><span id="jsReportsChevron">›</span></button>
@@ -53,9 +53,10 @@
           <button class="nav js-nav" data-page="jItemImport" onclick="loadJewelleryItemImportMaster()">${icon('⇩')}<span>Item Import Master</span></button>
           <button class="nav js-nav" data-page="jBarcode" onclick="loadBarcodePrintMaster()">${icon('▥')}<span>Barcode Print Master</span></button>
         </div>
-        <button class="nav js-nav" data-page="customers" onclick="loadCustomers()">${icon('♙')}<span>Customers</span></button>
+        <button class="nav js-nav" data-page="customers" onclick="loadCustomers()">${icon('♙')}<span>Customer</span></button>
         <button class="nav js-nav" onclick="loadJewelRates()">${icon('↗')}<span>Au/Ag Rates</span></button>
         <div class="js-section">SYSTEM</div>
+        <button id="jFeatureControlNav" class="nav js-nav" data-page="featurecontrol" onclick="loadJewelleryFeatureControl()">${icon('⚑')}<span>Feature Control</span></button>
         <button class="nav js-nav" onclick="loadSettings()">${icon('⚙')}<span>Settings</span></button>
         <button class="nav js-nav" onclick="loadDayClosing()">${icon('▣')}<span>Day Closing</span></button>
       </div>
@@ -126,14 +127,14 @@
         <button class="wholesale" onclick="jewelSuiteInvoice('wholesale')">♜<b>Wholesale</b></button>
         <button class="karigar" onclick="jewelSuiteInvoice('karigar')">♙<b>Karigar</b></button>
         <button class="exchange" onclick="jewelSuiteInvoice('exchange')">↔<b>Exchange</b></button>
-        <button class="repair" onclick="jewelSuiteInvoice('repair')">⌕<b>Repair</b></button>
+        <button class="repair" onclick="loadJewelRepairs()">⌕<b>Repair</b></button>
       </div>
       <div class="js-block-title">▣ &nbsp; MODULES</div>
       <div class="js-module-grid">
         <button onclick="loadJewelInvoices()">▤<b>All Vouchers</b><span>View all bills & invoices</span></button>
         <button onclick="jewelComingSoon('Girvi Loans')">⚖<b>Girvi Loans</b><span>Pawn / gold loans</span></button>
-        <button onclick="jewelComingSoon('Cr/Dr Ledger')">▭<b>Cr/Dr Ledger</b><span>Customer account ledger</span></button>
-        <button onclick="jewelComingSoon('Saving Schemes')">♧<b>Saving Schemes</b><span>Gold/silver saving plans</span></button>
+        <button onclick="loadJewelLedger()">▭<b>Cr/Dr Ledger</b><span>Customer account ledger</span></button>
+        <button onclick="loadJewelSavingSchemes()">♧<b>Saving Schemes</b><span>Gold/silver saving plans</span></button>
         <button onclick="loadProducts()">◇<b>Stocks</b><span>Jewellery stock register</span></button>
         <button onclick="loadJewelReports()">⌁<b>All Reports</b><span>Daybook, GST, sales, stock & girvi</span></button>
       </div>
@@ -142,7 +143,7 @@
         <button class="retail" onclick="loadCustomers()">♙<b>Retail Customer</b><span>Retail</span></button>
         <button class="wholesale" onclick="loadCustomers()">♜<b>Wholesale Party</b><span>Wholesale</span></button>
         <button class="purchase" onclick="loadSuppliers()">🛒<b>Supplier</b><span>Supplier</span></button>
-        <button class="karigar" onclick="jewelComingSoon('Karigar Master')">♙<b>Karigar</b><span>Karigar</span></button>
+        <button class="karigar" onclick="loadJewelKarigars()">♙<b>Karigar</b><span>Karigar</span></button>
         <button class="repair" onclick="jewelComingSoon('Girvi Client')">⚖<b>Girvi Client</b><span>Girvi</span></button>
       </div>
       <div class="js-block-title">SUMMARY</div>

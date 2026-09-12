@@ -497,6 +497,7 @@ SuvidhaPOS.Premium.PremiumCompletionModules.Map(app);
 SuvidhaPOS.Premium.RetailExpansionModules.Map(app);
 SuvidhaPOS.Premium.PurchaseImportModules.Map(app);
 SuvidhaPOS.Premium.DayCloseAutomationModules.Map(app);
+SuvidhaPOS.Premium.JewelleryRegisterModules.Map(app);
 
 app.Run();
 

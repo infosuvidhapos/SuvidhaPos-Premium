@@ -21,6 +21,7 @@ const baseLoadReports=w.loadReports;
 
 /* ---------- Item Master dashboard ---------- */
 w.loadProducts=async function(){
+ if(d.body.classList.contains('jewel-suite-mode'))return w.loadJewelleryStock();
  setPage('products');title.textContent='Item Master';const sub=d.querySelector('header p');if(sub)sub.textContent='Item entry, categories, import, bulk update, rates and stock in one master';
  try{products=await api('/api/products?size=1000');state.products=products;await loadCategories();
  app.innerHTML=`<div class="content retail-master-page">
@@ -149,7 +150,9 @@ function updateRateCount(){const e=d.querySelector('#rirCount');if(e)e.textConte
 w.retailRateApply=async function(){const rows=rateRows.filter(x=>x._selected&&Number(val(x,'ProductId','productId')||0)>0).map(x=>({ProductId:Number(val(x,'ProductId','productId')),Mrp:val(x,'Mrp','mrp'),PurchasePrice:val(x,'PurchasePrice','purchasePrice'),SalePrice:val(x,'SalePrice','salePrice')}));if(!rows.length)return notice('Select at least one matched row');try{const r=await api('/api/retail/item-rates/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Rows:rows})});notice((r.updated||0)+' item rate(s) updated');w.loadItemRateUpdate()}catch(e){alert(e.message||e)}};
 
 /* ---------- Customer / Company unified master ---------- */
+const baseCustomerDetails=w.loadCustomers;
 w.loadCustomers=async function(){
+ if(d.body.classList.contains('jewel-suite-mode'))return baseCustomerDetails.apply(this,arguments);
  setPage('customers');title.textContent='Customer / Company';const sub=d.querySelector('header p');if(sub)sub.textContent='All billing customers and BTC / Credit companies in one searchable master';
  partyRows=await api('/api/retail/customer-company');
  app.innerHTML=`<div class="content retail-submaster"><div class="retail-subhead"><div><span>PARTY MASTER</span><h2>Customer / Company</h2><p>Search, edit and delete customers and Bill To Company accounts.</p></div></div>
@@ -181,7 +184,7 @@ async function patchBillingState(){
  let input=old;if(old.tagName==='SELECT'){input=d.createElement('input');input.id='cbState';input.className=old.className;input.value=saved||old.value||'';old.replaceWith(input)}else if(!input.value||input.value==='Uttar Pradesh')input.value=saved||input.value;
  input.dataset.indiaStatePatched='1';delete input.dataset.indiaStateLoading;input.placeholder='Search State / UT';input.setAttribute('list','suvidhaIndiaStateList');input.setAttribute('autocomplete','off');
 }
-function patchNav(){d.querySelectorAll('[data-page="customers"] span').forEach(x=>x.textContent='Customer / Company');d.querySelectorAll('[data-page="products"] span').forEach(x=>x.textContent='Item Master')}
+function patchNav(){if(d.body.classList.contains('jewel-suite-mode'))return;d.querySelectorAll('[data-page="customers"] span').forEach(x=>x.textContent='Customer / Company');d.querySelectorAll('[data-page="products"] span').forEach(x=>x.textContent='Item Master')}
 new MutationObserver(()=>{patchNav();patchCategoryQuickAdd();patchBillingState()}).observe(d.querySelector('#app')||d.body,{childList:true,subtree:true});
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',()=>{patchNav();patchBillingState()});else{patchNav();patchBillingState()}
 })(window,document);
