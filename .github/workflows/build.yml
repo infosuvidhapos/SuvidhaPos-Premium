@@ -35,6 +35,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Validate deterministic retail parsing and price rules
+        run: dotnet run --project fixes/RetailPurchaseChecks --configuration Release
       - name: Validate purchase BTC day-close fixes
         shell: powershell
         run: |
