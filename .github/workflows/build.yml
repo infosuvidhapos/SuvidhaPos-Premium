@@ -292,7 +292,8 @@ jobs:
           if($j.Contains('Jewel Suite')){throw 'Legacy Jewel Suite branding remains'}
           if($j.Contains('Diamond 22K')){throw 'Fabricated/static diamond rate content remains'}
           $r=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-premium-ui.js' -Raw -Encoding UTF8
-          foreach($token in @('loadJewelReports','loadJewelDaybook','loadJewelSalesReport','loadJewelGstReport','loadJewelStockReport','loadJewelGirviReport','jewelExportReport','Girvi transactions are not enabled yet')){if(-not $r.Contains($token)){throw "Jewellery report missing: $token"}}
+          foreach($token in @('loadJewelReports','loadJewelDaybook','loadJewelSalesReport','loadJewelGstReport','loadJewelStockReport','loadJewelGirviReport','jewelExportReport','/api/jewellery/registers/report/girvi','report.principal','report.interest')){if(-not $r.Contains($token)){throw "Jewellery report missing: $token"}}
+          if($r.Contains('Girvi transactions are not enabled yet')){throw 'Girvi report must use saved loan entries'}
           $live=Get-Content 'src/SuvidhaPOS-Premium/JewelleryLiveRateModules.cs' -Raw -Encoding UTF8
           foreach($token in @('xaus.com/api/v1/spot?currency=INR&unit=gram','silver_usd_oz','gold*22m/24m','Saved rate fallback')){if(-not $live.Contains($token)){throw "Internet metal rate integration missing: $token"}}
           $css=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
