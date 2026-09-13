@@ -23,9 +23,13 @@ IF OBJECT_ID('dbo.RetailPurchaseInvoices') IS NULL
  CREATE TABLE dbo.RetailPurchaseInvoices(InvoiceKey char(64) NOT NULL PRIMARY KEY,ContentDigest char(64) NOT NULL,PurchaseId int NOT NULL REFERENCES dbo.Purchases(Id),RequestId nvarchar(100) NOT NULL REFERENCES dbo.RetailPurchaseRequests(RequestId));
 GO
 -- Change only the default used for future product inserts, never historic values.
-DECLARE @taxDefault sysname;
+DECLARE @taxDefault sysname,@dropTaxDefaultSql nvarchar(max);
 SELECT @taxDefault=dc.name FROM sys.default_constraints dc JOIN sys.columns col ON col.object_id=dc.parent_object_id AND col.column_id=dc.parent_column_id WHERE dc.parent_object_id=OBJECT_ID('dbo.Products') AND col.name='TaxMode';
-IF @taxDefault IS NOT NULL EXEC('ALTER TABLE dbo.Products DROP CONSTRAINT '+QUOTENAME(@taxDefault));
+IF @taxDefault IS NOT NULL
+BEGIN
+ SET @dropTaxDefaultSql=N'ALTER TABLE dbo.Products DROP CONSTRAINT '+QUOTENAME(@taxDefault);
+ EXEC sys.sp_executesql @dropTaxDefaultSql;
+END;
 ALTER TABLE dbo.Products ADD CONSTRAINT DF_Products_TaxMode DEFAULT 'INCLUSIVE' FOR TaxMode;
 GO
 IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE name='CK_ProductBatches_RetailTaxMode')
