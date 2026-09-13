@@ -340,8 +340,8 @@ public static class PremiumCompletionModules
 
     static async Task<List<object>> ValidateNormal(Db db,List<NormalImportRow> rows)
     {
-        var result=new List<object>();var i=0;
-        foreach(var r in rows){i++;var name=(r.Name??"").Trim();var bc=(r.Barcode??"").Trim();var ex=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode FROM Products WHERE IsActive=1 AND (UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) OR (@b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b)))",P("@n",name),P("@b",bc));result.Add(new{rowNumber=i,valid=!string.IsNullOrWhiteSpace(name),conflict=ex.Count>0,existingId=ex.GetValueOrDefault("Id"),message=string.IsNullOrWhiteSpace(name)?"Item name is required":ex.Count>0?"Existing item/barcode found":"Ready"});}
+        using var c=db.CreateConnection();await c.OpenAsync();var data=await PurchaseImportRules.Load(c,null,false);var result=new List<object>();var i=0;
+        foreach(var r in rows){i++;var name=PurchaseImportRules.Name(r.Name);var matches=data.Masters.Where(m=>PurchaseImportRules.Key(m.Name)==PurchaseImportRules.Key(name)).ToList();var barcodeCollision=!string.IsNullOrWhiteSpace(r.Barcode)&&data.Masters.Any(m=>PurchaseImportRules.Key(m.Barcode)==PurchaseImportRules.Key(r.Barcode));result.Add(new{rowNumber=i,valid=name!="",conflict=matches.Count>0,existingId=matches.Count==1?(int?)matches[0].Id:null,message=name==""?"Item name is required":matches.Count>0?"Existing master protected; import skips this match":barcodeCollision?"New item; conflicting barcode will be cleared":"Ready"});}
         return result;
     }
     static async Task<List<object>> ValidateJewellery(Db db,List<JewelleryImportRow> rows)
@@ -351,22 +351,27 @@ public static class PremiumCompletionModules
         return result;
     }
 
-    static async Task<IResult> CommitNormal(Db db,HttpContext ctx,NormalImportRequest x)
+    internal static async Task<IResult> CommitNormal(Db db,HttpContext ctx,NormalImportRequest x)
     {
-        var rows=x.Rows??new();var job=await NewImportJob(db,"NORMAL",x.SourceFileName,rows.Count,UserName(ctx));int added=0,updated=0,skipped=0;var conflicts=new List<object>();var i=0;
-        foreach(var r in rows){i++;var name=(r.Name??"").Trim();if(string.IsNullOrWhiteSpace(name)){skipped++;await Conflict(db,job,i,"REQUIRED","Name",name,"SKIP","Blank item name");continue;}
-            var bc=(r.Barcode??"").Trim();var ex=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode FROM Products WHERE IsActive=1 AND (UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) OR (@b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b)))",P("@n",name),P("@b",bc));
-            var resolution=(r.Resolution??"SKIP").ToUpperInvariant();
-            if(ex.Count>0&&resolution=="SKIP"){skipped++;conflicts.Add(new{rowNumber=i,type="DUPLICATE",value=name});await Conflict(db,job,i,"DUPLICATE","Name/Barcode",name,"SKIP","Existing item/barcode");continue;}
-            var unit=await UnitMasterModules.ResolveActiveNameAsync(db,string.IsNullOrWhiteSpace(r.Unit)?"PCS":r.Unit!);
-            if(ex.Count>0&&resolution=="UPDATE"){await db.ScalarAsync(@"UPDATE Products SET Name=@n,Sku=@s,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,TaxMode=@tm,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,LocationCode=@loc,RackName=@rack,ShelfName=@shelf WHERE Id=@id",
-                P("@n",name),P("@s",Blank(r.Sku)),P("@cat",Blank(r.Category)),P("@u",unit),P("@h",Blank(r.Hsn)),P("@g",r.GstRate),P("@tm",string.Equals(r.GstMode,"INCLUSIVE",StringComparison.OrdinalIgnoreCase)?"INCLUSIVE":"EXCLUSIVE"),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@loc",Blank(r.LocationCode)),P("@rack",Blank(r.RackName)),P("@shelf",Blank(r.ShelfName)),P("@id",ex["Id"]));updated++;continue;}
-            if(ex.Count>0&&resolution=="CREATE"){name=name+" (Import "+DateTime.Now.ToString("HHmmss")+"-"+i+")";bc="";await Conflict(db,job,i,"DUPLICATE","Name/Barcode",r.Name,"CREATE","Created as separate copy; conflicting barcode cleared");}
-            try{await db.ScalarAsync(@"INSERT Products(Name,Barcode,Sku,Category,Unit,Hsn,GstRate,TaxMode,Mrp,PurchasePrice,SalePrice,MinStock,LocationCode,RackName,ShelfName) VALUES(@n,@b,@s,@cat,@u,@h,@g,@tm,@m,@pp,@sp,@min,@loc,@rack,@shelf)",
-                P("@n",name),P("@b",Blank(bc)),P("@s",Blank(r.Sku)),P("@cat",Blank(r.Category)),P("@u",unit),P("@h",Blank(r.Hsn)),P("@g",r.GstRate),P("@tm",string.Equals(r.GstMode,"INCLUSIVE",StringComparison.OrdinalIgnoreCase)?"INCLUSIVE":"EXCLUSIVE"),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@loc",Blank(r.LocationCode)),P("@rack",Blank(r.RackName)),P("@shelf",Blank(r.ShelfName)));added++;}
-            catch(SqlException e)when(e.Number is 2601 or 2627){skipped++;await Conflict(db,job,i,"UNIQUE","Barcode",bc,"SKIP","Unique barcode conflict");}
-        }
-        await FinishImportJob(db,job,added+updated,skipped);return Results.Ok(new{jobId=job,added,updated,skipped,conflicts});
+        if(await JewelleryRegisterModules.IsJewelleryMode(db))return Results.BadRequest(new{message="Use Jewellery Item Import for this outlet"});
+        var rows=x.Rows??new();if(rows.Count==0)return Results.BadRequest(new{message="No rows to import"});
+        using var c=db.CreateConnection();await c.OpenAsync();using var tx=c.BeginTransaction(System.Data.IsolationLevel.Serializable);
+        try{
+            await PurchasePostingService.Lock(c,tx);var data=await PurchaseImportRules.Load(c,tx,true);int added=0,skipped=0,matchesSkipped=0;var conflicts=new List<object>();var i=0;
+            var known=data.Masters.ToList();var barcodes=known.Where(m=>!string.IsNullOrWhiteSpace(m.Barcode)).Select(m=>PurchaseImportRules.Key(m.Barcode)).ToHashSet();
+            foreach(var r in rows){i++;var name=PurchaseImportRules.Name(r.Name);var matches=known.Where(m=>PurchaseImportRules.Key(m.Name)==PurchaseImportRules.Key(name)).ToList();
+                if(matches.Count>0){skipped++;matchesSkipped++;conflicts.Add(new{rowNumber=i,type="PROTECTED",value=name,existingId=matches[0].Id,message="Existing item master protected; use explicit Item Edit or Rate Update"});continue;}
+                var unit=PurchaseImportRules.ResolveUnit(string.IsNullOrWhiteSpace(r.Unit)?"PCS":r.Unit,data.Units);var mode=string.IsNullOrWhiteSpace(r.GstMode)?"INCLUSIVE":PurchaseImportRules.Key(r.GstMode);
+                if(name==""||unit==null||r.Mrp<0||r.PurchasePrice<0||r.SalePrice<0||r.GstRate<0||r.GstRate>100||r.DiscountPer is <0 or >100||mode is not ("INCLUSIVE" or "EXCLUSIVE")){skipped++;conflicts.Add(new{rowNumber=i,type="INVALID",value=name,message="Invalid name, unit, tax mode, rate or discount"});continue;}
+                var bc=Blank(r.Barcode);if(bc!=null&&!barcodes.Add(PurchaseImportRules.Key(bc))){bc=null;conflicts.Add(new{rowNumber=i,type="BARCODE_CLEARED",value=name,message="Different-name barcode owner is protected; new barcode cleared"});}
+                using var cmd=PurchasePostingService.Command(c,tx,@"INSERT Products(Name,Barcode,Sku,Category,Unit,Hsn,GstRate,TaxMode,Mrp,PurchasePrice,SalePrice,Dis_Rate,MinStock,LocationCode,RackName,ShelfName) OUTPUT INSERTED.Id VALUES(@n,@b,@s,@cat,@u,@h,@g,@tm,@m,@pp,@sp,@disc,@min,@loc,@rack,@shelf)",
+                    P("@n",name),P("@b",bc),P("@s",Blank(r.Sku)),P("@cat",Blank(r.Category)),P("@u",unit),P("@h",Blank(r.Hsn)),P("@g",r.GstRate),P("@tm",mode),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.DiscountPer.HasValue?PurchaseImportRules.Sale(r.Mrp,r.DiscountPer.Value):r.SalePrice),P("@disc",r.DiscountPer??0),P("@min",r.MinStock),P("@loc",Blank(r.LocationCode)),P("@rack",Blank(r.RackName)),P("@shelf",Blank(r.ShelfName)));
+                var id=Convert.ToInt32(await cmd.ExecuteScalarAsync());known.Add(new(id,name,bc,true,unit!,unit!,null,unit!,1,1));added++;
+            }
+            using var audit=PurchasePostingService.Command(c,tx,"INSERT AuditLogs(UserName,Action,Entity,Details) VALUES(@u,'NORMAL_ITEM_IMPORT','Products',@d)",P("@u",UserName(ctx)),P("@d",$"Added {added}; protected matches {matchesSkipped}; skipped {skipped}"));await audit.ExecuteNonQueryAsync();
+            using var job=PurchasePostingService.Command(c,tx,"INSERT ItemImportJobs(Scope,SourceFileName,RowsFound,RowsAccepted,RowsRejected,Status,UserName,CompletedAt) OUTPUT INSERTED.Id VALUES('NORMAL',@f,@found,@accepted,@rejected,'COMPLETED',@u,SYSDATETIME())",P("@f",x.SourceFileName),P("@found",rows.Count),P("@accepted",added),P("@rejected",skipped),P("@u",UserName(ctx)));var jobId=Convert.ToInt64(await job.ExecuteScalarAsync());
+            await tx.CommitAsync();return Results.Ok(new{jobId,added,updated=0,skipped,matchesSkipped,protectedItems=matchesSkipped,conflicts});
+        }catch(Exception ex)when(ex is InvalidOperationException or SqlException or OverflowException){await tx.RollbackAsync();return Results.BadRequest(new{message=ex.Message});}
     }
 
     static async Task<IResult> CommitJewellery(Db db,HttpContext ctx,JewelleryImportRequest x)
@@ -460,7 +465,7 @@ public sealed class OutletSyncRequest{public string? Direction{get;set;}="PULL";
 public sealed class BarcodePrintLogRequest{public string? Scope{get;set;}public string? TemplateCode{get;set;}public string? ItemKey{get;set;}public int Copies{get;set;}=1;public string? PrinterName{get;set;}}
 public sealed class OverrideAuditRequest{public string? ActionName{get;set;}public string? Reason{get;set;}public string? Details{get;set;}}
 public sealed class NormalImportRequest{public string? SourceFileName{get;set;}public List<NormalImportRow>? Rows{get;set;}}
-public sealed class NormalImportRow{public string? Name{get;set;}public string? Barcode{get;set;}public string? Sku{get;set;}public string? Category{get;set;}public string? Unit{get;set;}public string? Hsn{get;set;}public decimal GstRate{get;set;}public string? GstMode{get;set;}="EXCLUSIVE";public decimal Mrp{get;set;}public decimal PurchasePrice{get;set;}public decimal SalePrice{get;set;}public decimal MinStock{get;set;}public string? LocationCode{get;set;}public string? RackName{get;set;}public string? ShelfName{get;set;}public string? Resolution{get;set;}="SKIP";}
+public sealed class NormalImportRow{public string? Name{get;set;}public string? Barcode{get;set;}public string? Sku{get;set;}public string? Category{get;set;}public string? Unit{get;set;}public string? Hsn{get;set;}public decimal GstRate{get;set;}public string? GstMode{get;set;}="INCLUSIVE";public decimal? DiscountPer{get;set;}public decimal Mrp{get;set;}public decimal PurchasePrice{get;set;}public decimal SalePrice{get;set;}public decimal MinStock{get;set;}public string? LocationCode{get;set;}public string? RackName{get;set;}public string? ShelfName{get;set;}public string? Resolution{get;set;}="SKIP";}
 public sealed class JewelleryImportRequest{public string? SourceFileName{get;set;}public List<JewelleryImportRow>? Rows{get;set;}}
 public sealed class JewelleryImportRow
 {

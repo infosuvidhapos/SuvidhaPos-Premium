@@ -51,7 +51,7 @@ async function api(url,opt={}){
   }
   if(!r.ok){
     const detail=d.message||d.detail||(raw&&raw.length<=700?raw:'')||('HTTP '+r.status);
-    throw new Error(detail+' ['+url+']');
+    const error=new Error(detail+' ['+url+']');error.status=r.status;throw error;
   }
   return d
 }

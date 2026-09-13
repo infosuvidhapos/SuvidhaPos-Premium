@@ -132,8 +132,8 @@ CAST(ISNULL(SUM(CASE WHEN CAST(BillDate AS date)=CAST(GETDATE() AS date) AND Sta
 (SELECT COUNT(*) FROM Suppliers WHERE IsActive=1) Suppliers FROM Sales")));
 app.MapGet("/api/dashboard/chart",async(Db db,int days=7)=>Results.Ok(await db.QueryAsync(@"SELECT CONVERT(varchar(10),CAST(BillDate AS date),23) [Date],CAST(ISNULL(SUM(GrandTotal),0) AS decimal(18,2)) Sales,COUNT(*) Bills FROM Sales WHERE Status='Completed' AND BillDate>=DATEADD(day,-@days+1,CAST(GETDATE() AS date)) GROUP BY CAST(BillDate AS date) ORDER BY [Date]",new SqlParameter("@days",days))));
 
-app.MapGet("/api/products",async(Db db,string? q,int page=1,int size=200)=>{q??="";page=Math.Max(1,page);return Results.Ok(await db.QueryAsync(@"SELECT p.Id,p.Name,p.Barcode,p.Sku,p.Category,p.Unit,p.Hsn,p.GstRate,p.TaxMode,p.Mrp,p.PurchasePrice,p.SalePrice,p.MinStock,p.MaxStock,p.LocationCode,p.RackName,p.ShelfName,p.TrackBatch,p.TrackExpiry,CAST(ISNULL((SELECT SUM(b.Quantity) FROM ProductBatches b WHERE b.ProductId=p.Id),0) AS decimal(18,3)) Stock FROM Products p WHERE p.IsActive=1 AND (@q='' OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like OR ISNULL(p.Sku,'') LIKE @like OR ISNULL(p.Category,'') LIKE @like) ORDER BY p.Name OFFSET @off ROWS FETCH NEXT @size ROWS ONLY",new SqlParameter("@q",q),new SqlParameter("@like","%"+q+"%"),new SqlParameter("@off",(page-1)*size),new SqlParameter("@size",size)));});
-app.MapGet("/api/products/{id:int}",async(Db db,int id)=>Results.Ok(await db.QuerySingleAsync("SELECT * FROM Products WHERE Id=@id",new SqlParameter("@id",id))));
+app.MapGet("/api/products",async(Db db,string? q,int page=1,int size=200)=>{q??="";page=Math.Max(1,page);return Results.Ok(await db.QueryAsync(@"SELECT p.Id,p.Id ItemCode,p.Dis_Rate,p.Name,p.Barcode,p.Sku,p.CategoryId,p.Category,p.Unit,p.Hsn,p.GstRate,p.TaxMode,p.Mrp,p.PurchasePrice,p.SalePrice,p.MinStock,p.MaxStock,p.LocationCode,p.RackName,p.ShelfName,p.TrackBatch,p.TrackExpiry,CAST(ISNULL((SELECT SUM(b.Quantity) FROM ProductBatches b WHERE b.ProductId=p.Id),0) AS decimal(18,3)) Stock FROM Products p WHERE p.IsActive=1 AND (@q='' OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like OR ISNULL(p.Sku,'') LIKE @like OR ISNULL(p.Category,'') LIKE @like) ORDER BY p.Name OFFSET @off ROWS FETCH NEXT @size ROWS ONLY",new SqlParameter("@q",q),new SqlParameter("@like","%"+q+"%"),new SqlParameter("@off",(page-1)*size),new SqlParameter("@size",size)));});
+app.MapGet("/api/products/{id:int}",async(Db db,int id)=>Results.Ok(await db.QuerySingleAsync("SELECT *,Id ItemCode FROM Products WHERE Id=@id",new SqlParameter("@id",id))));
 app.MapGet("/api/products/identity-check",async(Db db,string? name,string? barcode,int excludeId=0)=>{
  var n=(name??"").Trim(); var b=(barcode??"").Trim();
  var row=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
@@ -145,43 +145,8 @@ app.MapGet("/api/products/identity-check",async(Db db,string? name,string? barco
  return Results.Ok(new{duplicate=row.Count>0,conflict=row});
 });
 
-app.MapPost("/api/products",async(Db db,ProductRequest x)=>{
- var name=(x.Name??"").Trim(); var barcode=string.IsNullOrWhiteSpace(x.Barcode)?null:x.Barcode.Trim();
- if(string.IsNullOrWhiteSpace(name))return Results.BadRequest(new{message="Product name is required"});
- var unitName=await SuvidhaPOS.Premium.UnitMasterModules.ResolveActiveNameAsync(db,x.Unit??"PCS");
- if(unitName is null)return Results.BadRequest(new{message=$"Unit '{x.Unit}' is not in active Unit Master. Select a predefined unit or add it in Unit Master first."});
- var dup=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
- CASE WHEN UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) THEN 'Item Name' ELSE 'Barcode' END ConflictType
- FROM Products WHERE IsActive=1 AND
- (UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) OR (@b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b)))",
- P("@n",name),P("@b",barcode??""));
- if(dup.Count>0)return Results.BadRequest(new{message=$"Duplicate {dup["ConflictType"]}: existing item '{dup["Name"]}' already uses this value.",duplicate=true,conflict=dup});
- try{
-  var id=await db.ScalarAsync(@"INSERT Products(Name,Barcode,Sku,CategoryId,Category,Unit,Hsn,GstRate,TaxMode,Mrp,PurchasePrice,SalePrice,MinStock,MaxStock,LocationCode,RackName,ShelfName,TrackBatch,TrackExpiry)
- VALUES(@n,@b,@s,@cid,@cat,@u,@h,@g,@tm,@m,@pp,@sp,@min,@max,@loc,@rack,@shelf,@tb,@te);
- SELECT CAST(SCOPE_IDENTITY() AS int)",
- P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",unitName),P("@h",x.Hsn),P("@g",x.GstRate),P("@tm",string.Equals(x.TaxMode,"INCLUSIVE",StringComparison.OrdinalIgnoreCase)?"INCLUSIVE":"EXCLUSIVE"),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry));
-  return Results.Ok(new{id});
- }catch(SqlException e)when(e.Number==2601||e.Number==2627){return Results.BadRequest(new{message="Duplicate barcode is not allowed",duplicate=true});}
-});
-
-app.MapPut("/api/products/{id:int}",async(Db db,int id,ProductRequest x)=>{
- var name=(x.Name??"").Trim(); var barcode=string.IsNullOrWhiteSpace(x.Barcode)?null:x.Barcode.Trim();
- if(string.IsNullOrWhiteSpace(name))return Results.BadRequest(new{message="Product name is required"});
- var unitName=await SuvidhaPOS.Premium.UnitMasterModules.ResolveActiveNameAsync(db,x.Unit??"PCS");
- if(unitName is null)return Results.BadRequest(new{message=$"Unit '{x.Unit}' is not in active Unit Master. Select a predefined unit or add it in Unit Master first."});
- var dup=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
- CASE WHEN UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) THEN 'Item Name' ELSE 'Barcode' END ConflictType
- FROM Products WHERE IsActive=1 AND Id<>@id AND
- (UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) OR (@b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b)))",
- P("@n",name),P("@b",barcode??""),P("@id",id));
- if(dup.Count>0)return Results.BadRequest(new{message=$"Duplicate {dup["ConflictType"]}: existing item '{dup["Name"]}' already uses this value.",duplicate=true,conflict=dup});
- try{
-  await db.ScalarAsync(@"UPDATE Products SET Name=@n,Barcode=@b,Sku=@s,CategoryId=@cid,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,TaxMode=@tm,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,MaxStock=@max,LocationCode=@loc,RackName=@rack,ShelfName=@shelf,TrackBatch=@tb,TrackExpiry=@te WHERE Id=@id",
-  P("@n",name),P("@b",barcode),P("@s",string.IsNullOrWhiteSpace(x.Sku)?null:x.Sku.Trim()),P("@cid",x.CategoryId),P("@cat",x.Category),P("@u",unitName),P("@h",x.Hsn),P("@g",x.GstRate),P("@tm",string.Equals(x.TaxMode,"INCLUSIVE",StringComparison.OrdinalIgnoreCase)?"INCLUSIVE":"EXCLUSIVE"),P("@m",x.Mrp),P("@pp",x.PurchasePrice),P("@sp",x.SalePrice),P("@min",x.MinStock),P("@max",x.MaxStock),P("@loc",x.LocationCode),P("@rack",x.RackName),P("@shelf",x.ShelfName),P("@tb",x.TrackBatch),P("@te",x.TrackExpiry),P("@id",id));
-  return Results.Ok(new{updated=true});
- }catch(SqlException e)when(e.Number==2601||e.Number==2627){return Results.BadRequest(new{message="Duplicate barcode is not allowed",duplicate=true});}
-});
+app.MapPost("/api/products", (Db db,ProductRequest x)=>SuvidhaPOS.Premium.RetailItemRules.Save(db,null,x));
+app.MapPut("/api/products/{id:int}", (Db db,int id,ProductRequest x)=>SuvidhaPOS.Premium.RetailItemRules.Save(db,id,x));
 
 app.MapPost("/api/products/bulk-edit",async(Db db,ProductBulkEditRequest x)=>{
  if(x.Rows is null||x.Rows.Count==0)return Results.BadRequest(new{message="No item rows supplied"});
@@ -192,11 +157,13 @@ app.MapPost("/api/products/bulk-edit",async(Db db,ProductBulkEditRequest x)=>{
    if(u is null)conflicts.Add(new{r.Id,type="UNIT",value=r.Unit,message=$"Unit '{r.Unit}' is not in active Unit Master"});
    else normalizedUnits[r.Id]=u;
  }
+ var seenIds=new HashSet<int>();
  var seenNames=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase);
  var seenBarcodes=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase);
  foreach(var r in x.Rows){
-   var n=(r.Name??"").Trim();var bc=(r.Barcode??"").Trim();
+   var n=SuvidhaPOS.Premium.PurchaseImportRules.Name(r.Name);var bc=SuvidhaPOS.Premium.PurchaseImportRules.Name(r.Barcode);
    if(string.IsNullOrWhiteSpace(n)){conflicts.Add(new{r.Id,type="NAME",value=n,message="Item name is required"});continue;}
+   if(!seenIds.Add(r.Id))conflicts.Add(new{r.Id,type="ID",value=r.Id,message="Each item may appear only once in a bulk edit"});
    if(seenNames.TryGetValue(n,out var otherName))conflicts.Add(new{r.Id,type="NAME",value=n,message=$"Duplicate item name in bulk edit; also used by row {otherName}"});
    else seenNames[n]=r.Id;
    if(!string.IsNullOrWhiteSpace(bc)){
@@ -205,7 +172,7 @@ app.MapPost("/api/products/bulk-edit",async(Db db,ProductBulkEditRequest x)=>{
    }
  }
  foreach(var r in x.Rows){
-   var n=(r.Name??"").Trim();var bc=(r.Barcode??"").Trim();
+   var n=SuvidhaPOS.Premium.PurchaseImportRules.Name(r.Name);var bc=SuvidhaPOS.Premium.PurchaseImportRules.Name(r.Barcode);
    if(string.IsNullOrWhiteSpace(n))continue;
    var dup=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
     CASE WHEN UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) THEN 'NAME' ELSE 'BARCODE' END ConflictType
@@ -217,9 +184,14 @@ app.MapPost("/api/products/bulk-edit",async(Db db,ProductBulkEditRequest x)=>{
  if(conflicts.Count>0)return Results.BadRequest(new{message=$"Bulk edit blocked: {conflicts.Count} duplicate/invalid row(s). Fix highlighted item names/barcodes first.",duplicate=true,conflicts});
  using var c=db.CreateConnection();await c.OpenAsync();using var tx=c.BeginTransaction();
  try{
+   await SuvidhaPOS.Premium.PurchasePostingService.Lock(c,tx);
+   var masterData=await SuvidhaPOS.Premium.PurchaseImportRules.Load(c,tx,true);
    foreach(var r in x.Rows){
+     var current=masterData.Masters.SingleOrDefault(m=>m.Id==r.Id&&m.Active)??throw new InvalidOperationException("Item is inactive or missing");
+     await SuvidhaPOS.Premium.RetailItemRules.CheckBaseChange(c,tx,r.Id,current.BaseUnit,normalizedUnits[r.Id]);
+     if(masterData.Masters.Any(m=>m.Id!=r.Id&&(SuvidhaPOS.Premium.PurchaseImportRules.Key(m.Name)==SuvidhaPOS.Premium.PurchaseImportRules.Key(r.Name)||(!string.IsNullOrWhiteSpace(r.Barcode)&&SuvidhaPOS.Premium.PurchaseImportRules.Key(m.Barcode)==SuvidhaPOS.Premium.PurchaseImportRules.Key(r.Barcode)))))throw new InvalidOperationException("Item name or barcode changed while validating; review the edit");
      var cmd=new SqlCommand(@"UPDATE Products SET Name=@n,Barcode=@b,Sku=@s,Category=@cat,Unit=@u,Hsn=@h,GstRate=@g,Mrp=@m,PurchasePrice=@pp,SalePrice=@sp,MinStock=@min,MaxStock=@max,LocationCode=@loc,RackName=@rack,ShelfName=@shelf WHERE Id=@id AND IsActive=1",c,tx);
-     cmd.Parameters.AddRange(new[]{P("@n",r.Name.Trim()),P("@b",string.IsNullOrWhiteSpace(r.Barcode)?null:r.Barcode.Trim()),P("@s",string.IsNullOrWhiteSpace(r.Sku)?null:r.Sku.Trim()),P("@cat",r.Category),P("@u",normalizedUnits[r.Id]),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@max",r.MaxStock),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName),P("@id",r.Id)});
+     cmd.Parameters.AddRange(new[]{P("@n",SuvidhaPOS.Premium.PurchaseImportRules.Name(r.Name)),P("@b",string.IsNullOrWhiteSpace(r.Barcode)?null:r.Barcode.Trim()),P("@s",string.IsNullOrWhiteSpace(r.Sku)?null:r.Sku.Trim()),P("@cat",r.Category),P("@u",normalizedUnits[r.Id]),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@max",r.MaxStock),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName),P("@id",r.Id)});
      await cmd.ExecuteNonQueryAsync();
    }
    await tx.CommitAsync();return Results.Ok(new{updated=x.Rows.Count});
@@ -239,14 +211,7 @@ app.MapPost("/api/customers",async(Db db,PartyRequest x)=>Results.Ok(new{id=awai
 app.MapGet("/api/suppliers",async(Db db,string? q)=>Results.Ok(await db.QueryAsync("SELECT s.*,CAST(s.OpeningBalance+ISNULL((SELECT SUM(GrandTotal-PaidAmount) FROM Purchases p WHERE p.SupplierId=s.Id),0)-ISNULL((SELECT SUM(Amount) FROM SupplierPayments sp WHERE sp.SupplierId=s.Id),0) AS decimal(18,2)) Balance FROM Suppliers s WHERE s.IsActive=1 AND (@q='' OR s.Name LIKE @l OR ISNULL(s.Phone,'') LIKE @l) ORDER BY s.Name",P("@q",q??""),P("@l","%"+(q??"")+"%"))));
 app.MapPost("/api/suppliers",async(Db db,PartyRequest x)=>Results.Ok(new{id=await db.ScalarAsync("INSERT Suppliers(Name,Phone,Address,GstIn,OpeningBalance) VALUES(@n,@p,@a,@g,@o);SELECT CAST(SCOPE_IDENTITY() AS int)",P("@n",x.Name),P("@p",x.Phone),P("@a",x.Address),P("@g",x.GstIn),P("@o",x.OpeningBalance))}));
 
-app.MapPost("/api/purchases",async(Db db,PurchaseRequest x)=>{if(x.Lines.Count==0)return Results.BadRequest(new{message="Add purchase items"});
-var outletProfile=await db.QuerySingleAsync("SELECT TOP 1 StoreType,RequireBatch,RequireExpiry FROM OutletMaster ORDER BY Id");
-var purchaseStoreType=SuvidhaPOS.Premium.LicenseGuardModules.GetStatus().StoreType
-    ?? outletProfile.GetValueOrDefault("StoreType")?.ToString()
-    ?? "Retail Shop";
-var pharma=purchaseStoreType.Contains("Pharmacy",StringComparison.OrdinalIgnoreCase)||purchaseStoreType.Contains("Medical",StringComparison.OrdinalIgnoreCase);
-var requireBatch=pharma||Convert.ToBoolean(outletProfile.GetValueOrDefault("RequireBatch")??false);
-if(requireBatch&&x.Lines.Any(l=>string.IsNullOrWhiteSpace(l.BatchNo)))return Results.BadRequest(new{message="Batch No is mandatory for this outlet"});using var c=db.CreateConnection();await c.OpenAsync();using var tx=c.BeginTransaction();try{decimal sub=x.Lines.Sum(a=>a.Qty*a.Cost);decimal tax=x.Lines.Sum(a=>a.Qty*a.Cost*a.TaxRate/100);decimal total=Math.Max(0,sub-x.Discount+tax);var cmd=new SqlCommand("INSERT Purchases(InvoiceNo,SupplierId,SupplierName,PurchaseDate,SubTotal,Discount,Tax,GrandTotal,PaymentMode,PaidAmount,Notes) OUTPUT INSERTED.Id VALUES(@i,@sid,@sn,GETDATE(),@sub,@d,@t,@g,@pm,@paid,@notes)",c,tx);cmd.Parameters.AddRange(new[]{P("@i",x.InvoiceNo??("PUR-"+DateTime.Now.ToString("yyyyMMddHHmmss"))),P("@sid",x.SupplierId),P("@sn",x.SupplierName??"Walk-in Supplier"),P("@sub",sub),P("@d",x.Discount),P("@t",tax),P("@g",total),P("@pm",x.PaymentMode??"Credit"),P("@paid",x.PaidAmount),P("@notes",x.Notes)});int pid=(int)await cmd.ExecuteScalarAsync();foreach(var l in x.Lines){int bid;cmd=new SqlCommand("INSERT ProductBatches(ProductId,BatchNo,Quantity,CostPrice,SellingPrice,Mrp,ManufactureDate,ExpiryDate) OUTPUT INSERTED.Id VALUES(@p,@b,@q,@c,@s,@m,@md,@ed)",c,tx);cmd.Parameters.AddRange(new[]{P("@p",l.ProductId),P("@b",l.BatchNo??("B-"+Guid.NewGuid().ToString("N")[..10])),P("@q",l.Qty+l.FreeQuantity),P("@c",l.Cost),P("@s",l.SalePrice),P("@m",l.Mrp),P("@md",l.ManufactureDate),P("@ed",l.ExpiryDate)});bid=(int)await cmd.ExecuteScalarAsync();cmd=new SqlCommand("INSERT PurchaseLines(PurchaseId,ProductId,BatchId,Quantity,FreeQuantity,CostPrice,Mrp,SalePrice,TaxRate,TaxAmount,UnitPurchased,PurchasedQty,TotalBaseQty,RatePerPurchasedUnit) VALUES(@i,@p,@b,@q,@f,@c,@m,@s,@r,@t,@up,@pq,@tb,@rpu);INSERT StockLedger(ProductId,BatchId,MovementType,Quantity,ReferenceType,ReferenceId) VALUES(@p,@b,'PURCHASE',@stockQty,'PURCHASE',@i)",c,tx);cmd.Parameters.AddRange(new[]{P("@i",pid),P("@p",l.ProductId),P("@b",bid),P("@q",l.Qty),P("@f",l.FreeQuantity),P("@c",l.Cost),P("@m",l.Mrp),P("@s",l.SalePrice),P("@r",l.TaxRate),P("@t",l.Qty*l.Cost*l.TaxRate/100),P("@up",l.UnitPurchased),P("@pq",l.PurchasedQty>0?l.PurchasedQty:l.Qty),P("@tb",l.TotalBaseQty>0?l.TotalBaseQty:l.Qty),P("@rpu",l.RatePerPurchasedUnit>0?l.RatePerPurchasedUnit:l.Cost),P("@stockQty",l.Qty+l.FreeQuantity)});await cmd.ExecuteNonQueryAsync();}await tx.CommitAsync();return Results.Ok(new{id=pid,total});}catch{await tx.RollbackAsync();throw;}});
+app.MapPost("/api/purchases", (Db db,HttpContext ctx,PurchaseRequest x)=>SuvidhaPOS.Premium.ManualPurchaseService.Commit(db,x,SuvidhaPOS.Premium.PurchaseImportModules.Actor(ctx)));
 
 app.MapPost("/api/sales",async(Db db,SaleRequest x)=>{if(x.Lines.Count==0)return Results.BadRequest(new{message="Add items to bill"});using var c=db.CreateConnection();await c.OpenAsync();using var tx=c.BeginTransaction();try{foreach(var l in x.Lines){var ck=new SqlCommand("SELECT ISNULL(SUM(Quantity),0) FROM ProductBatches WITH(UPDLOCK) WHERE ProductId=@p AND Quantity>0 AND ExpiryDate>=CAST(GETDATE() AS date)",c,tx);ck.Parameters.Add(P("@p",l.ProductId));if(Convert.ToDecimal(await ck.ExecuteScalarAsync())<l.Qty)return Results.BadRequest(new{message="Insufficient saleable stock for product "+l.ProductId});}decimal sub=x.Lines.Sum(a=>a.Qty*a.SalePrice);decimal tax=x.Lines.Sum(a=>a.Qty*a.SalePrice*a.TaxRate/100);decimal total=Math.Max(0,sub-x.Discount+tax);decimal cost=0;var cmd=new SqlCommand("INSERT Sales(InvoiceNo,BillDate,CustomerId,CustomerName,PaymentMode,SubTotal,Discount,Tax,GrandTotal,TotalCost,PaidAmount,Notes) VALUES(@i,GETDATE(),@cid,@cn,@pm,@sub,@d,@t,@g,0,@paid,@notes);SELECT CAST(SCOPE_IDENTITY() AS int);",c,tx);cmd.Parameters.AddRange(new[]{P("@i","INV-"+DateTime.Now.ToString("yyyyMMddHHmmssfff")),P("@cid",x.CustomerId),P("@cn",x.CustomerName??"Walk-in Customer"),P("@pm",x.PaymentMode??"Cash"),P("@sub",sub),P("@d",x.Discount),P("@t",tax),P("@g",total),P("@paid",x.PaidAmount<=0?total:x.PaidAmount),P("@notes",x.Notes)});int sid=(int)await cmd.ExecuteScalarAsync();foreach(var l in x.Lines){decimal rem=l.Qty;while(rem>0){cmd=new SqlCommand("SELECT TOP 1 Id,Quantity,CostPrice FROM ProductBatches WITH(UPDLOCK,ROWLOCK) WHERE ProductId=@p AND Quantity>0 AND ExpiryDate>=CAST(GETDATE() AS date) ORDER BY ExpiryDate,Id",c,tx);cmd.Parameters.Add(P("@p",l.ProductId));using var r=await cmd.ExecuteReaderAsync();if(!await r.ReadAsync())throw new Exception("Stock changed during billing");int bid=r.GetInt32(0);decimal avail=r.GetDecimal(1),cp=r.GetDecimal(2);await r.CloseAsync();decimal take=Math.Min(rem,avail);cost+=take*cp;cmd=new SqlCommand("UPDATE ProductBatches SET Quantity=Quantity-@q WHERE Id=@b;INSERT SaleLines(SaleId,ProductId,BatchId,Quantity,SalePrice,CostPrice,TaxRate,Discount,UnitSold,SoldQuantity,TotalBaseQtyDeducted,RatePerSoldUnit) VALUES(@s,@p,@b,@q,@sp,@cp,@tr,@di,@us,@sq,@tb,@rsu);INSERT StockLedger(ProductId,BatchId,MovementType,Quantity,ReferenceType,ReferenceId) VALUES(@p,@b,'SALE',-@q,'SALE',@s)",c,tx);cmd.Parameters.AddRange(new[]{P("@q",take),P("@b",bid),P("@s",sid),P("@p",l.ProductId),P("@sp",l.SalePrice),P("@cp",cp),P("@tr",l.TaxRate),P("@di",l.Discount),P("@us",l.UnitSold),P("@sq",l.SoldQty>0?l.SoldQty*(take/(l.BaseQty>0?l.BaseQty:l.Qty)):take),P("@tb",take),P("@rsu",l.RatePerSoldUnit>0?l.RatePerSoldUnit:l.SalePrice)});await cmd.ExecuteNonQueryAsync();rem-=take;}}cmd=new SqlCommand("UPDATE Sales SET TotalCost=@c WHERE Id=@id",c,tx);cmd.Parameters.AddRange(new[]{P("@c",cost),P("@id",sid)});await cmd.ExecuteNonQueryAsync();await tx.CommitAsync();cmd=new SqlCommand("SELECT InvoiceNo FROM Sales WHERE Id=@id",c,tx); cmd.Parameters.Add(P("@id",sid)); var inv=await cmd.ExecuteScalarAsync(); return Results.Ok(new{id=sid,total,invoiceNo=inv?.ToString()??""});}catch{await tx.RollbackAsync();throw;}});
 
@@ -439,51 +404,9 @@ app.MapPost("/api/ai/import",async(HttpRequest req,Db db,HttpContext ctx)=>{
  }
 });
 
-app.MapPost("/api/ai/import/items/commit",async(Db db,HttpContext ctx,AiCommitRequest x)=>{
- if(x.Rows.Count==0)return Results.BadRequest(new{message="No rows to import"});
- int added=0,skipped=0;var conflicts=new List<object>();
- var seenNames=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
- var seenBarcodes=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
- foreach(var r in x.Rows){
-   var name=(r.Name??"").Trim();var barcode=(r.Barcode??"").Trim();
-   if(string.IsNullOrWhiteSpace(name)){skipped++;conflicts.Add(new{type="NAME",value=name,message="Blank item name skipped"});continue;}
-   if(!seenNames.Add(name)){skipped++;conflicts.Add(new{type="NAME",value=name,message="Duplicate item name inside AI import skipped"});continue;}
-   if(!string.IsNullOrWhiteSpace(barcode)&&!seenBarcodes.Add(barcode)){skipped++;conflicts.Add(new{type="BARCODE",value=barcode,message=$"Duplicate barcode inside AI import skipped: {barcode}"});continue;}
-   var existing=await db.QuerySingleAsync(@"SELECT TOP 1 Id,Name,Barcode,
-    CASE WHEN UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) THEN 'NAME' ELSE 'BARCODE' END ConflictType
-    FROM Products WHERE IsActive=1 AND
-    (UPPER(LTRIM(RTRIM(Name)))=UPPER(@n) OR (@b<>'' AND UPPER(LTRIM(RTRIM(ISNULL(Barcode,''))))=UPPER(@b)))",
-    P("@n",name),P("@b",barcode));
-   if(existing.Count>0){
-     skipped++;conflicts.Add(new{type=existing["ConflictType"]?.ToString(),value=existing["ConflictType"]?.ToString()=="NAME"?name:barcode,message=$"Skipped duplicate: '{name}' conflicts with existing item '{existing["Name"]}'",existingId=existing["Id"]});continue;
-   }
-   try{
-    await db.ScalarAsync(@"INSERT Products(Name,Barcode,Sku,Category,Unit,Hsn,GstRate,Mrp,PurchasePrice,SalePrice,MinStock,LocationCode,RackName,ShelfName)
-     VALUES(@n,@b,@s,@cat,@u,@h,@g,@m,@pp,@sp,@min,@loc,@rack,@shelf)",
-     P("@n",name),P("@b",string.IsNullOrWhiteSpace(barcode)?null:barcode),P("@s",string.IsNullOrWhiteSpace(r.Sku)?null:r.Sku.Trim()),P("@cat",r.Category),P("@u",r.Unit??"PCS"),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@min",r.MinStock),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName));
-    added++;
-   }catch(SqlException e)when(e.Number==2601||e.Number==2627){skipped++;conflicts.Add(new{type="BARCODE",value=barcode,message=$"Duplicate barcode skipped: {barcode}"});}
- }
- return Results.Ok(new{added,updated=0,skipped,conflicts,message=$"Imported {added}; skipped {skipped} duplicate/invalid row(s)."});
-});
+app.MapPost("/api/ai/import/items/commit", (Db db,HttpContext ctx,AiCommitRequest x)=>SuvidhaPOS.Premium.PremiumCompletionModules.CommitNormal(db,ctx,new SuvidhaPOS.Premium.NormalImportRequest{Rows=x.Rows.Select(r=>new SuvidhaPOS.Premium.NormalImportRow{Name=r.Name,Barcode=r.Barcode,Sku=r.Sku,Category=r.Category,Unit=r.Unit,Hsn=r.Hsn,GstRate=r.GstRate,GstMode=r.TaxMode,Mrp=r.Mrp,PurchasePrice=r.PurchasePrice,SalePrice=r.SalePrice,DiscountPer=r.DiscountPer,MinStock=r.MinStock,LocationCode=r.LocationCode,RackName=r.RackName,ShelfName=r.ShelfName}).ToList()}));
 
-app.MapPost("/api/ai/import/purchase/commit",async(Db db,HttpContext ctx,AiPurchaseCommitRequest x)=>{
- if(x.Rows.Count==0)return Results.BadRequest(new{message="No purchase rows to import"});
- var outlet=await db.QuerySingleAsync("SELECT TOP 1 RequireBatch,RequireExpiry,DefaultUnit FROM OutletMaster ORDER BY Id"); bool reqBatch=Convert.ToBoolean(outlet.GetValueOrDefault("RequireBatch")??false), reqExpiry=Convert.ToBoolean(outlet.GetValueOrDefault("RequireExpiry")??false);
- using var c=db.CreateConnection(); await c.OpenAsync(); using var tx=c.BeginTransaction();
- try{
-  decimal sub=0,tax=0; var prepared=new List<(AiImportRow r,int pid,int bid)>();
-  foreach(var r in x.Rows){if(string.IsNullOrWhiteSpace(r.Name)||r.Quantity<=0)continue; var prod=await FindProduct(c,tx,r); int pid;
-   if(prod is null){var cmd0=new SqlCommand("INSERT Products(Name,Barcode,Sku,Category,Unit,Hsn,GstRate,Mrp,PurchasePrice,SalePrice,MinStock,LocationCode,RackName,ShelfName) OUTPUT INSERTED.Id VALUES(@n,@b,@s,@cat,@u,@h,@g,@m,@pp,@sp,0,@loc,@rack,@shelf)",c,tx);cmd0.Parameters.AddRange(new[]{P("@n",r.Name),P("@b",r.Barcode),P("@s",r.Sku),P("@cat",r.Category),P("@u",r.Unit??(outlet.GetValueOrDefault("DefaultUnit")?.ToString()??"PCS")),P("@h",r.Hsn),P("@g",r.GstRate),P("@m",r.Mrp),P("@pp",r.PurchasePrice),P("@sp",r.SalePrice),P("@loc",r.LocationCode),P("@rack",r.RackName),P("@shelf",r.ShelfName)});pid=(int)await cmd0.ExecuteScalarAsync();}else pid=Convert.ToInt32(prod["Id"]);
-   if(reqBatch && string.IsNullOrWhiteSpace(r.BatchNo))throw new Exception("Batch number required for outlet type"); if(reqExpiry && string.IsNullOrWhiteSpace(r.ExpiryDate))throw new Exception("Expiry date required for outlet type");
-   var batch=r.BatchNo??("AI-"+Guid.NewGuid().ToString("N")[..10]); DateTime expiry=DateTime.TryParse(r.ExpiryDate,out var ed)?ed:new DateTime(2099,12,31); DateTime? mfg=DateTime.TryParse(r.ManufactureDate,out var md)?md:null;
-   var cmd=new SqlCommand("INSERT ProductBatches(ProductId,BatchNo,Quantity,CostPrice,SellingPrice,Mrp,ManufactureDate,ExpiryDate) OUTPUT INSERTED.Id VALUES(@p,@b,@q,@c,@s,@m,@md,@ed)",c,tx);cmd.Parameters.AddRange(new[]{P("@p",pid),P("@b",batch),P("@q",r.Quantity+r.FreeQuantity),P("@c",r.PurchasePrice),P("@s",r.SalePrice),P("@m",r.Mrp),P("@md",mfg),P("@ed",expiry)});int bid=(int)await cmd.ExecuteScalarAsync();prepared.Add((r,pid,bid)); sub+=r.Quantity*r.PurchasePrice; tax+=r.Quantity*r.PurchasePrice*r.GstRate/100;
-  }
-  decimal total=Math.Max(0,sub+tax-x.Discount); var cmdh=new SqlCommand("INSERT Purchases(InvoiceNo,SupplierId,SupplierName,PurchaseDate,SubTotal,Discount,Tax,GrandTotal,PaymentMode,PaidAmount,Notes) OUTPUT INSERTED.Id VALUES(@i,@sid,@sn,GETDATE(),@sub,@d,@t,@g,@pm,@paid,@n)",c,tx);cmdh.Parameters.AddRange(new[]{P("@i",x.InvoiceNo??("AI-PUR-"+DateTime.Now.ToString("yyyyMMddHHmmss"))),P("@sid",x.SupplierId),P("@sn",x.SupplierName??"AI Import"),P("@sub",sub),P("@d",x.Discount),P("@t",tax),P("@g",total),P("@pm",x.PaymentMode??"Credit"),P("@paid",x.PaidAmount),P("@n","Created from AI import preview")});int purId=(int)await cmdh.ExecuteScalarAsync();
-  foreach(var z in prepared){var r=z.r;var lc=new SqlCommand("INSERT PurchaseLines(PurchaseId,ProductId,BatchId,Quantity,FreeQuantity,CostPrice,Mrp,SalePrice,TaxRate,TaxAmount) VALUES(@i,@p,@b,@q,@f,@c,@m,@s,@r,@t);INSERT StockLedger(ProductId,BatchId,MovementType,Quantity,ReferenceType,ReferenceId,Notes) VALUES(@p,@b,'PURCHASE',@stock,'PURCHASE',@i,'AI import')",c,tx);lc.Parameters.AddRange(new[]{P("@i",purId),P("@p",z.pid),P("@b",z.bid),P("@q",r.Quantity),P("@f",r.FreeQuantity),P("@c",r.PurchasePrice),P("@m",r.Mrp),P("@s",r.SalePrice),P("@r",r.GstRate),P("@t",r.Quantity*r.PurchasePrice*r.GstRate/100),P("@stock",r.Quantity+r.FreeQuantity)});await lc.ExecuteNonQueryAsync();}
-  await tx.CommitAsync(); return Results.Ok(new{id=purId,total,rows=prepared.Count});
- }catch(Exception ex){await tx.RollbackAsync();return Results.BadRequest(new{message=ex.Message});}
-});
+app.MapPost("/api/ai/import/purchase/commit", (Db db,HttpContext ctx,AiPurchaseCommitRequest x)=>SuvidhaPOS.Premium.PurchasePostingService.Commit(db,new SuvidhaPOS.Premium.PurchaseImportModules.PurchaseImportCommitRequest(x.InvoiceNo,x.SupplierId,x.SupplierName,x.PurchaseDate??DateTime.Today,x.PaymentMode,x.PaidAmount,x.Discount,x.Rows.Select((r,i)=>new SuvidhaPOS.Premium.PurchaseImportModules.PurchaseImportRow{RowNo=i+1,ItemName=r.Name,Barcode=r.Barcode,Group=r.Category,Unit=r.Unit,Hsn=r.Hsn,GstRate=r.GstRate,TaxMode=r.TaxMode,Mrp=r.Mrp,PurchaseRate=r.PurchasePrice,SalePrice=r.SalePrice,Discount=r.DiscountPer??0,Qty=r.Quantity,FreeQuantity=r.FreeQuantity,BatchNo=r.BatchNo,ExpiryDate=string.IsNullOrWhiteSpace(r.ExpiryDate)?null:DateTime.TryParse(r.ExpiryDate,out var expiry)?expiry:DateTime.MinValue}).ToList(),x.RequestId,x.PreviewToken),SuvidhaPOS.Premium.PurchaseImportModules.Actor(ctx)));
 
 SuvidhaPOS.Premium.LicenseGuardModules.Map(app);
 SuvidhaPOS.Premium.UnitMasterModules.Map(app);
@@ -549,16 +472,16 @@ record PartyPaymentRequest(decimal Amount,string PaymentMode,string? ReferenceNo
 record DayClosingRequest(decimal OpeningCash,decimal CashSales,decimal CashIn,decimal CashOut,decimal ClosingCash,string? Notes);
 record CreateUserRequest(string UserName,string? DisplayName,string Password,string? Role);
 record SettingRequest(string? Value);
-record ProductRequest(string Name,string? Barcode,string? Sku,int? CategoryId,string? Category,string? Unit,string? Hsn,decimal GstRate,decimal Mrp,decimal PurchasePrice,decimal SalePrice,decimal MinStock,decimal MaxStock,string? LocationCode=null,string? RackName=null,string? ShelfName=null,bool TrackBatch=true,bool TrackExpiry=true,string? TaxMode="EXCLUSIVE");
+record ProductRequest(string Name,string? Barcode,string? Sku,int? CategoryId,string? Category,string? Unit,string? Hsn,decimal GstRate,decimal Mrp,decimal PurchasePrice,decimal SalePrice,decimal MinStock,decimal MaxStock,string? LocationCode=null,string? RackName=null,string? ShelfName=null,bool TrackBatch=true,bool TrackExpiry=true,string? TaxMode=null,decimal? DiscountPer=null,SuvidhaPOS.Premium.SpecializedModules.UomRequest? Uom=null);
 record ProductBulkEditRow(int Id,string Name,string? Barcode,string? Sku,string? Category,string? Unit,string? Hsn,decimal GstRate,decimal Mrp,decimal PurchasePrice,decimal SalePrice,decimal MinStock,decimal MaxStock,string? LocationCode,string? RackName,string? ShelfName);
 record ProductBulkEditRequest(List<ProductBulkEditRow> Rows);
 record OutletRequest(string OutletName,string StoreType,string? Address,string? Phone,string? Gstin,bool RequireBatch,bool RequireExpiry,string? DefaultUnit,string? State=null,string? City=null);
-record AiImportRow(string? Name,string? Barcode,string? Sku,string? Category,string? Unit,string? Hsn,decimal GstRate,decimal Mrp,decimal PurchasePrice,decimal SalePrice,decimal MinStock,string? LocationCode,string? RackName,string? ShelfName,string? BatchNo,string? ManufactureDate,string? ExpiryDate,decimal Quantity,decimal FreeQuantity,decimal Confidence,string? Notes);
+record AiImportRow(string? Name,string? Barcode,string? Sku,string? Category,string? Unit,string? Hsn,decimal GstRate,decimal Mrp,decimal PurchasePrice,decimal SalePrice,decimal MinStock,string? LocationCode,string? RackName,string? ShelfName,string? BatchNo,string? ManufactureDate,string? ExpiryDate,decimal Quantity,decimal FreeQuantity,decimal Confidence,string? Notes,decimal? DiscountPer=null,string? TaxMode="INCLUSIVE");
 record AiCommitRequest(List<AiImportRow> Rows);
-record AiPurchaseCommitRequest(string? InvoiceNo,int? SupplierId,string? SupplierName,string? PaymentMode,decimal PaidAmount,decimal Discount,List<AiImportRow> Rows);
+record AiPurchaseCommitRequest(string? InvoiceNo,int? SupplierId,string? SupplierName,string? PaymentMode,decimal PaidAmount,decimal Discount,List<AiImportRow> Rows,DateTime? PurchaseDate=null,string? RequestId=null,string? PreviewToken=null);
 record NameRequest(string Name); record PartyRequest(string Name,string? Phone,string? Address,string? GstIn,decimal OpeningBalance);
-record PurchaseRequest(string? InvoiceNo,int? SupplierId,string? SupplierName,string? PaymentMode,decimal PaidAmount,decimal Discount,string? Notes,List<PurchaseLine> Lines);
-record PurchaseLine(int ProductId,string? BatchNo,decimal Qty,decimal FreeQuantity,decimal Cost,decimal SalePrice,decimal Mrp,decimal TaxRate,DateTime? ManufactureDate,DateTime ExpiryDate,string? UnitPurchased=null,decimal PurchasedQty=0m,decimal TotalBaseQty=0m,decimal RatePerPurchasedUnit=0m);
+record PurchaseRequest(string? InvoiceNo,int? SupplierId,string? SupplierName,string? PaymentMode,decimal PaidAmount,decimal Discount,string? Notes,List<PurchaseLine> Lines,DateTime? PurchaseDate=null,string? RequestId=null);
+record PurchaseLine(int ProductId,string? BatchNo,decimal Qty,decimal FreeQuantity,decimal Cost,decimal SalePrice,decimal Mrp,decimal TaxRate,DateTime? ManufactureDate,DateTime? ExpiryDate=null,string? UnitPurchased=null,decimal PurchasedQty=0m,decimal TotalBaseQty=0m,decimal RatePerPurchasedUnit=0m,decimal? DiscountPer=null,string? TaxMode="INCLUSIVE",decimal? MrpPerPurchasedUnit=null);
 record SaleRequest(int? CustomerId,string? CustomerName,string? PaymentMode,decimal PaidAmount,decimal Discount,string? Notes,List<SaleLine> Lines);
 record SaleLine(int ProductId,decimal Qty,decimal SalePrice,decimal TaxRate,decimal Discount,string? UnitSold=null,decimal SoldQty=0m,decimal BaseQty=0m,decimal RatePerSoldUnit=0m);
 record ReturnRequest(string? PartyName,string? Reason,List<ReturnLine> Lines); record ReturnLine(int ProductId,int BatchId,decimal Qty,decimal Rate);
