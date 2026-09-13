@@ -55,42 +55,7 @@ FROM ProductUoms WHERE ProductId=@id", P("@id", id));
             }
             return Results.Ok(r);
         });
-        app.MapPut("/api/products/{id:int}/uom", async (Db db, int id, UomRequest x) =>
-        {
-            if (string.IsNullOrWhiteSpace(x.BaseUnit) || string.IsNullOrWhiteSpace(x.PackUnit))
-                return Results.BadRequest(new { message="Base unit and pack unit are required" });
-
-            var baseUnit=await UnitMasterModules.ResolveActiveNameAsync(db,x.BaseUnit);
-            var packUnit=await UnitMasterModules.ResolveActiveNameAsync(db,x.PackUnit);
-            var innerUnit=string.IsNullOrWhiteSpace(x.InnerUnit)?null:await UnitMasterModules.ResolveActiveNameAsync(db,x.InnerUnit);
-            if(baseUnit is null)return Results.BadRequest(new {message=$"Base Unit '{x.BaseUnit}' is not in active Unit Master. Select/search a predefined unit or add it in Unit Master first."});
-            if(packUnit is null)return Results.BadRequest(new {message=$"Pack Unit '{x.PackUnit}' is not in active Unit Master. Select/search a predefined unit or add it in Unit Master first."});
-            if(!string.IsNullOrWhiteSpace(x.InnerUnit)&&innerUnit is null)return Results.BadRequest(new {message=$"Inner Unit '{x.InnerUnit}' is not in active Unit Master. Select/search a predefined unit or add it in Unit Master first."});
-            var innerFactor=innerUnit is null?1m:Math.Max(1m,x.InnerConversionFactor);
-            var packInnerFactor=Math.Max(1m,x.PackInnerFactor);
-            var totalFactor=innerUnit is null
-                ? Math.Max(1m,x.ConversionFactor>0?x.ConversionFactor:packInnerFactor)
-                : innerFactor*packInnerFactor;
-            if(packUnit.Equals(baseUnit,StringComparison.OrdinalIgnoreCase) && innerUnit is null) totalFactor=1m;
-
-            await db.ScalarAsync(@"MERGE ProductUoms AS t
-USING (SELECT @id ProductId) s ON t.ProductId=s.ProductId
-WHEN MATCHED THEN UPDATE SET
- BaseUnit=@b,InnerUnit=@iu,PackUnit=@p,ConversionFactor=@f,
- InnerConversionFactor=@if,PackInnerFactor=@pf,
- PackPurchaseRate=@pp,PackMrp=@m,PackSalePrice=@sp,
- InnerPurchaseRate=@ip,InnerMrp=@im,InnerSalePrice=@is,
- LooseSalePrice=@lp,AllowLoose=@lo,UpdatedAt=SYSDATETIME()
-WHEN NOT MATCHED THEN
- INSERT(ProductId,BaseUnit,InnerUnit,PackUnit,ConversionFactor,InnerConversionFactor,PackInnerFactor,PackPurchaseRate,PackMrp,PackSalePrice,InnerPurchaseRate,InnerMrp,InnerSalePrice,LooseSalePrice,AllowLoose)
- VALUES(@id,@b,@iu,@p,@f,@if,@pf,@pp,@m,@sp,@ip,@im,@is,@lp,@lo);",
- P("@id",id),P("@b",baseUnit),P("@iu",innerUnit),P("@p",packUnit),P("@f",totalFactor),
- P("@if",innerFactor),P("@pf",packInnerFactor),
- P("@pp",x.PackPurchaseRate),P("@m",x.PackMrp),P("@sp",x.PackSalePrice),
- P("@ip",x.InnerPurchaseRate),P("@im",x.InnerMrp),P("@is",x.InnerSalePrice),
- P("@lp",x.LooseSalePrice),P("@lo",x.AllowLoose));
-            return Results.Ok(new { saved=true, BaseUnit=baseUnit, InnerUnit=innerUnit, PackUnit=packUnit, ConversionFactor=totalFactor, InnerConversionFactor=innerFactor, PackInnerFactor=packInnerFactor });
-        });
+        app.MapPut("/api/products/{id:int}/uom", (Db db,int id,UomRequest x)=>RetailItemRules.UpdateUom(db,id,x));
 
         app.MapGet("/api/jewellery/metal-rates", async (Db db) => Results.Ok(await db.QueryAsync(@"WITH r AS(SELECT Id,MetalType,Purity,RatePerGram,EffectiveAt,ROW_NUMBER() OVER(PARTITION BY MetalType,Purity ORDER BY EffectiveAt DESC,Id DESC) rn FROM JewelleryMetalRates WHERE IsActive=1) SELECT Id,MetalType,Purity,RatePerGram,EffectiveAt FROM r WHERE rn=1 ORDER BY MetalType,Purity")));
         app.MapPost("/api/jewellery/metal-rates", async (Db db, MetalRateRequest x) => { var id=await db.ScalarAsync("UPDATE JewelleryMetalRates SET IsActive=0 WHERE MetalType=@m AND Purity=@p AND IsActive=1;INSERT JewelleryMetalRates(MetalType,Purity,RatePerGram,EffectiveAt,IsActive) VALUES(@m,@p,@r,COALESCE(@e,SYSDATETIME()),1);SELECT CAST(SCOPE_IDENTITY() AS int)",P("@m",x.MetalType),P("@p",x.Purity),P("@r",x.RatePerGram),P("@e",x.EffectiveAt));return Results.Ok(new{id}); });

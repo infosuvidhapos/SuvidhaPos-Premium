@@ -52,27 +52,19 @@ public static class RetailExpansionModules
             using var tx = c.BeginTransaction();
             try
             {
+                if(x.Rows.Any(r=>r.ProductId<=0||r.Mrp is <0||r.PurchasePrice is <0||r.SalePrice is <0||r.DiscountPer is <0 or >100))throw new InvalidOperationException("Rates must be nonnegative and discount must be between 0 and 100");
+                if(x.Rows.GroupBy(r=>r.ProductId).Any(g=>g.Count()>1))throw new InvalidOperationException("Each item may appear only once in a rate update");
+                await PurchasePostingService.Lock(c,tx);
                 var updated = 0;
-                foreach (var r in x.Rows.Where(z => z.ProductId > 0))
+                foreach (var r in x.Rows)
                 {
                     using var cmd = new SqlCommand(@"UPDATE Products SET
-Mrp=COALESCE(@m,Mrp),PurchasePrice=COALESCE(@p,PurchasePrice),SalePrice=COALESCE(@s,SalePrice)
-WHERE Id=@id AND IsActive=1", c, tx);
-                    cmd.Parameters.AddRange(new[] { P("@m", r.Mrp), P("@p", r.PurchasePrice), P("@s", r.SalePrice), P("@id", r.ProductId) });
-                    updated += await cmd.ExecuteNonQueryAsync();
-
-                    using var uom = new SqlCommand(@"UPDATE ProductUoms SET
-LooseSalePrice=COALESCE(@s,LooseSalePrice),
-PackSalePrice=CASE WHEN @s IS NULL THEN PackSalePrice ELSE @s*CASE WHEN ConversionFactor>0 THEN ConversionFactor ELSE 1 END END,
-InnerSalePrice=CASE WHEN @s IS NULL THEN InnerSalePrice ELSE @s*CASE WHEN InnerConversionFactor>0 THEN InnerConversionFactor ELSE 1 END END,
-PackPurchaseRate=CASE WHEN @p IS NULL THEN PackPurchaseRate ELSE @p*CASE WHEN ConversionFactor>0 THEN ConversionFactor ELSE 1 END END,
-InnerPurchaseRate=CASE WHEN @p IS NULL THEN InnerPurchaseRate ELSE @p*CASE WHEN InnerConversionFactor>0 THEN InnerConversionFactor ELSE 1 END END,
-PackMrp=CASE WHEN @m IS NULL THEN PackMrp ELSE @m*CASE WHEN ConversionFactor>0 THEN ConversionFactor ELSE 1 END END,
-InnerMrp=CASE WHEN @m IS NULL THEN InnerMrp ELSE @m*CASE WHEN InnerConversionFactor>0 THEN InnerConversionFactor ELSE 1 END END,
-UpdatedAt=SYSDATETIME()
-WHERE ProductId=@id", c, tx);
-                    uom.Parameters.AddRange(new[] { P("@m", r.Mrp), P("@p", r.PurchasePrice), P("@s", r.SalePrice), P("@id", r.ProductId) });
-                    await uom.ExecuteNonQueryAsync();
+Mrp=COALESCE(@m,Mrp),PurchasePrice=COALESCE(@p,PurchasePrice),
+SalePrice=CASE WHEN @d IS NOT NULL THEN ROUND(COALESCE(@m,Mrp)*(1-@d/100.0),2) ELSE COALESCE(@s,SalePrice) END,
+Dis_Rate=COALESCE(@d,Dis_Rate) WHERE Id=@id AND IsActive=1", c, tx);
+                    cmd.Parameters.AddRange(new[] { P("@m",r.Mrp),P("@p",r.PurchasePrice),P("@s",r.SalePrice),P("@d",r.DiscountPer),P("@id",r.ProductId) });
+                    var count=await cmd.ExecuteNonQueryAsync();if(count!=1)throw new InvalidOperationException("Item is inactive or missing: "+r.ProductId);updated+=count;
+                    await RetailItemRules.SyncRates(c,tx,r.ProductId,purchase:r.PurchasePrice.HasValue,mrp:r.Mrp.HasValue,sale:r.SalePrice.HasValue,discount:r.DiscountPer.HasValue);
                 }
                 using (var audit = new SqlCommand("INSERT AuditLogs(UserName,Action,Entity,Details) VALUES(@u,'ITEM_RATE_BULK_UPDATE','Product',@d)", c, tx))
                 {
@@ -384,7 +376,7 @@ WHERE CreatedAt>=@f AND CreatedAt<@e
 
     static async Task<List<ProductLookup>> LoadProductsAsync(Db db)
     {
-        var rows = await db.QueryAsync(@"SELECT p.Id,p.Name,p.Barcode,p.Sku,p.Mrp,p.PurchasePrice,p.SalePrice,
+        var rows = await db.QueryAsync(@"SELECT p.Id,p.Name,p.Barcode,p.Sku,p.Mrp,p.PurchasePrice,p.SalePrice,p.Dis_Rate,
 CAST(ISNULL((SELECT SUM(b.Quantity) FROM ProductBatches b WHERE b.ProductId=p.Id),0) AS decimal(18,3)) Stock
 FROM Products p WHERE p.IsActive=1");
         return rows.Select(x => new ProductLookup(
@@ -395,7 +387,7 @@ FROM Products p WHERE p.IsActive=1");
             Convert.ToDecimal(x["Mrp"] ?? 0m),
             Convert.ToDecimal(x["PurchasePrice"] ?? 0m),
             Convert.ToDecimal(x["SalePrice"] ?? 0m),
-            Convert.ToDecimal(x["Stock"] ?? 0m))).ToList();
+            Convert.ToDecimal(x["Stock"] ?? 0m),Convert.ToDecimal(x["Dis_Rate"] ?? 0m))).ToList();
     }
 
     static ProductLookup? MatchProduct(Dictionary<string, string> row, List<ProductLookup> products)
@@ -437,13 +429,11 @@ FROM Products p WHERE p.IsActive=1");
     static RatePreviewRow BuildRatePreview(Dictionary<string, string> r, int rowNo, List<ProductLookup> products)
     {
         var p = MatchProduct(r, products);
-        var mrp = NullableDec(Get(r, "mrp"));
-        var purchase = NullableDec(Get(r, "purchaseprice", "costprice", "purchase", "cost"));
-        var sale = NullableDec(Get(r, "saleprice", "sellingprice", "sale", "selling"));
-        var any = (mrp ?? 0) > 0 || (purchase ?? 0) > 0 || (sale ?? 0) > 0;
-        return new RatePreviewRow(rowNo, p?.Id ?? 0, p?.Name ?? Get(r, "itemname", "name", "product", "item"), p?.Barcode ?? Get(r, "barcode", "itemcode", "code"),
-            p?.Mrp ?? 0, p?.PurchasePrice ?? 0, p?.SalePrice ?? 0, mrp, purchase, sale, p is not null && any,
-            p is null ? "Item not matched" : !any ? "No MRP/Purchase/Sale rate found" : "");
+        decimal? Rate(params string[] names){var raw=Get(r,names);return string.IsNullOrWhiteSpace(raw)?null:PurchaseImportParser.Number(raw);}
+        var mrp=Rate("mrp");var purchase=Rate("purchaseprice","costprice","purchase","cost");var sale=Rate("saleprice","sellingprice","sale","selling");var discount=Rate("discountper","disc","discount","discountpercent");
+        var any=mrp.HasValue||purchase.HasValue||sale.HasValue||discount.HasValue;
+        var error=p is null?"Item not matched":!any?"No rates or discount found":mrp is <0||purchase is <0||sale is <0||discount is <0 or >100?"Invalid rate or discount":"";
+        return new RatePreviewRow(rowNo,p?.Id??0,p?.Name??Get(r,"itemname","name","product","item"),p?.Barcode??Get(r,"barcode","itemcode","code"),p?.Mrp??0,p?.PurchasePrice??0,p?.SalePrice??0,mrp,purchase,sale,error=="",error,p?.DiscountPer??0,discount);
     }
 
     static async Task<ParsedUpload> ParseUploadAsync(HttpRequest req)
@@ -634,11 +624,11 @@ FROM Products p WHERE p.IsActive=1");
     static decimal Dec(string? s) => decimal.TryParse((s ?? "").Replace(",", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? Math.Max(0, v) : 0;
     static decimal? NullableDec(string? s) => string.IsNullOrWhiteSpace(s) ? null : Dec(s);
 
-    sealed record ProductLookup(int Id, string Name, string Barcode, string Sku, decimal Mrp, decimal PurchasePrice, decimal SalePrice, decimal Stock);
+    sealed record ProductLookup(int Id, string Name, string Barcode, string Sku, decimal Mrp, decimal PurchasePrice, decimal SalePrice, decimal Stock,decimal DiscountPer);
     sealed record ParsedUpload(string? FileName, List<Dictionary<string, string>> Rows, string? Error);
     public record OpeningPreviewRow(int RowNo, int ProductId, string ItemName, string Barcode, string BatchNo, decimal Quantity, decimal CostPrice, decimal SalePrice, decimal Mrp, string? ExpiryDate, decimal CurrentStock, bool Selected, string Error);
-    public record RatePreviewRow(int RowNo, int ProductId, string ItemName, string Barcode, decimal CurrentMrp, decimal CurrentPurchase, decimal CurrentSale, decimal? Mrp, decimal? PurchasePrice, decimal? SalePrice, bool Selected, string Error);
-    public record RateApplyRow(int ProductId, decimal? Mrp, decimal? PurchasePrice, decimal? SalePrice);
+    public record RatePreviewRow(int RowNo, int ProductId, string ItemName, string Barcode, decimal CurrentMrp, decimal CurrentPurchase, decimal CurrentSale, decimal? Mrp, decimal? PurchasePrice, decimal? SalePrice, bool Selected, string Error,decimal CurrentDiscountPer=0,decimal? DiscountPer=null);
+    public record RateApplyRow(int ProductId, decimal? Mrp, decimal? PurchasePrice, decimal? SalePrice,decimal? DiscountPer=null);
     public record RateApplyRequest(List<RateApplyRow> Rows);
     public record CategoryEditRequest(string? Name, string? OldName);
     public record CustomerEditRequest(string? Name, string? Phone, string? Address, string? GstIn, decimal OpeningBalance);

@@ -432,8 +432,8 @@ SELECT 1;");
         }
         else
         {
-            headers = new[] { "ItemName *", "Barcode", "SKU", "Category", "Unit *", "HSN", "GSTMode *", "GST% *", "MRP", "PurchasePrice", "SalePrice", "MinStock", "Location", "Rack", "Shelf" };
-            sample = new[] { "Premium Tea 250g", "890000000004", "TEA250", "Grocery", "PCS", "0902", "EXCLUSIVE", "5", "180", "140", "160", "5", "A-1", "Rack A", "Shelf 1" };
+            headers = new[] { "ItemName *", "Barcode", "SKU", "Category", "Unit *", "HSN", "GSTMode *", "GST% *", "MRP", "PurchasePrice", "SalePrice", "DiscountPer", "MinStock", "Location", "Rack", "Shelf" };
+            sample = new[] { "Premium Tea 250g", "890000000004", "TEA250", "Grocery", "PCS", "0902", "INCLUSIVE", "5", "180", "140", "162", "10", "5", "A-1", "Rack A", "Shelf 1" };
         }
 
         var headerRow = sheet.CreateRow(1);
