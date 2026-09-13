@@ -413,7 +413,9 @@ jobs:
         shell: powershell
         run: |
           $program = Get-Content 'src/SuvidhaPOS-Premium/Program.cs' -Raw -Encoding UTF8
-          foreach($token in @('/api/products/identity-check','/api/products/bulk-edit',"THEN 'Item Name' ELSE 'Barcode' END ConflictType",'FindProduct')){ if(-not $program.Contains($token)){ throw "Duplicate guard missing: $token" } }
+          foreach($token in @('/api/products/identity-check','/api/products/bulk-edit',"THEN 'NAME' ELSE 'BARCODE' END ConflictType",'RetailItemRules.Save','PurchasePostingService.Lock')){ if(-not $program.Contains($token)){ throw "Duplicate guard wiring missing: $token" } }
+          # Runtime collision, master-preservation and concurrent-posting behavior is exercised
+          # by RetailPurchaseChecks below; this check covers the public route wiring only.
           $app = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           if(-not $app.Contains('validateProductIdentity')){ throw 'Single item duplicate validation UI missing' }
           if(-not $app.Contains('openProductBulkEdit')){ throw 'Bulk edit UI missing' }

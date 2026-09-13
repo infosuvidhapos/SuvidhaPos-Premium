@@ -4,7 +4,9 @@
 
 Draft implementation. Do not distribute an installer from this branch until the C# parser checks, isolated SQL transaction checks, existing jewellery checks and Windows installer workflow pass on the exact revision.
 
-Local checks: 10 UI behavior scenarios pass, eight modified JavaScript files pass syntax checks, and workflow YAML parses. C# and SQL execution remain pending: this workspace has no .NET SDK and the SDK download was unavailable. GitHub Build206 was rejected before runner allocation; the Actions annotation reports failed account payments or a spending-limit restriction. The connected browser also blocks the local preview URL, so visual rendering has not been certified in this session.
+Build208 compiled the solution successfully with zero build warnings/errors, passed the C# XLS/XLSX/CSV parser and purchase-rule checks, all 10 UI behavior scenarios, and the jewellery calculation checks. It then stopped on a stale source-text assertion expecting the previous duplicate-conflict labels. That assertion now checks the current route wiring; transaction and collision behavior remains covered by the SQL checks. SQL integration and installer completion still require a successful subsequent workflow. Build206's earlier account allocation error no longer prevents runners from starting. The connected browser blocks the local preview URL, so visual rendering has not been certified in this session.
+
+Continuation instructions and release gates: [resume-suvidhapos.md](resume-suvidhapos.md).
 
 ## Change pointers
 
