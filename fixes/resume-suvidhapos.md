@@ -21,6 +21,7 @@ The user has authorized finishing the fixes, checking builds, and producing the 
 - Build207 on PR head `d6446c6557b996c175a6f4e97e45ec8ba3505969`: CS8801 from unqualified `P` in `RetailItemRules` and `ManualPurchaseService`. Fixed by qualifying `PurchasePostingService.P`.
 - Build208 on PR head `d13e30789038eff2350810946fda6b617fec7ce3`, run `34768093390`, job `103752584982`: C# parser/rule checks passed; all 10 UI behavior checks passed; solution compiled with zero warnings/errors; jewellery calculations passed. Stopped on obsolete source assertion `THEN 'Item Name' ELSE 'Barcode' END ConflictType`. This checkpoint's commit updates the assertion to current `NAME`/`BARCODE` labels and route wiring. SQL behavior gates remain required.
 - A later push may already have a newer run. Always read the newest PR head, workflow jobs and logs before making changes.
+- During the follow-up review, the backup step was found to open a fresh sqlcmd connection for every migration without selecting a database. Existing scripts contain USE statements, but the new additive completion/retail scripts intentionally use the caller's database. The workflow now uses master only for schema bootstrap and explicitly selects SuvidhaPOS for later scripts. Verify this fix in the newest build as well.
 
 ## Required behavior already implemented; protect it
 

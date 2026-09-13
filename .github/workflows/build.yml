@@ -494,7 +494,10 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'SQL Server 2019 connection failed'}
           New-Item -ItemType Directory -Force -Path database-artifact | Out-Null
           foreach($script in @('schema.sql','specialized-schema.sql','print-schema.sql','jewellery-registers-schema.sql','completion-schema.sql','retail-purchase-schema.sql','seed.sql')){
-            & $sqlcmd.FullName -I -S $server -E -b -i "src/SuvidhaPOS-Premium/Database/$script"
+            # Each sqlcmd starts a new connection. Additive migrations intentionally
+            # use the caller's database, so select it explicitly after bootstrap.
+            $scriptDatabase = if($script -eq 'schema.sql'){'master'}else{'SuvidhaPOS'}
+            & $sqlcmd.FullName -I -S $server -d $scriptDatabase -E -b -i "src/SuvidhaPOS-Premium/Database/$script"
             if($LASTEXITCODE -ne 0){throw "$script failed on SQL Server 2019"}
           }
           $bak=(Resolve-Path 'database-artifact').Path+'\SuvidhaPos.bak'
