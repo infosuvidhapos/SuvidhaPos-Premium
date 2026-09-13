@@ -48,6 +48,8 @@ jobs:
           $env:NODE_PATH = "$PWD/fixes/ui-deps/node_modules"
           node fixes/retail-purchase-ui.cjs
           if($LASTEXITCODE -ne 0){throw 'Retail UI behavior checks failed'}
+      - name: Validate sidebar feature switch behavior
+        run: node fixes/test-sidebar-feature-control.cjs
       - name: Validate BTC day-close fixes
         shell: powershell
         run: |
