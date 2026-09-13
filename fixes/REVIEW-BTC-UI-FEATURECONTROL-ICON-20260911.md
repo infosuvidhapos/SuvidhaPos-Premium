@@ -21,3 +21,9 @@ Requested after Build #167. Each pointer is intentionally separated so it can be
 
 Build gate: compile + JS syntax + targeted source validations + installer validation before merge.
 - F-17 Remove top-level AI Import navigation and dashboard quick action; keep AI Import inside Item Master (normal + jewellery) alongside Item Import and Opening Stock.
+
+## Continuation after Build #212
+
+- F-18 Normal retail Feature Control now reads the visible sidebar label independently of decorative icons, so Settings, Day Closing, Users and other icon-prefixed controls obey their switches.
+- F-19 Matching is exact after icon cleanup, preventing a Stock switch from accidentally matching Stock Report. Jewellery keeps its dedicated `jewellery-workspace.js` Feature Control and the retail controller remains inactive in jewellery mode.
+- F-20 Cache-bust `sidebar-feature-control.js` to 6211 and run `node fixes/test-sidebar-feature-control.cjs` in CI. The regression covers hide/show, route blocking, persistence, exact matching and jewellery isolation.

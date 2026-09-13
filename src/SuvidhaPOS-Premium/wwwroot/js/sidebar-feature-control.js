@@ -36,7 +36,11 @@ async function load(){
  try{const rows=await api('/api/app-settings');state={};catalog.forEach(x=>state[x[0]]=true);(rows||[]).forEach(x=>{const k=String(x.Key||x.key||'');if(!k.startsWith(PREFIX))return;state[k.slice(PREFIX.length)]=!/^false|0|off$/i.test(String(x.Value??x.value??'true'))});loaded=true;apply()}catch(_){}
 }
 function textButtons(){return [...d.querySelectorAll('#sidebar button,#sidebar .nav,#sidebar .plain')]}
-function matchesText(el,names){const t=String(el.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();return names.some(n=>t===String(n).toLowerCase()||t.startsWith(String(n).toLowerCase()+' '))}
+function matchesText(el,names){
+ const label=el.querySelector?.('span:not(.js-icon)');
+ const t=String(label?.textContent||el.textContent||'').replace(/^[^\p{L}\p{N}]+/u,'').replace(/\s+/g,' ').trim().toLowerCase();
+ return names.some(n=>t===String(n).toLowerCase())
+}
 function apply(){
  if(!loaded||d.body.classList.contains('jewel-suite-mode'))return;
  const side=d.getElementById('sidebar');if(!side)return;
