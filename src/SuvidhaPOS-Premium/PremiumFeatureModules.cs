@@ -47,7 +47,9 @@ public static class PremiumFeatureModules
                 var baseRate=factor>0?soldRate/factor:l.SalePrice;
                 if(baseQty<=0) return Results.BadRequest(new { message="Quantity must be greater than zero" });
                 var taxMode=string.Equals(l.TaxMode,"INCLUSIVE",StringComparison.OrdinalIgnoreCase)?"INCLUSIVE":"EXCLUSIVE";
-                resolved.Add(new ResolvedPremiumSaleLine(l.ProductId,baseQty,baseRate,l.TaxRate,l.Discount,string.IsNullOrWhiteSpace(soldUnit)?null:soldUnit,soldQty,soldRate,factor,taxMode));
+                var lineGross=baseQty*baseRate;
+                var lineDiscount=Math.Min(Math.Max(0m,l.Discount),lineGross);
+                resolved.Add(new ResolvedPremiumSaleLine(l.ProductId,baseQty,baseRate,l.TaxRate,lineDiscount,string.IsNullOrWhiteSpace(soldUnit)?null:soldUnit,soldQty,soldRate,factor,taxMode));
             }
 
             using var c = db.CreateConnection();
@@ -64,11 +66,11 @@ public static class PremiumFeatureModules
                 }
 
                 decimal sub = resolved.Sum(a => {
-                    var amount=a.BaseQty*a.BaseRate;
+                    var amount=Math.Max(0m,a.BaseQty*a.BaseRate-a.Discount);
                     return a.TaxMode=="INCLUSIVE" && a.TaxRate>0 ? amount*100m/(100m+a.TaxRate) : amount;
                 });
                 decimal tax = resolved.Sum(a => {
-                    var amount=a.BaseQty*a.BaseRate;
+                    var amount=Math.Max(0m,a.BaseQty*a.BaseRate-a.Discount);
                     return a.TaxRate<=0?0m:(a.TaxMode=="INCLUSIVE"?amount*a.TaxRate/(100m+a.TaxRate):amount*a.TaxRate/100m);
                 });
                 decimal beforeDiscount=sub+tax;
@@ -140,6 +142,7 @@ SELECT CAST(SCOPE_IDENTITY() AS int);", c, tx);
                         decimal take = Math.Min(rem, avail);
                         cost += take * cp;
                         decimal soldTake=l.Factor>0?take/l.Factor:take;
+                        decimal takeDiscount=l.BaseQty>0?Math.Round(l.Discount*(take/l.BaseQty),6):0m;
 
                         cmd = new SqlCommand(@"UPDATE ProductBatches SET Quantity=Quantity-@q WHERE Id=@b;
 INSERT SaleLines(SaleId,ProductId,BatchId,Quantity,SalePrice,CostPrice,TaxRate,TaxMode,Discount,UnitSold,SoldQuantity,TotalBaseQtyDeducted,RatePerSoldUnit)
@@ -148,7 +151,7 @@ INSERT StockLedger(ProductId,BatchId,MovementType,Quantity,ReferenceType,Referen
 VALUES(@p,@b,'SALE',-@q,'SALE',@s,@note)", c, tx);
                         cmd.Parameters.AddRange(new[] {
                             P("@q",take),P("@b",bid),P("@s",sid),P("@p",l.ProductId),
-                            P("@sp",l.BaseRate),P("@cp",cp),P("@tr",l.TaxRate),P("@tm",l.TaxMode),P("@di",l.Discount),
+                            P("@sp",l.BaseRate),P("@cp",cp),P("@tr",l.TaxRate),P("@tm",l.TaxMode),P("@di",takeDiscount),
                             P("@us",l.UnitSold),P("@sq",soldTake),P("@tb",take),P("@rsu",l.SoldRate),
                             P("@note",string.IsNullOrWhiteSpace(l.UnitSold)?"Base-unit sale":$"{soldTake:0.###} {l.UnitSold} = {take:0.###} base units")
                         });
@@ -172,11 +175,11 @@ VALUES(@p,@b,'SALE',-@q,'SALE',@s,@note)", c, tx);
                 }
 
                 cmd = new SqlCommand("INSERT AuditLogs(UserName,Action,Entity,EntityId,Details) VALUES(@u,'SALE_CREATED','Sale',@id,@d)", c, tx);
-                cmd.Parameters.AddRange(new[] { P("@u",cashier),P("@id",sid),P("@d",$"Payment={paymentMode}; Discount={discountType}:{discountValue}; Total={total}") });
+                cmd.Parameters.AddRange(new[] { P("@u",cashier),P("@id",sid),P("@d",$"Payment={paymentMode}; BillDiscount={discountType}:{discountValue}; ItemSavings={resolved.Sum(z=>z.Discount)}; Total={total}") });
                 await cmd.ExecuteNonQueryAsync();
 
                 await tx.CommitAsync();
-                return Results.Ok(new { id=sid, total, invoiceNo, discount, paymentMode, cashier });
+                return Results.Ok(new { id=sid, total, invoiceNo, discount, itemSavings=resolved.Sum(z=>z.Discount), paymentMode, cashier });
             }
             catch (Exception ex)
             {

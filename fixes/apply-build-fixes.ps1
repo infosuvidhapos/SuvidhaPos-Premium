@@ -107,7 +107,7 @@ $runtimeLoader=@'
 (function(){
  if(document.querySelector('script[data-runtime-6126]'))return;
  var s=document.createElement('script');s.setAttribute('data-runtime-6126','1');
- s.src='/js/runtime-fixes-6126.js?v=6210';s.defer=false;document.head.appendChild(s);
+ s.src='/js/runtime-fixes-6126.js?v=6220';s.defer=false;document.head.appendChild(s);
 })();
 '@
 if(-not $runtime.Contains('runtime-fixes-6126.js')){$runtime += "`r`n"+$runtimeLoader+"`r`n"}
@@ -117,7 +117,7 @@ if($runtime.Contains('runtime-fixes-6125.js')){throw 'Unpublished 6.12.5 draft l
 & node --check $runtimeNewPath
 if($LASTEXITCODE -ne 0){throw 'runtime-fixes-6126.js JavaScript syntax check failed'}
 $newRuntime=Get-Content $runtimeNewPath -Raw -Encoding UTF8
-foreach($token in @('/api/jewellery/quantity-catalog','/api/jewellery/sales/quantity-complete','jewelSuiteSetQty','jewelSuiteEditItem','jewelSuiteEditOldMetal','/api/item-import/direct/parse','Upload & Preview','AI/OpenAI is not used','SCOPED FEATURE CONTROL','loadJewelleryFeatureControl','data-runtime-6126')){
+foreach($token in @('/api/jewellery/quantity-catalog','/api/jewellery/sales/quantity-complete','jewelSuiteSetQty','jewelSuiteEditItem','jewelSuiteEditOldMetal','/api/item-import/direct/parse','Upload & Preview','AI/OpenAI is not used','loadRetailFeatureControl','loadJewelleryFeatureControl','data-runtime-6126')){
   if(-not $newRuntime.Contains($token)){throw "Runtime 6.12.6 feature missing: $token"}
 }
 if(-not $index.Contains('/js/jewellery-workspace.js?v=6200')){throw 'Jewellery workspace runtime missing'}

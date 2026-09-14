@@ -2,32 +2,35 @@
 'use strict';
 const PREFIX='Sidebar.Feature.';
 const catalog=[
- ['BILLING','New Billing / Jewellery Billing',['[data-page="billing"]'],['New Billing','Jewellery Billing']],
- ['ITEM_MASTER','Item Master',['[data-page="products"]'],['Item Master','Item Entry','Items & Inventory']],
- ['STOCK','Stock / Inventory',[],['Stock']],
- ['PURCHASE','Purchases',['[data-page="purchase"]'],['Purchases','Purchase Bill']],
+ ['BILLING','New Billing',['[data-page="billing"]'],['New Billing']],
+ ['ITEM_MASTER','Item Master',['[data-page="products"]'],['Item Master','Items & Inventory']],
+ ['CATEGORY_MASTER','Category Master',[],['Category Entry','Category Master']],
+ ['AI_IMPORT','AI Import',[],['AI Import']],
+ ['ITEM_IMPORT','Item Import Master',[],['Item Import','Item Import Master']],
+ ['BULK_EDIT','Bulk Edit Update',[],['Bulk Edit Update']],
+ ['ITEM_RATE_UPDATE','Item Rate Update',[],['Item Rate Update']],
+ ['OPENING_STOCK','Opening Stock Master',[],['Opening Stock','Opening Stock Master']],
+ ['STOCK','Stock Management',[],['Stock','Stock Management']],
+ ['PURCHASE','Purchase Master',['[data-page="purchase"]'],['Purchases','Purchase Master','Purchase Bill']],
  ['SALES','Sales History',['[data-page="sales"]'],['Sales History']],
- ['BILL_MANAGEMENT','Bill Management',['[data-page="billmaster"]'],['Bill Management','Bill Management Master']],
+ ['BILL_MANAGEMENT','Bill Management Master',['[data-page="billmaster"]'],['Bill Management','Bill Management Master']],
  ['BTC_SETTLEMENT','BTC / Credit Settlement',['#btcSettlementNav'],['BTC Settlement','BTC / Credit Settlement']],
- ['CUSTOMERS','Customer / Company',['[data-page="customers"]'],['Customers','Customer / Company']],
- ['SUPPLIERS','Suppliers',['[data-page="suppliers"]'],['Suppliers']],
+ ['CUSTOMERS','Customer / Company Master',['[data-page="customers"]'],['Customers','Customer / Company']],
+ ['SUPPLIERS','Supplier Master',['[data-page="suppliers"]'],['Suppliers']],
  ['EXPIRY','Expiry Center',['[data-page="expiry"]'],['Expiry Center']],
  ['RETURNS','Returns',['[data-page="returns"]'],['Returns']],
- ['EXPENSES','Expenses',['[data-page="expenses"]'],['Expenses']],
+ ['EXPENSES','Expense Master',['[data-page="expenses"]'],['Expenses']],
  ['TAX_MASTER','Tax Master',['[data-page="taxmaster"]'],['Tax Master']],
  ['UNIT_MASTER','Unit Master',['[data-page="unitmaster"]'],['Unit Master']],
- ['REPORTS','Reports',['[data-page="reports"]'],['Reports']],
- ['SETTINGS','Settings',[],['Settings']],
- ['DAY_CLOSE','Day Close / Shift End',[],['Day Close','Day Closing']],
- ['USERS','Users',[],['Users']],
  ['BARCODE','Barcode Print Master',['[data-page="barcodemaster"]','#barcodeMasterNav'],['Barcode Print Master']],
  ['PRINT_MASTER','Print Master',[],['Print Master']],
- ['DATABASE_BACKUP','Database Backup',[],['Database Backup']],
- ['GIRVI','Girvi Loans',[],['Girvi Loans']],
- ['CRDR','Cr/Dr Ledger',[],['Cr/Dr Ledger']],
- ['SAVING','Saving Schemes',[],['Saving Schemes']],
- ['JEWELLERY_ITEM_MASTER','Jewellery Item Master',[],['Jewellery Item Master']]
+ ['REPORTS','Reports',['[data-page="reports"]'],['Reports']],
+ ['SETTINGS','Settings / Outlet Master',[],['Settings']],
+ ['USERS','User Master',[],['Users']],
+ ['DAY_CLOSE','Day Close / Shift End',[],['Day Close','Day Closing']],
+ ['DATABASE_BACKUP','Database Backup',[],['Database Backup']]
 ];
+const nestedRoutes={loadCategoryMaster:'CATEGORY_MASTER',loadAIImport:'AI_IMPORT',loadNormalItemImportMaster:'ITEM_IMPORT',openProductBulkEdit:'BULK_EDIT',loadItemRateUpdate:'ITEM_RATE_UPDATE',loadOpeningStockMaster:'OPENING_STOCK',loadStock:'STOCK'};
 let state={},loaded=false;
 const role=()=>String((w.currentUser||{}).Role||'').toLowerCase();
 const admin=()=>['admin','administrator','manager'].includes(role());
@@ -50,16 +53,20 @@ function apply(){
   textButtons().filter(x=>matchesText(x,names)).forEach(x=>nodes.add(x));
   nodes.forEach(x=>{if(x.id==='featureControlNav'||/feature control/i.test(x.textContent||''))return;x.style.display=on?'':'none';x.dataset.sidebarFeature=key});
  });
+ const root=d.getElementById('app');
+ if(root)root.querySelectorAll('button[onclick]').forEach(button=>{
+  const code=String(button.getAttribute('onclick')||''),match=Object.entries(nestedRoutes).find(([fn])=>new RegExp('\\b'+fn+'\\s*\\(').test(code));
+  if(match){button.style.display=state[match[1]]!==false?'':'none';button.dataset.sidebarFeature=match[1]}
+ });
 }
-w.loadPremiumFeatureControl=async function(){
+w.loadRetailFeatureControl=async function(){
  if(d.body.classList.contains('jewel-suite-mode')&&w.loadJewelleryFeatureControl)return w.loadJewelleryFeatureControl();
-
- if(typeof setPage==='function')setPage('featurecontrol');if(typeof title!=='undefined')title.textContent='Feature Control';const hp=d.querySelector('header p');if(hp)hp.textContent='Sidebar masters and modules access';
+ if(typeof setPage==='function')setPage('featurecontrol');if(typeof title!=='undefined')title.textContent='Feature Control';const hp=d.querySelector('header p');if(hp)hp.textContent='Normal billing masters and module switches';
  if(!admin()){app.innerHTML='<div class="content"><div class="alert">Admin / Manager permission required.</div></div>';return}
  if(!loaded)await load();
- const relevant=catalog.filter(([key,,selectors,names])=>{if(['GIRVI','CRDR','SAVING','STOCK','JEWELLERY_ITEM_MASTER'].includes(key))return d.body.classList.contains('jewel-suite-mode')||textButtons().some(x=>matchesText(x,names));return true});
- app.innerHTML='<div class="content completion-page feature-access-page"><div class="panel completion-hero"><div><span class="completion-kicker">SIDEBAR ACCESS</span><h2>Feature Control</h2><p>Only real sidebar masters/modules are shown here. Validity, website sync and internal technical flags are not user switches.</p></div><span class="tag">ADMIN</span></div><div class="panel"><div class="feature-grid">'+relevant.map(([key,name])=>'<label class="feature-flag"><span><b>'+esc(name)+'</b><small>'+esc(key.replaceAll('_',' '))+'</small></span><input type="checkbox" '+(state[key]!==false?'checked':'')+' onchange="sidebarFeatureToggle(\''+key+'\',this.checked)"></label>').join('')+'</div></div></div>'
+ app.innerHTML='<div class="content completion-page feature-access-page"><div class="panel completion-hero"><div><span class="completion-kicker">NORMAL BILLING ACCESS</span><h2>Feature Control</h2><p>Enable or disable normal Retail / Canteen masters and modules here. Jewellery controls stay separate.</p></div><span class="tag">'+catalog.length+' OPTIONS</span></div><div class="panel"><div class="feature-grid">'+catalog.map(([key,name])=>'<label class="feature-flag"><span><b>'+esc(name)+'</b></span><input type="checkbox" '+(state[key]!==false?'checked':'')+' onchange="sidebarFeatureToggle(\''+key+'\',this.checked)"></label>').join('')+'</div></div></div>'
 };
+w.loadPremiumFeatureControl=w.loadRetailFeatureControl;
 w.sidebarFeatureToggle=async function(key,on){try{await api('/api/app-settings/'+encodeURIComponent(PREFIX+key),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:on?'true':'false'})});state[key]=!!on;apply();toast((on?'Enabled: ':'Disabled: ')+(catalog.find(x=>x[0]===key)?.[1]||key))}catch(e){alert(e.message||e)}};
 const original={};
 function gate(key,names){
@@ -68,6 +75,14 @@ function gate(key,names){
 function gates(){
  if(!loaded||d.body.classList.contains('jewel-suite-mode'))return;
  gate('BILLING',['loadBilling']);
+ gate('ITEM_MASTER',['loadProducts']);
+ gate('CATEGORY_MASTER',['loadCategoryMaster']);
+ gate('AI_IMPORT',['loadAIImport']);
+ gate('ITEM_IMPORT',['loadNormalItemImportMaster']);
+ gate('BULK_EDIT',['openProductBulkEdit']);
+ gate('ITEM_RATE_UPDATE',['loadItemRateUpdate']);
+ gate('OPENING_STOCK',['loadOpeningStockMaster']);
+ gate('STOCK',['loadStock']);
  gate('PURCHASE',['loadPurchase']);
  gate('SALES',['loadSales']);
  gate('BILL_MANAGEMENT',['loadBillMaster']);
@@ -86,14 +101,10 @@ function gates(){
  gate('PRINT_MASTER',['loadPrintSettings']);
  gate('DATABASE_BACKUP',['loadBackupMaster']);
  gate('DAY_CLOSE',['loadDayClosing']);
- gate('JEWELLERY_ITEM_MASTER',['loadJewelleryItemMaster']);
- const product=w.loadProducts;
- if(typeof product==='function'&&!product.__sidebarProductGate){
-   const wrapped=function(){if(d.body.classList.contains('jewel-suite-mode'))return product.apply(this,arguments);const key='ITEM_MASTER';if(state[key]===false){try{toast((catalog.find(x=>x[0]===key)?.[1]||key)+' is disabled in Feature Control')}catch{};return}return product.apply(this,arguments)};wrapped.__sidebarProductGate=true;w.loadProducts=wrapped;
- }
 }
 function pulse(){apply();gates()}
 new MutationObserver(()=>pulse()).observe(d.getElementById('sidebar')||d.documentElement,{childList:true,subtree:true});
+new MutationObserver(()=>apply()).observe(d.getElementById('app')||d.documentElement,{childList:true,subtree:true});
 w.addEventListener('load',()=>setTimeout(()=>{load();setInterval(pulse,2000)},250));
 if(d.readyState!=='loading')setTimeout(load,100);
 })(window,document);

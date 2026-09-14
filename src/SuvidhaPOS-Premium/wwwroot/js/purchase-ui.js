@@ -9,7 +9,7 @@ const stockQty=n=>Math.round((n+Number.EPSILON)*1000)/1000;
 const baseRate=n=>Math.round((n+Number.EPSILON)*1e6)/1e6;
 const read=id=>d.getElementById(id)?.value||'';
 const TEMP='SuvidhaPOS.BarcodePurchase.Temp.v1';
-let history=[],saving=false,scanQueue=Promise.resolve(),session=0;
+let history=[],saving=false,scanQueue=Promise.resolve(),session=0,purchaseSuggestIndex=0;
 function page(title,subtitle){setPage('purchase');d.getElementById('title').textContent=title;const p=d.querySelector('header p');if(p)p.textContent=subtitle}
 async function catalog(){[S.items,S.suppliers]=await Promise.all([api('/api/products?size=1000'),api('/api/suppliers')]);if(!S.spec)S.spec=await api('/api/specialization')}
 const requiresExpiry=()=>/pharmacy|medical/i.test(S.spec?.StoreType||S.spec?.storeType||'')||S.spec?.RequireExpiry===true||S.spec?.requireExpiry===true;
@@ -28,38 +28,67 @@ w.loadRetailPurchases=async function(){
 function historyRows(rows){return rows.map(x=>`<tr><td><b>${esc(x.InvoiceNo)}</b><small>${esc(String(x.PurchaseDate||'').slice(0,10))}</small></td><td>${esc(x.SupplierName)}</td><td>₹${money(x.SubTotal)}</td><td>₹${money(x.Tax)}</td><td><b>₹${money(x.GrandTotal)}</b></td><td>₹${money(x.PaidAmount)}</td><td>₹${money(Number(x.GrandTotal||0)-Number(x.PaidAmount||0))}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No purchases found. Add a bill or import Excel to begin.</td></tr>'}
 w.filterPurchaseHistory=q=>{const term=String(q).toLowerCase();d.getElementById('rpHistoryRows').innerHTML=historyRows(history.filter(x=>[x.InvoiceNo,x.SupplierName,x.PurchaseDate].join(' ').toLowerCase().includes(term)))};
 function supplierOptions(){return '<option value="">Walk-in Supplier</option>'+S.suppliers.map(x=>`<option value="${x.Id}">${esc(x.Name)}</option>`).join('')}
-function suggestions(){return S.items.map(x=>`<option value="${esc(x.Barcode||x.Name)}">${esc(x.Name)} · ${esc(x.Sku||'')}</option><option value="${esc(x.Name)}">${esc(x.Barcode||'')}</option>`).join('')}
+function purchaseMatches(q){
+ const term=String(q||'').trim().toLowerCase();if(!term)return [];
+ const score=x=>{const bc=String(x.Barcode||'').toLowerCase(),name=String(x.Name||'').toLowerCase(),sku=String(x.Sku||'').toLowerCase();if(bc===term)return 0;if(name===term)return 1;if(sku===term)return 2;if(bc.startsWith(term))return 3;if(name.startsWith(term))return 4;if(sku.startsWith(term))return 5;return 6};
+ return (S.items||[]).filter(x=>[x.Barcode,x.Name,x.Sku].some(v=>String(v||'').toLowerCase().includes(term))).sort((a,b)=>score(a)-score(b)||String(a.Name||'').localeCompare(String(b.Name||''))).slice(0,30)
+}
+function hidePurchaseSuggestions(){const box=d.getElementById('bpSuggest');if(box)box.style.display='none'}
+function renderPurchaseSuggestions(list=purchaseMatches(read('bpScan'))){
+ const box=d.getElementById('bpSuggest');if(!box)return;if(purchaseSuggestIndex>=list.length)purchaseSuggestIndex=Math.max(0,list.length-1);
+ box.innerHTML=list.map((x,i)=>`<button type="button" class="rp-purchase-suggestion ${i===purchaseSuggestIndex?'active':''}" onmousedown="event.preventDefault()" onclick="bpPickPurchaseItem(${x.Id})"><span><b>${esc(x.Name)}</b><small>${esc(x.Barcode||'No barcode')}${x.Sku?' · '+esc(x.Sku):''}</small></span><em>₹${money(x.PurchasePrice||0)}</em></button>`).join('');
+ box.style.display=list.length?'grid':'none';box.querySelector('.active')?.scrollIntoView?.({block:'nearest'})
+}
+w.purchaseHeaderKey=function(e,nextId){if(e.key!=='Enter')return;e.preventDefault();const next=d.getElementById(nextId);if(next){next.focus();next.select?.()}};
+w.bpSearchChanged=function(){purchaseSuggestIndex=0;renderPurchaseSuggestions()};
+w.bpSearchKey=function(e){
+ const list=purchaseMatches(read('bpScan'));
+ if(e.key==='ArrowDown'){e.preventDefault();if(list.length){purchaseSuggestIndex=Math.min(list.length-1,purchaseSuggestIndex+1);renderPurchaseSuggestions(list)}return}
+ if(e.key==='ArrowUp'){e.preventDefault();if(list.length){purchaseSuggestIndex=Math.max(0,purchaseSuggestIndex-1);renderPurchaseSuggestions(list)}return}
+ if(e.key==='Escape'){hidePurchaseSuggestions();return}
+ if(e.key==='Enter'){e.preventDefault();const p=list[purchaseSuggestIndex]||list[0];if(p)return w.bpPickPurchaseItem(p.Id);barcodePurchaseScan()}
+};
 w.openUomPurchase=()=>w.openBarcodePurchase('standard');
 w.openBarcodePurchase=async function(mode='barcode'){
  closeModal();const active=++session;await catalog();if(active!==session)return;S.purchaseMode=mode;S.barPurLines=[];S.purchaseRequestId=crypto.randomUUID();S.purchaseAttempt=null;saving=false;
  page(mode==='standard'?'New Purchase':'Barcode Purchase','Add items and review totals before saving stock');
  app.innerHTML=`<div class="content retail-purchase barcode-purchase-full"><div class="rp-heading"><div><span class="rp-eyebrow">PURCHASE ENTRY</span><h2>${mode==='standard'?'New purchase':'Barcode purchase'}</h2><p>Purchase cost and retail discount are shown separately.</p></div><button class="btn secondary" onclick="leavePurchaseEntry()">← Purchases</button></div>
- <div class="panel rp-bill-head"><label>Invoice no.<input id="bpi" class="input" maxlength="100" placeholder="Supplier bill number" oninput="purchaseDraftChanged()"></label><label>Bill date<input id="bpdate" class="input" type="date" value="${today()}" onchange="purchaseDraftChanged()"></label><label>Supplier<select id="bpsup" class="select" onchange="purchaseDraftChanged()">${supplierOptions()}</select></label><div class="rp-draft-actions"><button class="btn secondary" onclick="barcodePurchaseTempSave()">Temp Save</button><button class="btn secondary" onclick="barcodePurchaseTempLoad()">Get Temp Data</button></div></div>
- <div class="panel rp-entry-items"><div class="rp-scan-row"><label>BARCODE / SKU / ITEM NAME<input id="bpScan" class="input" list="bpItemSuggestions" autocomplete="off" placeholder="Scan or type an item, then press Enter"><datalist id="bpItemSuggestions">${suggestions()}</datalist></label><button class="btn" onclick="barcodePurchaseScan()">＋ Add item</button><button class="btn secondary" onclick="openPurchaseImport()">Import Excel Bill</button></div>
+ <div class="panel rp-bill-head"><label>Bill No :<input id="bpi" class="input" maxlength="100" placeholder="Supplier bill number" onkeydown="purchaseHeaderKey(event,'bpdate')" oninput="purchaseDraftChanged()"></label><label>Bill Date :<input id="bpdate" class="input" type="date" value="${today()}" onkeydown="purchaseHeaderKey(event,'bpsup')" onchange="purchaseDraftChanged()"></label><label>Supplier Name :<select id="bpsup" class="select" onkeydown="purchaseHeaderKey(event,'bpScan')" onchange="purchaseDraftChanged()">${supplierOptions()}</select></label><div class="rp-draft-actions"><button class="btn secondary" onclick="barcodePurchaseTempSave()">Temp Save</button><button class="btn secondary" onclick="barcodePurchaseTempLoad()">Get Temp Data</button></div></div>
+ <div class="panel rp-entry-items"><div class="rp-scan-row"><label>Barcode / Item Name:<div class="rp-purchase-search"><input id="bpScan" class="input" autocomplete="off" placeholder="Scan barcode or type item name" oninput="bpSearchChanged()" onkeydown="bpSearchKey(event)"><div id="bpSuggest" class="rp-purchase-suggestions" style="display:none"></div></div></label><button class="btn" onclick="barcodePurchaseScan()">＋ Add item</button><button class="btn secondary" onclick="openPurchaseImport()">Import Excel Bill</button></div>
  <div class="rp-table-hint"><span>Prices are per selected unit · change the unit for box/strip purchase</span><span>F4 Search · F10 Save</span></div><div id="bpLines"></div></div>
  <div class="rp-payment-area"><div class="panel rp-payment"><label>Bill discount ₹<input id="bpdisc" class="input" type="number" min="0" step=".01" value="0" oninput="purchaseDraftChanged();renderPurchaseTotals()"></label><label>Paid amount ₹<input id="bppaid" class="input" type="number" min="0" step=".01" value="0" oninput="purchaseDraftChanged();renderPurchaseTotals()"></label><label>Payment<select id="bpm" class="select" onchange="purchaseDraftChanged()"><option>Credit</option><option>Cash</option><option>UPI</option><option>Card</option></select></label><label class="rp-note">Notes<input id="bpnotes" class="input" maxlength="1000" placeholder="Optional reference or note" oninput="purchaseDraftChanged()"></label></div><div id="bpTotals" class="panel rp-totals" aria-live="polite"></div></div>
  <div class="rp-savebar"><span id="bpSaveStatus">Draft · stock changes only after save</span><div><button class="btn secondary" onclick="barcodePurchaseTempSave()">Save draft</button><button id="bpSave" class="btn green" onclick="saveBarcodePurchase()">Save purchase <small>F10</small></button></div></div></div>`;
  renderBarcodePurchaseLines();
- d.querySelector('.barcode-purchase-full').addEventListener('keydown',e=>{if(e.key==='F10'){e.preventDefault();saveBarcodePurchase()}else if(e.key==='F4'){e.preventDefault();d.getElementById('bpScan').focus()}else if(e.key==='Enter'&&e.target.id==='bpScan'){e.preventDefault();barcodePurchaseScan()}});
+ d.querySelector('.barcode-purchase-full').addEventListener('keydown',e=>{if(e.key==='F10'){e.preventDefault();saveBarcodePurchase()}else if(e.key==='F4'){e.preventDefault();d.getElementById('bpScan').focus()}});
  d.getElementById('bpScan').focus();
  try{if(JSON.parse(localStorage.getItem(TEMP)||'null')?.Attempt)await barcodePurchaseTempLoad()}catch{}
 };
 w.leavePurchaseEntry=function(){if(saving)return toast('Wait for the save result.');if(S.purchaseAttempt)barcodePurchaseTempSave();if(S.barPurLines?.length&&!confirm('Leave this purchase? Use Save draft to keep it on this PC.'))return;loadPurchase()};
 w.purchaseDraftChanged=function(){if(S.purchaseAttempt)return;const e=d.getElementById('bpSaveStatus');if(e)e.textContent='Draft · stock changes only after save'};
+async function addPurchaseProduct(p){
+ const active=session,u=await w.suvidhaUom.load(p.Id),options=w.suvidhaUom.choices(p,u);if(active!==session)return;
+ const def=S.purchaseMode==='standard'?options.slice().sort((a,b)=>b.factor-a.factor)[0]:options.find(x=>x.factor===1)||options[0];
+ const existingIndex=S.barPurLines.findIndex(x=>x.ProductId===p.Id&&!x.BatchNo&&!x.ExpiryDate&&x.Unit===def.unit);
+ let rowIndex=existingIndex;
+ if(existingIndex>=0)S.barPurLines[existingIndex].Qty+=1;
+ else{S.barPurLines.push({ProductId:p.Id,Name:p.Name,Barcode:p.Barcode||'',Uom:u,Options:options,Unit:def.unit,Factor:def.factor,Qty:1,FreeQuantity:0,Cost:def.purchase,Mrp:def.mrp,SalePrice:def.sale,DiscountPer:Number(p.Dis_Rate||0),DiscountChanged:false,GstRate:Number(p.GstRate||0),TaxMode:'INCLUSIVE',BatchNo:'',ExpiryDate:''});rowIndex=S.barPurLines.length-1}
+ purchaseDraftChanged();renderBarcodePurchaseLines();hidePurchaseSuggestions();const input=d.getElementById('bpScan');if(input)input.value='';setTimeout(()=>focusPurchaseRow(rowIndex),0)
+}
+w.bpPickPurchaseItem=function(id){if(saving||S.purchaseAttempt)return;const p=(S.items||[]).find(x=>Number(x.Id)===Number(id));if(!p)return toast('Item not found');scanQueue=scanQueue.catch(()=>{}).then(()=>addPurchaseProduct(p)).catch(e=>toast(e.message));return scanQueue};
 w.barcodePurchaseScan=function(){
  if(saving||S.purchaseAttempt)return scanQueue;
- const input=d.getElementById('bpScan'),q=String(input?.value||'').trim(),active=session;if(!q)return scanQueue;if(input)input.value='';
+ const input=d.getElementById('bpScan'),q=String(input?.value||'').trim(),active=session;if(!q)return scanQueue;
  scanQueue=scanQueue.catch(()=>{}).then(async()=>{
-  if(active!==session)return;const key=q.toLowerCase();const exact=x=>[x.Barcode,x.Sku,x.Name].some(v=>String(v||'').trim().toLowerCase()===key);
-  let matches=S.items.filter(exact);
-  if(!matches.length){const found=await api('/api/products?q='+encodeURIComponent(q)+'&size=100');matches=found.filter(exact);if(matches.length===1&&!S.items.some(x=>x.Id===matches[0].Id))S.items.push(matches[0])}
-  if(active!==session)return;if(matches.length!==1){toast(matches.length?'Multiple items match. Use the exact barcode or name.':'Item not found: '+q);return}
-  const p=matches[0],u=await w.suvidhaUom.load(p.Id),options=w.suvidhaUom.choices(p,u);if(active!==session)return;
-  const def=S.purchaseMode==='standard'?options.slice().sort((a,b)=>b.factor-a.factor)[0]:options.find(x=>x.factor===1)||options[0];
-  // Repeated scans increment the still-empty batch row; differing batches can be added with Duplicate line.
-  const existing=S.barPurLines.find(x=>x.ProductId===p.Id&&!x.BatchNo&&!x.ExpiryDate&&x.Unit===def.unit);
-  if(existing)existing.Qty+=1;else S.barPurLines.push({ProductId:p.Id,Name:p.Name,Barcode:p.Barcode||'',Uom:u,Options:options,Unit:def.unit,Factor:def.factor,Qty:1,FreeQuantity:0,Cost:def.purchase,Mrp:def.mrp,SalePrice:def.sale,DiscountPer:Number(p.Dis_Rate||0),DiscountChanged:false,GstRate:Number(p.GstRate||0),TaxMode:'INCLUSIVE',BatchNo:'',ExpiryDate:''});
-  purchaseDraftChanged();renderBarcodePurchaseLines();input?.focus();
+  if(active!==session)return;const key=q.toLowerCase();
+  let found=(S.items||[]),exactBarcode=found.filter(x=>String(x.Barcode||'').trim().toLowerCase()===key);
+  if(exactBarcode.length===1)return addPurchaseProduct(exactBarcode[0]);
+  let exact=found.filter(x=>[x.Name,x.Sku].some(v=>String(v||'').trim().toLowerCase()===key));
+  if(exact.length===1)return addPurchaseProduct(exact[0]);
+  let matches=purchaseMatches(q);
+  if(!matches.length){const remote=await api('/api/products?q='+encodeURIComponent(q)+'&size=100');for(const x of remote||[])if(!S.items.some(y=>y.Id===x.Id))S.items.push(x);matches=purchaseMatches(q)}
+  if(active!==session)return;
+  if(matches.length===1)return addPurchaseProduct(matches[0]);
+  purchaseSuggestIndex=0;renderPurchaseSuggestions(matches);toast(matches.length?'Select item with ↑/↓ + Enter or mouse click.':'Item not found: '+q)
  }).catch(e=>toast(e.message));return scanQueue;
 };
 w.barcodePurchaseUom=function(i,unit){if(saving||S.purchaseAttempt)return;const x=S.barPurLines[i],o=x?.Options.find(a=>a.unit===unit);if(!o)return;x.Unit=o.unit;x.Factor=o.factor;x.Cost=o.purchase;x.Mrp=o.mrp;x.SalePrice=x.DiscountChanged?round(x.Mrp*(1-x.DiscountPer/100)):o.sale;purchaseDraftChanged();renderBarcodePurchaseLines()};
@@ -71,12 +100,14 @@ w.barcodePurchaseSet=function(i,k,v){
 };
 w.purchaseRemoveLine=i=>{if(saving||S.purchaseAttempt)return;S.barPurLines.splice(i,1);purchaseDraftChanged();renderBarcodePurchaseLines()};
 w.purchaseDuplicateLine=i=>{if(saving||S.purchaseAttempt)return;const x=S.barPurLines[i];S.barPurLines.splice(i+1,0,{...x,Qty:1,FreeQuantity:0,BatchNo:'',ExpiryDate:''});purchaseDraftChanged();renderBarcodePurchaseLines()};
-function numeric(i,k,value,step='.01'){return `<input class="input" aria-label="${esc(k)} row ${i+1}" type="number" min="${k==='Qty'?'.001':'0'}" ${['DiscountPer','GstRate'].includes(k)?'max="100"':''} step="${step}" data-no-tax-enhance="1" value="${Number.isFinite(value)?value:''}" oninput="barcodePurchaseSet(${i},'${k}',this.value)">`}
+function numeric(i,k,value,step='.01'){return `<input class="input" aria-label="${esc(k)} row ${i+1}" type="number" min="${k==='Qty'?'.001':'0'}" ${['DiscountPer','GstRate'].includes(k)?'max="100"':''} step="${step}" data-no-tax-enhance="1" data-purchase-edit="1" data-field="${k}" value="${Number.isFinite(value)?value:''}" onkeydown="purchaseCellKey(event,${i})" oninput="barcodePurchaseSet(${i},'${k}',this.value)">`}
+function focusPurchaseRow(i){const row=d.querySelector(`#bpLines tbody tr:nth-child(${i+1})`);if(!row)return d.getElementById('bpScan')?.focus();const start=requiresBatch()?row.querySelector('[data-field="BatchNo"]'):row.querySelector('[data-field="Qty"]');(start||row.querySelector('[data-purchase-edit]'))?.focus();(start||row.querySelector('[data-purchase-edit]'))?.select?.()}
+w.purchaseCellKey=function(e,i){if(e.key!=='Enter')return;e.preventDefault();const row=e.target.closest('tr'),edits=[...(row?.querySelectorAll('[data-purchase-edit]')||[])],at=edits.indexOf(e.target),next=edits[at+1];if(next){next.focus();next.select?.()}else{const s=d.getElementById('bpScan');if(s){s.focus();s.select?.()}}};
 function lineTotals(x){const raw=round(Number(x.Qty)*Number(x.Cost)),tax=x.TaxMode==='EXCLUSIVE'?round(raw*x.GstRate/100):round(raw-raw/(1+x.GstRate/100));return {sub:round(x.TaxMode==='EXCLUSIVE'?raw:raw-tax),tax,total:round(x.TaxMode==='EXCLUSIVE'?raw+tax:raw)}}
 w.renderBarcodePurchaseLines=function(){
  const box=d.getElementById('bpLines');if(!box)return;
- box.innerHTML=`<div class="rp-lines-table"><table class="table"><thead><tr><th>Item / Batch</th><th>Unit</th><th>Qty / Free</th><th>Purchase ₹</th><th>MRP ₹</th><th>Discount % / Sale</th><th>GST % / Tax detail</th><th>Line total</th><th></th></tr></thead><tbody>${(S.barPurLines||[]).map((x,i)=>`<tr><td class="rp-item-cell"><b>${esc(x.Name)}</b><small>${esc(x.Barcode||'No barcode')} · code ${x.ProductId}</small><div class="rp-batch-fields"><input class="input" aria-label="Batch row ${i+1}" placeholder="Batch ${requiresBatch()?'*':'(optional)'}" maxlength="100" value="${esc(x.BatchNo)}" oninput="barcodePurchaseSet(${i},'BatchNo',this.value)"><input class="input" aria-label="Expiry row ${i+1}" type="date" title="${requiresExpiry()?'Expiry required':'Expiry optional'}" value="${esc(x.ExpiryDate)}" onchange="barcodePurchaseSet(${i},'ExpiryDate',this.value)"></div></td>
- <td><select class="select" aria-label="Unit row ${i+1}" onchange="barcodePurchaseUom(${i},this.value)">${x.Options.map(o=>`<option value="${esc(o.unit)}" ${o.unit===x.Unit?'selected':''}>${esc(o.unit)}${o.factor>1?' ×'+o.factor:''}</option>`).join('')}</select><small>${x.Factor} ${esc(x.Uom.BaseUnit)}</small></td><td>${numeric(i,'Qty',x.Qty,'.001')}<label class="rp-free">Free ${numeric(i,'FreeQuantity',x.FreeQuantity,'.001')}</label></td><td>${numeric(i,'Cost',x.Cost)}</td><td>${numeric(i,'Mrp',x.Mrp)}</td><td>${numeric(i,'DiscountPer',x.DiscountPer)}<small data-sale="${i}">₹${money(x.SalePrice)}</small></td><td>${numeric(i,'GstRate',x.GstRate)}<select class="select rp-tax-mode" data-no-tax-enhance="1" aria-label="Tax detail row ${i+1}" onchange="barcodePurchaseSet(${i},'TaxMode',this.value)"><option value="INCLUSIVE" ${x.TaxMode==='INCLUSIVE'?'selected':''}>Inclusive</option><option value="EXCLUSIVE" ${x.TaxMode==='EXCLUSIVE'?'selected':''}>Exclusive</option></select></td><td class="rp-line-total"><b data-amount="${i}">₹${money(lineTotals(x).total)}</b></td><td><button class="btn small secondary" title="Add a separate batch for this item" aria-label="Duplicate line ${i+1}" onclick="purchaseDuplicateLine(${i})">＋</button><button class="btn small danger" aria-label="Remove line ${i+1}" onclick="purchaseRemoveLine(${i})">×</button></td></tr>`).join('')||'<tr><td colspan="9" class="rp-empty"><b>Add your first item</b><p>Scan a barcode, search by name or import an Excel bill.</p></td></tr>'}</tbody></table></div>`;
+ box.innerHTML=`<div class="rp-lines-table"><table class="table"><thead><tr><th>Item / Batch</th><th>Unit</th><th>Qty / Free</th><th>Purchase ₹</th><th>MRP ₹</th><th>Discount % / Sale</th><th>GST % / Tax detail</th><th>Line total</th><th></th></tr></thead><tbody>${(S.barPurLines||[]).map((x,i)=>`<tr><td class="rp-item-cell"><b>${esc(x.Name)}</b><small>${esc(x.Barcode||'No barcode')} · code ${x.ProductId}</small><div class="rp-batch-fields"><input class="input" aria-label="Batch row ${i+1}" data-purchase-edit="1" data-field="BatchNo" placeholder="Batch ${requiresBatch()?'*':'(optional)'}" maxlength="100" value="${esc(x.BatchNo)}" onkeydown="purchaseCellKey(event,${i})" oninput="barcodePurchaseSet(${i},'BatchNo',this.value)"><input class="input" aria-label="Expiry row ${i+1}" data-purchase-edit="1" data-field="ExpiryDate" type="date" title="${requiresExpiry()?'Expiry required':'Expiry optional'}" value="${esc(x.ExpiryDate)}" onkeydown="purchaseCellKey(event,${i})" onchange="barcodePurchaseSet(${i},'ExpiryDate',this.value)"></div></td>
+ <td><select class="select" data-purchase-edit="1" data-field="Unit" aria-label="Unit row ${i+1}" onkeydown="purchaseCellKey(event,${i})" onchange="barcodePurchaseUom(${i},this.value)">${x.Options.map(o=>`<option value="${esc(o.unit)}" ${o.unit===x.Unit?'selected':''}>${esc(o.unit)}${o.factor>1?' ×'+o.factor:''}</option>`).join('')}</select><small>${x.Factor} ${esc(x.Uom.BaseUnit)}</small></td><td>${numeric(i,'Qty',x.Qty,'.001')}<label class="rp-free">Free ${numeric(i,'FreeQuantity',x.FreeQuantity,'.001')}</label></td><td>${numeric(i,'Cost',x.Cost)}</td><td>${numeric(i,'Mrp',x.Mrp)}</td><td>${numeric(i,'DiscountPer',x.DiscountPer)}<small data-sale="${i}">₹${money(x.SalePrice)}</small></td><td>${numeric(i,'GstRate',x.GstRate)}<select class="select rp-tax-mode" data-no-tax-enhance="1" data-purchase-edit="1" data-field="TaxMode" aria-label="Tax detail row ${i+1}" onkeydown="purchaseCellKey(event,${i})" onchange="barcodePurchaseSet(${i},'TaxMode',this.value)"><option value="INCLUSIVE" ${x.TaxMode==='INCLUSIVE'?'selected':''}>Inclusive</option><option value="EXCLUSIVE" ${x.TaxMode==='EXCLUSIVE'?'selected':''}>Exclusive</option></select></td><td class="rp-line-total"><b data-amount="${i}">₹${money(lineTotals(x).total)}</b></td><td><button class="btn small secondary" title="Add a separate batch for this item" aria-label="Duplicate line ${i+1}" onclick="purchaseDuplicateLine(${i})">＋</button><button class="btn small danger" aria-label="Remove line ${i+1}" onclick="purchaseRemoveLine(${i})">×</button></td></tr>`).join('')||'<tr><td colspan="9" class="rp-empty"><b>Add your first item</b><p>Scan a barcode, search by name or import an Excel bill.</p></td></tr>'}</tbody></table></div>`;
  renderPurchaseTotals();
 };
 w.renderPurchaseTotals=function(){
