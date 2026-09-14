@@ -205,12 +205,21 @@ ${styleCss(template,thermal)}
    if(cfg.template==='T11'){cfg.mode='Thermal';cfg.width='80MM'}
    return {d:{h,l,company:c,outlet:o},cfg}
  }
+ window.getInvoicePrintArtifact=async function(id){
+   const x=await saleData(id),saved=String(x.d.h?.PrintSnapshotHtml||'').trim();
+   const html=saved||buildHtml(x.d,x.cfg.mode,x.cfg.template,x.cfg.width,false,x.cfg.currency);
+   if(!saved){
+    try{await api('/api/sales/'+id+'/print-snapshot',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Html:html})})}catch(_){}
+   }
+   return {id:Number(id),invoiceNo:x.d.h?.InvoiceNo||('Bill-'+id),billDate:x.d.h?.BillDate||null,html,
+    mode:x.cfg.mode,width:x.cfg.width,template:x.cfg.template,format:x.d.h?.PrintFormat||(x.cfg.mode==='A4'?'A4 Printer':'Thermal Printer '+x.cfg.width),snapshot:!!saved};
+ };
  window.printInvoice=async function(id){
    try{
-    const x=await saleData(id),html=buildHtml(x.d,x.cfg.mode,x.cfg.template,x.cfg.width,false,x.cfg.currency);
-    if(window.premiumPrintHtml)return window.premiumPrintHtml(html,x.d.h?.InvoiceNo||('Bill-'+id));
-    const w=window.open('','_blank',x.cfg.mode==='Thermal'?'width=460,height=760':'width=1000,height=800');
-    if(!w)return toast('Popup blocked');w.document.write(html);w.document.close();w.print()
+    const a=await window.getInvoicePrintArtifact(id);
+    if(window.premiumPrintHtml)return window.premiumPrintHtml(a.html,a.invoiceNo);
+    const w=window.open('','_blank',a.mode==='Thermal'?'width=460,height=760':'width=1000,height=800');
+    if(!w)return toast('Popup blocked');w.document.write(a.html);w.document.close();w.print()
    }catch(e){alert('Print failed: '+e.message)}
  };
  window.printLastBill=window.printInvoice;
