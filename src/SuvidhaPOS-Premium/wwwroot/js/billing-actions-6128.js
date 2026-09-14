@@ -5,9 +5,12 @@ function q(s){return d.querySelector(s)}
 function qa(s){return Array.prototype.slice.call(d.querySelectorAll(s))}
 function notice(m){try{toast(m)}catch(_){}}
 async function readMode(){
- // Every new bill starts in Direct Print as requested. The operator can switch
- // this bill to Save As PDF or Print & Preview using the radio buttons.
- currentMode='DIRECT';modeLoaded=true;syncRadios();return currentMode;
+ try{
+  const row=await api('/api/app-settings/'+encodeURIComponent(PRINT_KEY));
+  const saved=String(row?.Value??row?.value??'DIRECT').toUpperCase();
+  currentMode=allowed.includes(saved)?saved:'DIRECT';
+ }catch(_){currentMode='DIRECT'}
+ modeLoaded=true;syncRadios();return currentMode;
 }
 async function saveMode(mode,show){
  mode=String(mode||'DIRECT').toUpperCase();if(allowed.indexOf(mode)<0)mode='DIRECT';currentMode=mode;modeLoaded=true;syncRadios();
@@ -15,6 +18,7 @@ async function saveMode(mode,show){
  return mode;
 }
 w.billingSetPrintMode=function(mode){return saveMode(mode,true)};
+w.billingGetPrintMode=async function(){return modeLoaded?currentMode:await readMode()};
 function checked(mode){return currentMode===mode?' checked':''}
 function printBox(){return '<div class="billing-print-actions" id="billingPrintActions"><b>Bill Print</b><label><input type="radio" name="billingPrintAction" value="DIRECT"'+checked('DIRECT')+' onchange="billingSetPrintMode(this.value)"> Direct Print</label><label><input type="radio" name="billingPrintAction" value="PDF"'+checked('PDF')+' onchange="billingSetPrintMode(this.value)"> Save As PDF</label><label><input type="radio" name="billingPrintAction" value="PREVIEW"'+checked('PREVIEW')+' onchange="billingSetPrintMode(this.value)"> Print &amp; Preview</label></div>'}
 function syncRadios(){qa('input[name="billingPrintAction"]').forEach(function(x){x.checked=x.value===currentMode})}
@@ -34,9 +38,7 @@ w.cbClearBillList=clearNormal;
 w.cbRemoveBillRow=function(i){if(typeof state==='undefined'||!state.cart||!state.cart[i])return;try{w.cbSelectRow(i)}catch(_){};if(typeof w.cbRemoveSelected==='function')w.cbRemoveSelected()};
 function startNewBill(root,isJewel){
  if(isJewel){if(lastJewelRoot===root)return;lastJewelRoot=root}else{if(lastNormalRoot===root)return;lastNormalRoot=root}
- currentMode='DIRECT';modeLoaded=true;syncRadios();
- // Persist the requested default without blocking billing.
- saveMode('DIRECT',false);
+ modeLoaded=false;readMode();
 }
 function patchNormal(){
  var root=q('.counter-billing');if(!root)return;startNewBill(root,false);
@@ -57,8 +59,9 @@ new MutationObserver(patch).observe(q('#app')||d.body,{childList:true,subtree:tr
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',function(){readMode();patch()});else{readMode();patch()}
 
 /* Global bill printing: exactly DIRECT / PDF / PREVIEW. DIRECT is the default for every new bill. */
-w.premiumPrintHtml=async function(html,name){
- var mode=modeLoaded?currentMode:await readMode();
+w.premiumPrintHtml=async function(html,name,modeOverride){
+ var mode=String(modeOverride||'').toUpperCase();
+ if(allowed.indexOf(mode)<0)mode=modeLoaded?currentMode:await readMode();
  if(w.desktopPrintHtml&&w.desktopPrintHtml(html,mode,name||'SuvidhaPOS-Bill'))return true;
  var pw=w.open('','_blank','width=1000,height=820');if(!pw)return notice('Popup blocked');pw.document.write(html);pw.document.close();
  if(mode==='PREVIEW')return true;
