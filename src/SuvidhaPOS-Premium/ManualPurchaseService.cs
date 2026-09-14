@@ -41,7 +41,18 @@ internal static class ManualPurchaseService
             if(x.SupplierId.HasValue){using var supplierCmd=Command(c,tx,"SELECT Name FROM Suppliers WHERE Id=@id AND IsActive=1",PurchasePostingService.P("@id",x.SupplierId));var found=(await supplierCmd.ExecuteScalarAsync())?.ToString()??throw new InvalidOperationException("Supplier is inactive or missing");if(!string.IsNullOrWhiteSpace(x.SupplierName)&&PurchaseImportRules.Key(x.SupplierName)!=PurchaseImportRules.Key(found))throw new InvalidOperationException("Selected supplier does not match supplier name");supplier=found;}
             var invoiceKey=PurchaseImportRules.Hash(new{Supplier=PurchaseImportRules.Key(supplier),Invoice=PurchaseImportRules.Key(invoice),Date=date});await CheckInvoice(c,tx,invoiceKey,supplier,invoice,date);await SaveRequest(c,tx,requestId,digest,"{}");
             var id=await Head(c,tx,invoice,x.SupplierId,supplier,date,sub,x.Discount,tax,total,x.PaymentMode,x.PaidAmount,x.Notes);
-            foreach(var p in prepared){var l=p.Line;await Line(c,tx,id,l.ProductId,l.BatchNo,l.Qty+l.FreeQuantity,l.Qty,l.FreeQuantity,l.Cost,l.Mrp,p.Sale,l.TaxRate,p.Tax,l.DiscountPer,p.Mode,l.ManufactureDate,l.ExpiryDate,p.Unit,p.PurchasedQty,p.PurchasedRate);}
+            foreach(var p in prepared)
+            {
+                var l=p.Line;
+                if(l.DiscountPer.HasValue)
+                {
+                    using var rates=Command(c,tx,@"UPDATE Products SET Mrp=@mrp,SalePrice=@sale,Dis_Rate=@disc WHERE Id=@id AND IsActive=1",
+                        PurchasePostingService.P("@mrp",l.Mrp),PurchasePostingService.P("@sale",p.Sale),PurchasePostingService.P("@disc",l.DiscountPer.Value),PurchasePostingService.P("@id",l.ProductId));
+                    if(await rates.ExecuteNonQueryAsync()!=1)throw new InvalidOperationException("Item became inactive while updating purchase discount");
+                    await RetailItemRules.SyncRates(c,tx,l.ProductId,mrp:true,discount:true);
+                }
+                await Line(c,tx,id,l.ProductId,l.BatchNo,l.Qty+l.FreeQuantity,l.Qty,l.FreeQuantity,l.Cost,l.Mrp,p.Sale,l.TaxRate,p.Tax,l.DiscountPer,p.Mode,l.ManufactureDate,l.ExpiryDate,p.Unit,p.PurchasedQty,p.PurchasedRate);
+            }
             await Invoice(c,tx,invoiceKey,digest,id,requestId);var result=new{id,invoiceNo=invoice,total,alreadyImported=false,requestId};await Finish(c,tx,requestId,result,user,"PURCHASE",id);await tx.CommitAsync();return Results.Ok(result);
         }catch(Exception ex)when(ex is InvalidOperationException or SqlException or OverflowException){await tx.RollbackAsync();return Results.BadRequest(new{message=ex.Message});}
     }
