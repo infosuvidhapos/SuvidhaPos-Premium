@@ -43,7 +43,7 @@
  }
  function sample(){
    return {
-    h:{InvoiceNo:'INV-20260908-001',BillDate:new Date(),CustomerName:'Walk-in Customer',PaymentMode:'Cash',SubTotal:865,Discount:25,Tax:43.20,GrandTotal:883.20,PaidAmount:883.20,PrintTemplate:state.template,PrintFormat:state.mode==='A4'?'A4 Printer':'Thermal Printer '+state.width},
+    h:{InvoiceNo:'INV-20260914-001',BillDate:new Date(),CustomerName:'Walk-in Customer',PaymentMode:'UPI',SubTotal:237,Discount:0,Tax:10.85,GrandTotal:247.85,PaidAmount:247.85,PrintTemplate:state.template,PrintFormat:state.mode==='A4'?'A4 Printer':'Thermal Printer '+state.width},
     l:[
      {Name:'Veg Sandwich',Barcode:'890000000001',BatchNo:'',ExpiryDate:null,Quantity:2,UnitSold:'PCS',SoldQuantity:2,RatePerSoldUnit:80,SalePrice:80,TaxRate:5,Discount:24},
      {Name:'Cold Coffee',Barcode:'890000000004',BatchNo:'',ExpiryDate:null,Quantity:1,UnitSold:'PCS',SoldQuantity:1,RatePerSoldUnit:90,SalePrice:90,TaxRate:5,Discount:9},
