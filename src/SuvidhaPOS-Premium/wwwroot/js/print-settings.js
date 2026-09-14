@@ -103,7 +103,8 @@ ${styleCss(template,thermal)}
    };return map[t]||'';
  }
  function buildHtml(d,mode=state.mode,template=state.template,width=state.width,autoPrint=false,currencyMode=state.currency){
-   const h=d.h||{},lines=d.l||[],c=d.company||{},o=d.outlet||{},ccy=currency(currencyMode);
+   const h=d.h||{},sourceLines=d.l||[],c=d.company||{},o=d.outlet||{},ccy=currency(currencyMode);
+   const lines=template==='T11'?Object.values(sourceLines.reduce((map,x)=>{const z=lineInfo(x),key=[x.ProductId||x.Name,z.unit,z.rate,x.TaxRate||0].join('|');if(!map[key])map[key]={...x,Quantity:0,SoldQuantity:0,Discount:0,UnitSold:z.unit,RatePerSoldUnit:z.rate};map[key].Quantity+=Number(x.Quantity||0);map[key].SoldQuantity+=z.qty;map[key].Discount+=Number(x.Discount||0);return map},{})):sourceLines;
    const isPharma=/pharmacy|medical/i.test(o.StoreType||'')||template==='T06'||template==='A06';
    const cancelledMark=String(h.Status||'Completed').toLowerCase()!=='completed'?'<div style="border:3px double #900;color:#900;font-weight:900;text-align:center;padding:6px;margin:6px 0">CANCELLED BILL</div>':'';
    const showCode=['T04','A02','A07'].includes(template);
