@@ -81,7 +81,7 @@ async function restorePayment(draft){
 }
 w.cbOpenHoldBills=async function(){
  if(!root())return;const rows=await fetchHolds(),cart=(typeof state!=='undefined'&&state.cart)||[],total=totalsFromCart();setBadgeCount(rows.length);
- modal('🧾⏱️ Hold Bill / Unhold',`<div class="hold-manager"><div class="hold-summary"><div><span>Current Bill</span><b>${cart.length} item(s)</b><small>₹${money(total)}</small></div><div><span>Held Bills</span><b>${rows.length} / 10</b><small>${10-rows.length} slot(s) free</small></div></div><div class="hold-list" id="holdBillList">${holdListHtml(rows)}</div></div>`,`<button class="btn green" ${cart.length?'':'disabled'} onclick="cbHoldCurrentBill()">🧾⏱️ Hold Current Bill</button><button class="btn secondary" onclick="closeModal()">Close</button>`);
+ modal('🧾⏱️ Hold Bill / Unhold',`<div class="hold-manager"><div class="hold-summary"><div><span>Current Bill</span><b>${cart.length} item(s)</b><small>₹${money(total)}</small></div><div><span>Held Bills</span><b>${rows.length} / 10</b><small>${10-rows.length} slot(s) free</small></div></div><div class="hold-list" id="holdBillList">${holdListHtml(rows)}</div></div>`,`<button class="btn green" ${cart.length?'':'disabled'} onclick="cbHoldCurrentBill()">🧾⏱️ Hold Current Bill</button>`);
 };
 w.cbHoldCurrentBill=async function(){
  const cart=(typeof state!=='undefined'&&state.cart)||[];if(!cart.length)return notice('Add at least one item before holding the bill');
