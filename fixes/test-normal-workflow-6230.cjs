@@ -56,6 +56,11 @@ const reports=read(files.reports);
 for(const token of ["['stock-date-wise-report','Stock Report Date Wise']","['stock-transfer-report','Stock Transfer Report']","21 premium business reports","<b>21</b>"])
  assert.ok(reports.includes(token),'Report Master missing '+token);
 
+const html=read('src/SuvidhaPOS-Premium/wwwroot/index.html');
+assert.ok(html.includes('data-page="inventorymaster"'),'Inventory Master sidebar entry missing');
+assert.ok(!html.includes('data-page="purchase"'),'Purchase must not remain a top-level sidebar entry');
+assert.ok(!html.includes('data-page="returns"'),'Returns must not remain a top-level sidebar entry');
+
 const manual=read('src/SuvidhaPOS-Premium/ManualPurchaseService.cs');
 assert.ok(manual.includes('Bill No is required'),'Backend Bill No guard missing');
 assert.ok(!manual.includes('?"PUR-"+Guid.NewGuid()'),'Manual purchase must not auto-generate Bill No');
