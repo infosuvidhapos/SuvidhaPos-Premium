@@ -52,6 +52,8 @@ jobs:
         run: node fixes/test-sidebar-feature-control.cjs
       - name: Validate normal retail savings and purchase keyboard flow
         run: node fixes/test-normal-retail-savings.cjs
+      - name: Validate normal print purchase inventory workflow
+        run: node fixes/test-normal-workflow-6230.cjs
       - name: Validate BTC day-close fixes
         shell: powershell
         run: |
@@ -66,7 +68,7 @@ jobs:
           foreach($token in @("desktopPrintHtml(html,'DIRECT'","Print Receipt")){if(-not $btcReceipt.Contains($token)){throw "BTC receipt print fix missing: $token"}}
           foreach($token in @('btcPrOpenCardUpi','Card / UPI Payment','btcPrUseCardUpi')){if(-not $btcFlow.Contains($token)){throw "BTC Card/UPI detail missing: $token"}}
           foreach($token in @('bmSaveModifyAndPrint','Save & Print','bmReprint','Changed during bill modification')){if(-not $bill.Contains($token)){throw "Bill modify/reprint fix missing: $token"}}
-          foreach($token in @('New Billing','Item Master','Category Master','AI Import','Item Import Master','Bulk Edit Update','Item Rate Update','Opening Stock Master','Purchase Master','Bill Management Master','BTC / Credit Settlement','Customer / Company Master','Barcode Print Master','Print Master','Database Backup')){if(-not $features.Contains($token)){throw "Sidebar Feature Control missing: $token"}}
+          foreach($token in @('New Billing','Item Master','Inventory Master','Category Master','AI Import','Item Import Master','Bulk Edit Update','Item Rate Update','Opening Stock Master','Purchase Master','Bill Management Master','BTC / Credit Settlement','Customer / Company Master','Barcode Print Master','Print Master','Database Backup')){if(-not $features.Contains($token)){throw "Sidebar Feature Control missing: $token"}}
           foreach($token in @('Confirm Day Close & Shift End ?','DayClose.Auto','auto-run')){if(-not ($day+$dayApi).Contains($token)){throw "Day Close fix missing: $token"}}
           foreach($token in @('/js/sidebar-feature-control.js','/js/day-close-auto.js')){if(-not $html.Contains($token)){throw "Runtime script missing: $token"}}
           foreach($token in @('data-page="aiimport"','data-page="itemimport"','data-page="openingstock"')){if($html.Contains($token)){throw "Top-level Item Master child returned: $token"}}
@@ -88,7 +90,7 @@ jobs:
       - name: Validate source layout
         shell: powershell
         run: |
-          $required=@('src/SuvidhaPOS-Premium/Program.cs','src/SuvidhaPOS-Premium/SpecializedModules.cs','src/SuvidhaPOS-Premium/PremiumFeatureModules.cs','src/SuvidhaPOS-Premium/PremiumCompletionModules.cs','src/SuvidhaPOS-Premium/wwwroot/js/premium-masters.js','src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js','src/SuvidhaPOS-Premium/wwwroot/css/premium-completion.css','src/SuvidhaPOS-Premium/Database/completion-schema.sql','src/SuvidhaPOS-Premium/wwwroot/js/outlet-login-sync.js','src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js','src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-masters.css','src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj','src/SuvidhaPOS-Premium/Database/schema.sql','src/SuvidhaPOS-Premium/Database/specialized-schema.sql','src/SuvidhaPOS-Premium/Database/seed.sql','src/SuvidhaPOS-Premium/Database/print-schema.sql','src/SuvidhaPOS-Premium/wwwroot/index.html','src/SuvidhaPOS-Premium/wwwroot/js/app.js','src/SuvidhaPOS-Premium/wwwroot/js/login-authfix7.js','src/SuvidhaPOS-Premium/wwwroot/js/desktop-bridge.js','src/SuvidhaPOS-Premium/wwwroot/js/pos-fixes.js','src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js','src/SuvidhaPOS-Premium/wwwroot/js/backup-master.js','src/SuvidhaPOS-Premium/wwwroot/css/app.css','src/SuvidhaPOS-Premium/wwwroot/css/login-premium.css','src/SuvidhaPOS-Premium/wwwroot/css/backup-master.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-fixes.css','src/SuvidhaPOS-Premium/suvidha-pos.ico','src/SuvidhaPOS-Premium/wwwroot/img/suvidha-pos-mark.svg','installer/Generate-AppIcon.ps1','installer/Ensure-SqlAccess.ps1','src/SuvidhaPOS.Desktop/SuvidhaPOS.Desktop.csproj','src/SuvidhaPOS.Desktop/Program.cs','src/SuvidhaPOS.Desktop/MainForm.cs','src/SuvidhaPOS.Desktop/Database.config.json','installer/SuvidhaPOS.iss'); foreach($f in $required){if(-not(Test-Path $f)){throw "Missing $f"}}
+          $required=@('src/SuvidhaPOS-Premium/Program.cs','src/SuvidhaPOS-Premium/InventoryMasterModules.cs','src/SuvidhaPOS-Premium/SpecializedModules.cs','src/SuvidhaPOS-Premium/PremiumFeatureModules.cs','src/SuvidhaPOS-Premium/PremiumCompletionModules.cs','src/SuvidhaPOS-Premium/wwwroot/js/premium-masters.js','src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js','src/SuvidhaPOS-Premium/wwwroot/css/premium-completion.css','src/SuvidhaPOS-Premium/Database/completion-schema.sql','src/SuvidhaPOS-Premium/wwwroot/js/outlet-login-sync.js','src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js','src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-masters.css','src/SuvidhaPOS-Premium/SuvidhaPOS.Premium.csproj','src/SuvidhaPOS-Premium/Database/schema.sql','src/SuvidhaPOS-Premium/Database/specialized-schema.sql','src/SuvidhaPOS-Premium/Database/seed.sql','src/SuvidhaPOS-Premium/Database/print-schema.sql','src/SuvidhaPOS-Premium/wwwroot/index.html','src/SuvidhaPOS-Premium/wwwroot/js/app.js','src/SuvidhaPOS-Premium/wwwroot/js/inventory-master.js','src/SuvidhaPOS-Premium/wwwroot/css/inventory-master.css','src/SuvidhaPOS-Premium/wwwroot/js/login-authfix7.js','src/SuvidhaPOS-Premium/wwwroot/js/desktop-bridge.js','src/SuvidhaPOS-Premium/wwwroot/js/pos-fixes.js','src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js','src/SuvidhaPOS-Premium/wwwroot/js/backup-master.js','src/SuvidhaPOS-Premium/wwwroot/css/app.css','src/SuvidhaPOS-Premium/wwwroot/css/login-premium.css','src/SuvidhaPOS-Premium/wwwroot/css/backup-master.css','src/SuvidhaPOS-Premium/wwwroot/css/premium-fixes.css','src/SuvidhaPOS-Premium/suvidha-pos.ico','src/SuvidhaPOS-Premium/wwwroot/img/suvidha-pos-mark.svg','installer/Generate-AppIcon.ps1','installer/Ensure-SqlAccess.ps1','src/SuvidhaPOS.Desktop/SuvidhaPOS.Desktop.csproj','src/SuvidhaPOS.Desktop/Program.cs','src/SuvidhaPOS.Desktop/MainForm.cs','src/SuvidhaPOS.Desktop/Database.config.json','installer/SuvidhaPOS.iss'); foreach($f in $required){if(-not(Test-Path $f)){throw "Missing $f"}}
       - name: Validate sales trigger compatibility and report master
         shell: powershell
         run: |
@@ -97,10 +99,10 @@ jobs:
           if ($premium -match 'INSERT Sales[\\s\\S]{0,500}OUTPUT INSERTED') { throw 'Premium Sales insert is not trigger-safe' }
           if ($program -match 'INSERT Sales[\\s\\S]{0,500}OUTPUT INSERTED') { throw 'Standard Sales insert is not trigger-safe' }
           $reports = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/reports-suite.js' -Raw -Encoding UTF8
-          $required = @('Account Report','Daily Sale Report Bill Wise','Cashier Report','Date Wise Summary','Bill Modification Report','Utility Report','Item Wise Report','Profit & Loss Report','Date Wise Sale Summary Report','Bill/Customer Report','Category Wise Sale Report','Category Wise Monthly Sale Report','HSN Wise Sale Report','Purchase Register Report','Bill Detail Report','Qty Wise Report','Product Expiry Report','GSTR1','Current Stock Report')
+          $required = @('Account Report','Daily Sale Report Bill Wise','Cashier Report','Date Wise Summary','Bill Modification Report','Utility Report','Item Wise Report','Profit & Loss Report','Date Wise Sale Summary Report','Bill/Customer Report','Category Wise Sale Report','Category Wise Monthly Sale Report','HSN Wise Sale Report','Purchase Register Report','Bill Detail Report','Qty Wise Report','Product Expiry Report','GSTR1','Current Stock Report','Stock Report Date Wise','Stock Transfer Report')
           foreach($name in $required){ if(-not $reports.Contains($name)){ throw "Missing report: $name" } }
           $optionCount = ([regex]::Matches($reports, "\['[^']+','[^']+'\]")).Count
-          if($optionCount -ne 19){ throw "Expected 19 premium report options, found $optionCount" }
+          if($optionCount -ne 21){ throw "Expected 21 premium report options, found $optionCount" }
           $html = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
           if($html.Contains('legacy-report-suite.js') -or $html.Contains('legacy-report-boot.js')){ throw 'Legacy report override is still loaded' }
       - name: Validate central-only Store Type and jewellery normalization
@@ -115,13 +117,13 @@ jobs:
           if(-not $special.Contains('LicenseGuardModules.GetStatus().StoreType')){ throw 'Specialization does not prefer signed central Store Type' }
           $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/specialized-schema.sql' -Raw -Encoding UTF8
           if(-not $schema.Contains("StoreType IN ('Gold & Diamond Jewellery','Silver Jewellery')")){ throw 'Legacy jewellery type normalization migration missing' }
-      - name: Validate 19-report tile master and outlet mode switching
+      - name: Validate 21-report tile master and outlet mode switching
         shell: powershell
         run: |
           $reports = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/reports-suite.js' -Raw -Encoding UTF8
-          foreach($token in @('normal-report-grid','normal-report-tile','openNormalReport','Business Reports','19 premium business reports','data-no-tax-enhance="1"')){ if(-not $reports.Contains($token)){ throw "Premium report tile master missing: $token" } }
+          foreach($token in @('normal-report-grid','normal-report-tile','openNormalReport','Business Reports','21 premium business reports','data-no-tax-enhance="1"')){ if(-not $reports.Contains($token)){ throw "Premium report tile master missing: $token" } }
           $defs = ([regex]::Matches($reports,"\['[^']+','[^']+'\]")).Count
-          if($defs -lt 19){ throw "Expected all 19 normal reports, found $defs" }
+          if($defs -lt 21){ throw "Expected all 21 normal reports, found $defs" }
           $tax = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/tax-master.js' -Raw -Encoding UTF8
           if(-not $tax.Contains("el.id==='reportType'")){ throw 'Hidden report selector tax exclusion missing' }
           $outlet = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/outlet-master-fix.js' -Raw -Encoding UTF8
@@ -387,12 +389,12 @@ jobs:
           $special = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/specialized-pos.js' -Raw -Encoding UTF8
           foreach($token in @('id="uautorates"','syncUomRates','recalcAllUomRates',"syncUomRates('purchase','pack')","syncUomRates('mrp','inner')","syncUomRates('sale','base')",'pack/f.tf','inner/f.inf','base*f.tf','uncheck for manual override')){ if(-not $special.Contains($token)){ throw "UOM auto-rate feature missing: $token" } }
           if($special.Contains('const ip=+uip.value||bp*inf')){ throw 'Manual override is still replaced during save' }
-      - name: Validate 21-style Print Master
+      - name: Validate 22-style Print Master
         shell: powershell
         run: |
           $print = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/print-settings.js' -Raw -Encoding UTF8
-          foreach($id in @('T01','T02','T03','T04','T05','T06','T07','T08','T09','T10','T11','A01','A02','A03','A04','A05','A06','A07','A08','A09','A10')){ if(-not $print.Contains("'$id'")){ throw "Missing print template $id" } }
-          foreach($token in @('LIVE PREVIEW','Retail Savings 80mm','You Save:','YOU SAVED','Print.CurrencyText')){ if(-not $print.Contains($token)){ throw "Savings Print Master missing: $token" } }
+          foreach($id in @('T01','T02','T03','T04','T05','T06','T07','T08','T09','T10','T11','A01','A02','A03','A04','A05','A06','A07','A08','A09','A10','A11')){ if(-not $print.Contains("'$id'")){ throw "Missing print template $id" } }
+          foreach($token in @('LIVE PREVIEW','Retail Savings 80mm','Discount Savings A4','You Save:','YOU SAVED','Print.CurrencyText','Print.Normal.ActionMode','a4Orientation')){ if(-not $print.Contains($token)){ throw "Savings Print Master missing: $token" } }
           if(-not $print.Contains('window.printInvoice')){ throw 'Invoice print override missing' }
           $schema = Get-Content 'src/SuvidhaPOS-Premium/Database/print-schema.sql' -Raw -Encoding UTF8
           if(-not $schema.Contains('PrintTemplate')){ throw 'Sales PrintTemplate persistence missing' }
@@ -497,7 +499,7 @@ jobs:
           & $sqlcmd.FullName -I -S $server -E -b -Q "SELECT @@VERSION; SELECT SERVERPROPERTY('ProductVersion') AS ProductVersion, SERVERPROPERTY('ProductLevel') AS ProductLevel, SERVERPROPERTY('Edition') AS Edition;"
           if($LASTEXITCODE -ne 0){throw 'SQL Server 2019 connection failed'}
           New-Item -ItemType Directory -Force -Path database-artifact | Out-Null
-          foreach($script in @('schema.sql','specialized-schema.sql','print-schema.sql','jewellery-registers-schema.sql','completion-schema.sql','retail-purchase-schema.sql','seed.sql')){
+          foreach($script in @('schema.sql','specialized-schema.sql','print-schema.sql','jewellery-registers-schema.sql','completion-schema.sql','retail-purchase-schema.sql','inventory-master-schema.sql','seed.sql')){
             # Each sqlcmd starts a new connection. Additive migrations intentionally
             # use the caller's database, so select it explicitly after bootstrap.
             $scriptDatabase = if($script -eq 'schema.sql'){'master'}else{'SuvidhaPOS'}
