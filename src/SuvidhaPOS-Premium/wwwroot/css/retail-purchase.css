@@ -39,3 +39,20 @@
 @media(max-width:900px){.retail-purchase{padding:15px;gap:14px}.rp-heading h2{font-size:25px}.rp-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.rp-import-banner{align-items:start;flex-direction:column}.rp-payment-area{grid-template-columns:1fr}.rp-scan-row{flex-wrap:wrap}.rp-scan-row>label{flex-basis:100%}.rp-protection{align-items:start;flex-direction:column;gap:5px}.pi-upload{align-items:start;flex-direction:column}.pi-samples{display:flex;flex-wrap:wrap}.pi-review-head{align-items:start;flex-direction:column}.pi-review-head input{max-width:none}.pi-meta-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rp-savebar{flex-wrap:wrap}.rp-savebar>div:last-child{margin-left:auto}}
 @media(max-width:600px){.retail-item-modal{padding:16px!important}.retail-item-grid,.retail-item-form .formgrid,.pi-edit-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.item-tax-options{grid-column:1/-1}.retail-item-grid .item-sale-preview{grid-column:auto;grid-template-columns:1fr;padding:6px 10px}.item-sale-preview input{text-align:left}.rp-bill-head{grid-template-columns:1fr 1fr}.rp-bill-head>label:nth-child(3){grid-column:1/-1}.rp-payment{grid-template-columns:1fr 1fr}.pi-steps{gap:15px}.pi-steps li{gap:5px}.pi-steps li span{font-size:10px}.pi-meta-grid{grid-template-columns:1fr}.pi-pagination{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){.item-switch:before{transition:none}}
+
+/* 2026-09-14 normal purchase alignment */
+.rp-keyboard-strip{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:-4px 0 -4px}
+.rp-keyboard-strip span{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:6px;padding:5px 8px;font-size:9px;font-weight:700;letter-spacing:.25px}
+.purchase-mode-barcode{max-width:none;padding:12px 16px 18px;gap:11px}
+.purchase-mode-barcode .rp-heading{padding:2px 4px}.purchase-mode-barcode .rp-heading h2{font-size:24px;margin:3px 0}.purchase-mode-barcode .rp-heading p{margin-top:2px}
+.purchase-mode-barcode>.panel{padding:12px 14px}.purchase-mode-barcode .rp-bill-head{grid-template-columns:minmax(170px,.85fr) 160px minmax(230px,1.3fr) auto}
+.purchase-mode-barcode .rp-entry-items{padding-top:10px}.purchase-mode-barcode .rp-scan-row #bpScan{height:38px}.purchase-mode-barcode .rp-scan-row>.btn{height:38px}
+.purchase-mode-barcode .rp-table-hint{margin:9px 0 7px}.purchase-mode-barcode .rp-lines-table{min-height:285px;max-height:48vh;border-radius:7px}
+.purchase-mode-barcode .rp-lines-table th{padding:9px 6px}.purchase-mode-barcode .rp-lines-table td{padding:7px 6px}
+.purchase-mode-barcode .rp-payment-area{grid-template-columns:minmax(0,1.35fr) minmax(320px,.8fr);gap:10px}
+.purchase-mode-barcode .rp-payment-area>.panel{padding:12px 14px}.purchase-mode-barcode .rp-payment{gap:9px}
+.purchase-mode-barcode .rp-totals>div{padding:5px 0}.purchase-mode-barcode .rp-grand{padding:9px 0!important}.purchase-mode-barcode .rp-grand b{font-size:20px}
+.purchase-mode-barcode .rp-savebar{padding:10px 14px;border-radius:8px}
+.purchase-mode-standard .rp-heading h2{font-size:27px}.purchase-mode-standard .rp-bill-head{border-top:3px solid var(--accent)}
+.pi-row-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.pi-row-actions .btn{min-width:58px}
+@media(max-width:1000px){.purchase-mode-barcode .rp-payment-area{grid-template-columns:1fr}.purchase-mode-barcode .rp-bill-head{grid-template-columns:1fr 150px 1fr}.purchase-mode-barcode .rp-draft-actions{grid-column:1/-1}}
