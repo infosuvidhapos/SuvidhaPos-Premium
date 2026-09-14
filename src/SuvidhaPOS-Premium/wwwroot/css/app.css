@@ -82,3 +82,10 @@ body[data-theme="light"] .normal-report-intro,body[data-theme="light"] .normal-r
 body[data-theme="light"] .stock-summary-grid>div{background:#fffdf8;border-color:#d8cbb8}body[data-theme="light"] .stock-summary-grid b{color:#2d3a46}body[data-theme="light"] .stock-report-table th{background:#eee9df;color:#403a32}
 @media(max-width:1100px){.stock-report-filters{grid-template-columns:1fr 1fr}.stock-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.stock-report-filters,.stock-summary-grid{grid-template-columns:1fr}.stock-report-actions .btn{width:100%}}
+
+.bill-detail-original-preview{margin-top:12px;padding:14px;overflow:hidden}
+.bill-detail-original-frame{display:block;margin:0 auto;border:1px solid #30485c;border-radius:10px;background:#fff;box-shadow:0 14px 34px #0003}
+.bill-detail-original-frame.thermal{width:min(430px,100%);height:760px}
+.bill-detail-original-frame.a4{width:min(920px,100%);height:980px}
+#reportTable td small{display:block;margin-top:4px;color:var(--muted);font-size:9px}
+@media(max-width:780px){.bill-detail-original-frame.a4{height:720px}.bill-detail-original-frame.thermal{height:640px}}
