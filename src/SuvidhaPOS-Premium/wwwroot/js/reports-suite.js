@@ -83,7 +83,7 @@
   const box=document.querySelector('#normalReportWorkspace');if(!box)return;
   box.innerHTML=`<div class="panel normal-report-workspace">
    <div class="normal-report-workspace-head"><div><span class="normal-report-kicker">OPEN REPORT</span><h3>${esc(currentDef[1])}</h3></div><button class="btn small secondary" onclick="closeNormalReport()">✕ Close</button></div>
-   <div class="normal-report-filters"><label>From Date<input id="reportFrom" class="input" type="date" value="${from}"></label><label>To Date<input id="reportTo" class="input" type="date" value="${today}"></label><label>Search<input id="reportQ" class="input" placeholder="Bill, item, customer, supplier, user..."></label></div>
+   <div class="normal-report-filters"><label>From Date<input id="reportFrom" class="input" type="date" value="${from}"></label><label>To Date<input id="reportTo" class="input" type="date" value="${today}"></label><label>${currentDef[0]==='bill-detail'?'Bill No / Search':'Search'}<input id="reportQ" class="input" placeholder="${currentDef[0]==='bill-detail'?'Bill No, customer or item...':'Bill, item, customer, supplier, user...'}"></label></div>
    <div class="toolbar"><button class="btn" onclick="runReport()">Generate Report</button><button class="btn secondary" onclick="exportReportExcel()">⬇ Export Excel</button><button class="btn secondary" onclick="exportReportPdf()">⬇ Export PDF</button></div>
    <div id="reportMeta" class="muted normal-report-meta">Loading report…</div>
    <div class="normal-report-table-shell"><div class="tablewrap"><table class="table" id="reportTable"><thead></thead><tbody><tr><td class="empty">Generating report…</td></tr></tbody></table></div></div>
@@ -105,7 +105,7 @@
     <label>Stock Status<select id="stockStatus" class="select" onchange="stockApplyFilters()"><option value="ALL">All Stock</option><option value="POSITIVE">In Stock</option><option value="LOW">Low Stock ≤ 5</option><option value="ZERO">Zero Stock</option><option value="NEGATIVE">Negative Stock</option></select></label>
     <label class="stock-search">Search<input id="reportQ" class="input" placeholder="Item / barcode / SKU / category / rack..." oninput="stockApplyFilters()" onkeydown="if(event.key==='Enter'){event.preventDefault();stockApplyFilters()}"></label>
    </div>
-   <div class="toolbar stock-report-actions"><button class="btn" onclick="stockReload()">↻ Generate / Refresh</button><button class="btn secondary" onclick="exportReportExcel()">⬇ Export Excel</button><button class="btn secondary" onclick="printCurrentStockReport()">🖨 Print / PDF</button></div>
+   <div class="toolbar stock-report-actions"><button class="btn" onclick="stockReload()">↻ Generate / Refresh</button><button class="btn secondary" onclick="exportReportExcel()">⬇ Export Excel</button><button class="btn secondary" onclick="printCurrentStockReport()">⬇ Export PDF</button></div>
    <div id="stockSummary" class="stock-summary-grid"></div>
    <div id="reportMeta" class="muted normal-report-meta">Loading current stock…</div>
    <div class="normal-report-table-shell stock-report-table-shell"><div class="tablewrap"><table class="table stock-report-table" id="reportTable"><thead></thead><tbody><tr><td class="empty">Loading stock…</td></tr></tbody></table></div></div>
