@@ -15,6 +15,7 @@ for(const file of jsFiles){
 }
 const print=read(jsFiles[0]),billing=read(jsFiles[1]),purchase=read(jsFiles[2]),feature=read(jsFiles[3]),runtime=read(jsFiles[4]),completion=read(jsFiles[5]);
 const backend=read('src/SuvidhaPOS-Premium/PremiumFeatureModules.cs');
+const manualPurchase=read('src/SuvidhaPOS-Premium/ManualPurchaseService.cs');
 
 for(const token of ["['T11','Retail Savings 80mm'","You Save:","YOU SAVED","Print.CurrencyText","Thermal Printer · 11","template==='T11'?z.net:z.amount"])
  assert.ok(print.includes(token),'T11 missing '+token);
@@ -25,7 +26,7 @@ for(const token of ['cbApplyLineEdit','DiscountPer:cbProductDiscount','cb-line-d
  assert.ok(billing.includes(token),'Billing discount missing '+token);
 assert.ok(billing.includes("Discount: ${Number(dl.percent.toFixed(2))}%"),'Billing must show non-zero item discount below item');
 
-for(const token of ['Barcode / Item Name:','bpSearchKey','bpPickPurchaseItem','purchaseCellKey','data-purchase-edit'])
+for(const token of ['Bill No :','Bill Date :','Supplier Name :','Barcode / Item Name:','purchaseHeaderKey','bpSearchKey','bpPickPurchaseItem','purchaseCellKey','data-purchase-edit'])
  assert.ok(purchase.includes(token),'Purchase keyboard picker missing '+token);
 assert.ok(!purchase.includes('list="bpItemSuggestions"'),'Native datalist must not be the purchase picker');
 
@@ -42,6 +43,8 @@ assert.ok(!completion.includes("if(!jewel()&&!enabled('P-03'))return notify('P-0
 
 for(const token of ['lineDiscount=Math.Min','a.BaseQty*a.BaseRate-a.Discount','takeDiscount','P("@di",takeDiscount)','itemSavings=resolved.Sum'])
  assert.ok(backend.includes(token),'Server line-discount persistence missing '+token);
+for(const token of ['UPDATE Products SET Mrp=@mrp,SalePrice=@sale,Dis_Rate=@disc','RetailItemRules.SyncRates(c,tx,l.ProductId,mrp:true,discount:true)'])
+ assert.ok(manualPurchase.includes(token),'Manual purchase discount-to-master sync missing '+token);
 
 const gross=80*2,discount=gross*15/100;
 assert.equal(discount,24);
