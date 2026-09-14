@@ -208,7 +208,7 @@ ${styleCss(template,thermal)}
  window.printInvoice=async function(id){
    try{
     const x=await saleData(id),html=buildHtml(x.d,x.cfg.mode,x.cfg.template,x.cfg.width,false,x.cfg.currency);
-    if(window.premiumPrintHtml)return window.premiumPrintHtml(html,x.d.h?.InvoiceNo||('Bill-'+id),jewellery()?undefined:x.cfg.action);
+    if(window.premiumPrintHtml)return window.premiumPrintHtml(html,x.d.h?.InvoiceNo||('Bill-'+id));
     const w=window.open('','_blank',x.cfg.mode==='Thermal'?'width=460,height=760':'width=1000,height=800');
     if(!w)return toast('Popup blocked');w.document.write(html);w.document.close();w.print()
    }catch(e){alert('Print failed: '+e.message)}
