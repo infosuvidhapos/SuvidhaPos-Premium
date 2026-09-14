@@ -296,6 +296,25 @@ FROM ProductBatches b JOIN Products p ON p.Id=b.ProductId WHERE b.Quantity>0 AND
                 case "gstr1":
                     sql=@"SELECT s.BillDate,s.InvoiceNo,s.CustomerName,ISNULL(c.GstIn,'') CustomerGSTIN,ISNULL(p.Hsn,'') HSN,sl.TaxRate GSTPercent,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*100/(100+sl.TaxRate)-sl.Discount ELSE sl.Quantity*sl.SalePrice-sl.Discount END AS decimal(18,2)) TaxableValue,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*sl.TaxRate/(100+sl.TaxRate)/2 ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/200 END AS decimal(18,2)) CGST,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*sl.TaxRate/(100+sl.TaxRate)/2 ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/200 END AS decimal(18,2)) SGST,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice-sl.Discount ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*(1+sl.TaxRate/100) END AS decimal(18,2)) InvoiceLineValue
 FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId JOIN Products p ON p.Id=sl.ProductId LEFT JOIN Customers c ON c.Id=s.CustomerId WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e AND (@q='' OR s.InvoiceNo LIKE @like OR s.CustomerName LIKE @like OR ISNULL(c.GstIn,'') LIKE @like) ORDER BY s.BillDate DESC,s.InvoiceNo"; break;
+                case "stock-transfer-report":
+                    sql=@"SELECT t.TransferDate,t.TransferNo,t.FromOutlet,t.ToOutlet,t.Status,p.Name ItemName,p.Barcode,b.BatchNo,
+ CAST(l.Quantity AS decimal(18,3)) Quantity,l.CostPrice,CAST(l.Quantity*l.CostPrice AS decimal(18,2)) CostValue,t.CreatedBy,t.Notes
+ FROM StockTransfers t JOIN StockTransferLines l ON l.TransferId=t.Id JOIN Products p ON p.Id=l.ProductId JOIN ProductBatches b ON b.Id=l.BatchId
+ WHERE t.TransferDate>=@f AND t.TransferDate<@e AND (@q='' OR t.TransferNo LIKE @like OR t.FromOutlet LIKE @like OR t.ToOutlet LIKE @like OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like)
+ ORDER BY t.TransferDate DESC,t.TransferNo,p.Name"; break;
+                case "stock-date-wise-report":
+                    sql=@"WITH D AS(
+ SELECT CAST(sl.CreatedAt AS date) StockDate,sl.ProductId,
+ CAST(SUM(CASE WHEN sl.Quantity>0 THEN sl.Quantity ELSE 0 END) AS decimal(18,3)) InQty,
+ CAST(SUM(CASE WHEN sl.Quantity<0 THEN -sl.Quantity ELSE 0 END) AS decimal(18,3)) OutQty
+ FROM StockLedger sl WHERE sl.CreatedAt>=@f AND sl.CreatedAt<@e GROUP BY CAST(sl.CreatedAt AS date),sl.ProductId)
+ SELECT d.StockDate,p.Name ItemName,p.Barcode,ISNULL(p.Category,'') Category,p.Unit,
+ CAST(ISNULL((SELECT SUM(s2.Quantity) FROM StockLedger s2 WHERE s2.ProductId=d.ProductId AND s2.CreatedAt<d.StockDate),0) AS decimal(18,3)) OpeningQty,
+ d.InQty,d.OutQty,
+ CAST(ISNULL((SELECT SUM(s3.Quantity) FROM StockLedger s3 WHERE s3.ProductId=d.ProductId AND s3.CreatedAt<DATEADD(day,1,d.StockDate)),0) AS decimal(18,3)) ClosingQty
+ FROM D d JOIN Products p ON p.Id=d.ProductId
+ WHERE (@q='' OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like OR ISNULL(p.Category,'') LIKE @like)
+ ORDER BY d.StockDate DESC,p.Name"; break;
                 case "current-stock-report":
                     sql=@"SELECT
 p.Id ProductId,
