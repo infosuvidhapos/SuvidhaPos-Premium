@@ -4,6 +4,10 @@ IF COL_LENGTH('dbo.Sales','PrintFormat') IS NULL ALTER TABLE dbo.Sales ADD Print
 GO
 IF COL_LENGTH('dbo.Sales','PrintTemplate') IS NULL ALTER TABLE dbo.Sales ADD PrintTemplate nvarchar(40) NOT NULL CONSTRAINT DF_Sales_PrintTemplate DEFAULT 'T01';
 GO
+IF COL_LENGTH('dbo.Sales','PrintSnapshotHtml') IS NULL ALTER TABLE dbo.Sales ADD PrintSnapshotHtml nvarchar(max) NULL;
+GO
+IF COL_LENGTH('dbo.Sales','PrintSnapshotAt') IS NULL ALTER TABLE dbo.Sales ADD PrintSnapshotAt datetime2 NULL;
+GO
 IF NOT EXISTS(SELECT 1 FROM dbo.AppSettings WHERE [Key]='Print.BillFormat') INSERT dbo.AppSettings([Key],[Value]) VALUES('Print.BillFormat','Thermal Printer 80MM');
 IF NOT EXISTS(SELECT 1 FROM dbo.AppSettings WHERE [Key]='Print.BillMode') INSERT dbo.AppSettings([Key],[Value]) VALUES('Print.BillMode','Thermal');
 IF NOT EXISTS(SELECT 1 FROM dbo.AppSettings WHERE [Key]='Print.ThermalWidth') INSERT dbo.AppSettings([Key],[Value]) VALUES('Print.ThermalWidth','80MM');
