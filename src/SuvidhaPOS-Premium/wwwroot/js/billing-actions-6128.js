@@ -91,7 +91,7 @@ async function loadRuntime(){
  try{
   await addScript('/js/btc-payment-receipt-flow.js?v=6190','btcReceiptFlowJs6130');
   await addScript('/js/btc-payment-receipt-input-fix.js?v=6180','btcReceiptInputFixJs6130');
-  await addScript('/js/billing-hold.js?v=6180','billingHoldJs6130');
+  await addScript('/js/billing-hold.js?v=6230','billingHoldJs6130');
   await addScript('/js/india-locations.js?v=6180','indiaLocationsJs6140');
   await addScript('/js/retail-masters-ui.js?v=6210','retailMastersUiJs6140');
   await addScript('/js/audit-report-thermal.js?v=6180','auditReportThermalJs6140');
