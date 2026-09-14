@@ -142,6 +142,7 @@ try{
  var edit=await http.PostAsJsonAsync("/checks/product/"+protectedId,productEdit);Check(edit.IsSuccessStatusCode,"Unrelated product edit succeeds");
  Check(Convert.ToDecimal(await new SqlCommand("SELECT SalePrice FROM Products WHERE Id="+protectedId,connection).ExecuteScalarAsync())==11.37m,"Omitted discount preserves historic explicit sale price");
  Check((await new SqlCommand("SELECT TaxMode FROM Products WHERE Id="+protectedId,connection).ExecuteScalarAsync())?.ToString()=="EXCLUSIVE","Omitted edit tax mode preserves historic exclusive value");
+ var missingBill=await http.PostAsJsonAsync("/checks/purchase",new{invoiceNo="",supplierName="Synthetic Supplier",lines=new[]{new{productId=protectedId,qty=1,cost=10,mrp=14,salePrice=14,taxRate=0}}});Check(missingBill.StatusCode==HttpStatusCode.BadRequest,"Manual purchase without Bill No is rejected server-side");
  var manualRequest=new{invoiceNo="MANUAL-001",supplierName="Synthetic Supplier",purchaseDate="2026-08-25",requestId=Guid.NewGuid().ToString(),lines=new[]{new{productId=protectedId,qty=2,cost=118,mrp=150,salePrice=1,taxRate=18,discountPer=10}}};
  var manual=await http.PostAsJsonAsync("/checks/purchase",manualRequest);Check(manual.IsSuccessStatusCode,"Ordinary retail purchase accepts missing expiry");
  Check(JsonDocument.Parse(await manual.Content.ReadAsStringAsync()).RootElement.GetProperty("total").GetDecimal()==236,"Manual purchase defaults inclusive despite historic exclusive master");
