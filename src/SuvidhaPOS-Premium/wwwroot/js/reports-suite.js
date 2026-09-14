@@ -19,7 +19,9 @@
  ['qty-wise-report','Qty Wise Report'],
  ['product-expiry','Product Expiry Report'],
  ['gstr1','GSTR1'],
- ['current-stock-report','Current Stock Report']
+ ['current-stock-report','Current Stock Report'],
+ ['stock-date-wise-report','Stock Report Date Wise'],
+ ['stock-transfer-report','Stock Transfer Report']
  ];
  let currentRows=[],currentDef=null,stockAllRows=[];
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -31,7 +33,7 @@
  const format=(k,v)=>{if(v===null||v===undefined)return '-';if(/percent|rate|gst/i.test(k)&&typeof v==='number')return esc(v)+'%';if(typeof v==='number'){if(/amount|value|price|total|tax|paid|cost|sales|expense|profit|credit|debit|discount|mrp|balance|collected/i.test(k))return '₹'+money(v);return money(v)}if(/date|time|created/i.test(k)){const d=new Date(v);if(!isNaN(d))return esc(d.toLocaleString('en-IN'))}return esc(v)};
 
  window.loadReports=async function(){
-  setPage('reports');title.textContent='Report Master';document.querySelector('header p').textContent='19 premium business reports with filters and export';
+  setPage('reports');title.textContent='Report Master';document.querySelector('header p').textContent='21 premium business reports with filters and export';
   currentRows=[];currentDef=null;
   const meta={
    'account-report':['▣','Accounts','Ledger / account view','blue'],
@@ -52,12 +54,14 @@
    'qty-wise-report':['#','Inventory','Quantity-wise movement','cyan'],
    'product-expiry':['◷','Inventory','Expiry and batch watch','red'],
    'gstr1':['GST','Tax','GSTR-1 outward supply summary','green'],
-   'current-stock-report':['▦','Inventory','Current stock and valuation','indigo']
+   'current-stock-report':['▦','Inventory','Current stock and valuation','indigo'],
+   'stock-date-wise-report':['⌁','Inventory','Opening, inward, outward and closing by date','teal'],
+   'stock-transfer-report':['⇄','Inventory','Outlet-to-outlet transfer audit','blue']
   };
   app.innerHTML=`<div class="content normal-report-master">
    <div class="normal-report-intro">
     <div><span class="normal-report-kicker">ANALYTICS & REPORTING</span><h2>Business Reports</h2><p>Choose a report tile to open filters, live data, Excel export and PDF print.</p></div>
-    <div class="normal-report-count"><b>19</b><span>Reports Ready</span></div>
+    <div class="normal-report-count"><b>21</b><span>Reports Ready</span></div>
    </div>
    <select id="reportType" data-no-tax-enhance="1" data-report-master="1" hidden>${defs.map(x=>`<option value="${x[0]}">${esc(x[1])}</option>`).join('')}</select>
    <div class="normal-report-grid">${defs.map(x=>{const m=meta[x[0]]||['▤','Report','Open business report','blue'];return `<button class="normal-report-tile tone-${m[3]}" onclick="openNormalReport('${x[0]}')"><div class="normal-report-tile-top"><span class="normal-report-icon">${m[0]}</span><span class="normal-report-arrow">↗</span></div><span class="normal-report-category">${esc(m[1])}</span><b>${esc(x[1])}</b><small>${esc(m[2])}</small></button>`}).join('')}</div>
