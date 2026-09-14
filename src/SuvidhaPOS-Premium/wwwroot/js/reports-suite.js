@@ -28,7 +28,13 @@
  const money=x=>Number(x||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
  const iso=d=>{const x=new Date(d);return new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,10)};
  const pretty=k=>k.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/_/g,' ').toUpperCase();
- const fileStem=()=>`SuvidhaPOS_${currentDef?.[0]||'report'}_${document.querySelector('#reportFrom')?.value||''}_${document.querySelector('#reportTo')?.value||''}`;
+ const safeFile=s=>String(s||'Report').replace(/[<>:"/\\|?*\x00-\x1F]/g,'_').replace(/\s+/g,' ').trim();
+ const billGroups=()=>{const m=new Map();(currentRows||[]).forEach(r=>{const k=String(r.SaleId||r.InvoiceNo||'');if(!m.has(k))m.set(k,{id:Number(r.SaleId||0),invoiceNo:r.InvoiceNo||k,billDate:r.BillDate,customer:r.CustomerName||'Walk-in Customer',payment:r.PaymentMode||'',format:r.PrintFormat||'',template:r.PrintTemplate||'',subTotal:r.BillSubTotal,discount:r.BillDiscount,tax:r.BillTax,total:r.BillTotal,paid:r.PaidAmount,lines:[]});m.get(k).lines.push(r)});return [...m.values()]};
+ const fileStem=()=>{const name=currentDef?.[1]||'Report',from=document.querySelector('#reportFrom')?.value||'',to=document.querySelector('#reportTo')?.value||from;
+  if(currentDef?.[0]==='bill-detail'){const bills=billGroups();if(bills.length===1)return safeFile('Bill No. '+bills[0].invoiceNo);return safeFile('Bill Detail Report From '+from+' To '+to)}
+  if(currentDef?.[0]==='current-stock-report')return safeFile('Current Stock Report As On '+(document.querySelector('#stockAsOn')?.value||to));
+  return safeFile(name+' From '+from+' To '+to)
+ };
  const raw=v=>v===null||v===undefined?'':String(v);
  const format=(k,v)=>{if(v===null||v===undefined)return '-';if(/percent|rate|gst/i.test(k)&&typeof v==='number')return esc(v)+'%';if(typeof v==='number'){if(/amount|value|price|total|tax|paid|cost|sales|expense|profit|credit|debit|discount|mrp|balance|collected/i.test(k))return '₹'+money(v);return money(v)}if(/date|time|created/i.test(k)){const d=new Date(v);if(!isNaN(d))return esc(d.toLocaleString('en-IN'))}return esc(v)};
 
