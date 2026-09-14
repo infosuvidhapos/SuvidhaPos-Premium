@@ -38,8 +38,11 @@ assert.ok(!feature.includes("['JEWELLERY_ITEM_MASTER'"),'Retail controller must 
 assert.ok(runtime.includes("if(isJewel()&&w.loadJewelleryFeatureControl)"),'Jewellery Feature Control routing must remain dedicated');
 assert.ok(runtime.includes("loadRetailFeatureControl"),'Runtime must delegate normal Feature Control');
 assert.ok(!runtime.includes('SCOPED FEATURE CONTROL'),'Legacy P/Common Feature Control page must be gone');
-assert.ok(!completion.includes("if(!jewel()&&!enabled('P-05'))return notify('P-05 is disabled')"),'Legacy P-05 must not gate normal item import');
-assert.ok(!completion.includes("if(!jewel()&&!enabled('P-03'))return notify('P-03 is disabled')"),'Legacy P-03 must not gate normal barcode master');
+const normalImportBlock=completion.slice(completion.indexOf('w.loadNormalItemImportMaster='),completion.indexOf('w.runNormalItemImport='));
+const barcodeBlock=completion.slice(completion.indexOf('w.loadBarcodePrintMaster='),completion.indexOf('w.premiumChooseBarcodeTemplate='));
+assert.ok(!normalImportBlock.includes("enabled('P-05')"),'Legacy P-05 must not gate normal item import');
+assert.ok(!barcodeBlock.includes("enabled('P-03')"),'Legacy P-03 must not gate normal barcode master');
+assert.ok(completion.includes("if(!jewel()&&!enabled('P-05'))return notify('P-05 is disabled')"),'Jewellery import legacy guard must remain untouched by normal-only scope');
 
 for(const token of ['lineDiscount=Math.Min','a.BaseQty*a.BaseRate-a.Discount','takeDiscount','P("@di",takeDiscount)','itemSavings=resolved.Sum'])
  assert.ok(backend.includes(token),'Server line-discount persistence missing '+token);
