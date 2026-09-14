@@ -492,6 +492,7 @@ record AiCommitRequest(List<AiImportRow> Rows);
 record AiPurchaseCommitRequest(string? InvoiceNo,int? SupplierId,string? SupplierName,string? PaymentMode,decimal PaidAmount,decimal Discount,List<AiImportRow> Rows,DateTime? PurchaseDate=null,string? RequestId=null,string? PreviewToken=null);
 record NameRequest(string Name); record PartyRequest(string Name,string? Phone,string? Address,string? GstIn,decimal OpeningBalance);
 record PurchaseRequest(string? InvoiceNo,int? SupplierId,string? SupplierName,string? PaymentMode,decimal PaidAmount,decimal Discount,string? Notes,List<PurchaseLine> Lines,DateTime? PurchaseDate=null,string? RequestId=null);
+record PrintSnapshotRequest(string Html);
 record PurchaseLine(int ProductId,string? BatchNo,decimal Qty,decimal FreeQuantity,decimal Cost,decimal SalePrice,decimal Mrp,decimal TaxRate,DateTime? ManufactureDate,DateTime? ExpiryDate=null,string? UnitPurchased=null,decimal PurchasedQty=0m,decimal TotalBaseQty=0m,decimal RatePerPurchasedUnit=0m,decimal? DiscountPer=null,string? TaxMode="INCLUSIVE",decimal? MrpPerPurchasedUnit=null);
 record SaleRequest(int? CustomerId,string? CustomerName,string? PaymentMode,decimal PaidAmount,decimal Discount,string? Notes,List<SaleLine> Lines);
 record SaleLine(int ProductId,decimal Qty,decimal SalePrice,decimal TaxRate,decimal Discount,string? UnitSold=null,decimal SoldQty=0m,decimal BaseQty=0m,decimal RatePerSoldUnit=0m);
