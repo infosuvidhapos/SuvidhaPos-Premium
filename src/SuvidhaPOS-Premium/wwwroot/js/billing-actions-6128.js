@@ -1,12 +1,14 @@
 (function(w,d){
 'use strict';
-var PRINT_KEY='Print.ActionMode',allowed=['DIRECT','PDF','PREVIEW'],currentMode='DIRECT',modeLoaded=true,injectBusy=false,lastNormalRoot=null,lastJewelRoot=null;
+var PRINT_KEY='Print.Normal.ActionMode',JEWEL_PRINT_KEY='Print.ActionMode',allowed=['DIRECT','PDF','PREVIEW'],currentMode='DIRECT',modeLoaded=true,injectBusy=false,lastNormalRoot=null,lastJewelRoot=null;
 function q(s){return d.querySelector(s)}
 function qa(s){return Array.prototype.slice.call(d.querySelectorAll(s))}
 function notice(m){try{toast(m)}catch(_){}}
+function jewelPage(){return d.body.classList.contains('jewel-suite-mode')||!!q('.js-invoice-page')&&!q('.counter-billing')}
+function actionKey(){return jewelPage()?JEWEL_PRINT_KEY:PRINT_KEY}
 async function readMode(){
  try{
-  const row=await api('/api/app-settings/'+encodeURIComponent(PRINT_KEY));
+  const row=await api('/api/app-settings/'+encodeURIComponent(actionKey()));
   const saved=String(row?.Value??row?.value??'DIRECT').toUpperCase();
   currentMode=allowed.includes(saved)?saved:'DIRECT';
  }catch(_){currentMode='DIRECT'}
@@ -14,7 +16,7 @@ async function readMode(){
 }
 async function saveMode(mode,show){
  mode=String(mode||'DIRECT').toUpperCase();if(allowed.indexOf(mode)<0)mode='DIRECT';currentMode=mode;modeLoaded=true;syncRadios();
- try{await api('/api/app-settings/'+encodeURIComponent(PRINT_KEY),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:mode})});if(show)notice('Bill print mode: '+(mode==='DIRECT'?'Direct Print':mode==='PDF'?'Save As PDF':'Print & Preview'))}catch(e){if(show)notice('Print mode selected for this bill')}
+ try{await api('/api/app-settings/'+encodeURIComponent(actionKey()),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:mode})});if(show)notice('Bill print mode: '+(mode==='DIRECT'?'Direct Print':mode==='PDF'?'Save As PDF':'Print & Preview'))}catch(e){if(show)notice('Print mode selected for this bill')}
  return mode;
 }
 w.billingSetPrintMode=function(mode){return saveMode(mode,true)};
@@ -37,7 +39,12 @@ function clearNormal(){
 w.cbClearBillList=clearNormal;
 w.cbRemoveBillRow=function(i){if(typeof state==='undefined'||!state.cart||!state.cart[i])return;try{w.cbSelectRow(i)}catch(_){};if(typeof w.cbRemoveSelected==='function')w.cbRemoveSelected()};
 function startNewBill(root,isJewel){
- if(isJewel){if(lastJewelRoot===root)return;lastJewelRoot=root}else{if(lastNormalRoot===root)return;lastNormalRoot=root}
+ if(isJewel){
+  if(lastJewelRoot===root)return;lastJewelRoot=root;
+  currentMode='DIRECT';modeLoaded=true;syncRadios();
+  return;
+ }
+ if(lastNormalRoot===root)return;lastNormalRoot=root;
  modeLoaded=false;readMode();
 }
 function patchNormal(){
