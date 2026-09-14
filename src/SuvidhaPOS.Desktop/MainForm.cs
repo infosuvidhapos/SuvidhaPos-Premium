@@ -183,6 +183,20 @@ public sealed class MainForm : Form
                 var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
                 await HandlePrintHtmlAsync(msg);
             }
+            else if (string.Equals(type, "saveTextFile", StringComparison.OrdinalIgnoreCase))
+            {
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                var file=SafeFileName(string.IsNullOrWhiteSpace(msg.FileName)?"SuvidhaPOS Report.xls":msg.FileName!);
+                var path=UniquePath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),file));
+                File.WriteAllText(path,msg.Content??string.Empty,new UTF8Encoding(true));
+                await SendDesktopResultAsync("saveTextFile",null,path);
+                MessageBox.Show(this,"Report saved on Desktop:\n"+path,"SuvidhaPOS Report",MessageBoxButtons.OK,MessageBoxIcon.Information);
+            }
+            else if (string.Equals(type, "printHtmlBatch", StringComparison.OrdinalIgnoreCase))
+            {
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                await HandlePrintHtmlBatchAsync(msg);
+            }
         }
         catch (Exception ex)
         {
@@ -194,7 +208,7 @@ public sealed class MainForm : Form
     {
         if (string.IsNullOrWhiteSpace(msg.Html)) return;
         var mode = (msg.Mode ?? "PREVIEW").Trim().ToUpperInvariant();
-        if (mode is not ("DIRECT" or "PDF" or "PREVIEW")) mode = "PREVIEW";
+        if (mode is not ("DIRECT" or "PDF" or "PREVIEW" or "REPORT_PDF")) mode = "PREVIEW";
 
         using var host = new Form
         {
@@ -239,6 +253,17 @@ public sealed class MainForm : Form
             return;
         }
 
+        if (mode == "REPORT_PDF")
+        {
+            var safe=SafeFileName(string.IsNullOrWhiteSpace(msg.FileName)?"SuvidhaPOS Report.pdf":msg.FileName!);
+            if(!safe.EndsWith(".pdf",StringComparison.OrdinalIgnoreCase))safe+=".pdf";
+            var path=UniquePath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),safe));
+            if(!await viewer.CoreWebView2.PrintToPdfAsync(path))throw new InvalidOperationException("Report PDF could not be created.");
+            await SendDesktopResultAsync("reportPdf",null,path);
+            MessageBox.Show(this,"PDF saved on Desktop:\n"+path,"SuvidhaPOS Report",MessageBoxButtons.OK,MessageBoxIcon.Information);
+            return;
+        }
+
         if (mode == "PDF")
         {
             var safe = string.IsNullOrWhiteSpace(msg.FileName) ? "SuvidhaPOS-Bill" : msg.FileName!;
@@ -262,6 +287,49 @@ public sealed class MainForm : Form
         var closed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         host.FormClosed += (_, _) => closed.TrySetResult(true);
         await closed.Task;
+    }
+
+    private async Task HandlePrintHtmlBatchAsync(DesktopMessage msg)
+    {
+        if(msg.Items is null||msg.Items.Count==0)return;
+        var folder=SafeFileName(string.IsNullOrWhiteSpace(msg.FolderName)?"Bill Detail Report":msg.FolderName!);
+        var dir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),folder);
+        Directory.CreateDirectory(dir);
+        foreach(var item in msg.Items)
+        {
+            if(string.IsNullOrWhiteSpace(item.Html))continue;
+            var file=SafeFileName(string.IsNullOrWhiteSpace(item.FileName)?"Bill.pdf":item.FileName!);
+            if(!file.EndsWith(".pdf",StringComparison.OrdinalIgnoreCase))file+=".pdf";
+            var path=UniquePath(Path.Combine(dir,file));
+            await SaveHtmlPdfAsync(item.Html!,path);
+        }
+        await SendDesktopResultAsync("reportPdfBatch",null,dir);
+        MessageBox.Show(this,$"{msg.Items.Count} bill PDF(s) saved on Desktop:\n"+dir,"SuvidhaPOS Bill Detail",MessageBoxButtons.OK,MessageBoxIcon.Information);
+    }
+
+    private async Task SaveHtmlPdfAsync(string html,string path)
+    {
+        using var host=new Form{Width=1000,Height=800,StartPosition=FormStartPosition.Manual,Location=new Point(-32000,-32000),ShowInTaskbar=false};
+        using var viewer=new WebView2{Dock=DockStyle.Fill};host.Controls.Add(viewer);host.Show(this);
+        await viewer.EnsureCoreWebView2Async();
+        var loaded=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        void Done(object? _,CoreWebView2NavigationCompletedEventArgs a){viewer.CoreWebView2.NavigationCompleted-=Done;loaded.TrySetResult(a.IsSuccess);}
+        viewer.CoreWebView2!.NavigationCompleted+=Done;viewer.NavigateToString(html);
+        if(!await loaded.Task.WaitAsync(TimeSpan.FromSeconds(10)))throw new InvalidOperationException("Bill HTML could not be rendered.");
+        if(!await viewer.CoreWebView2.PrintToPdfAsync(path))throw new InvalidOperationException("Bill PDF could not be created.");
+    }
+
+    private static string SafeFileName(string name)
+    {
+        foreach(var ch in Path.GetInvalidFileNameChars())name=name.Replace(ch,'_');
+        return string.IsNullOrWhiteSpace(name)?"SuvidhaPOS Report":name.Trim();
+    }
+    private static string UniquePath(string path)
+    {
+        if(!File.Exists(path))return path;
+        var dir=Path.GetDirectoryName(path)??"",name=Path.GetFileNameWithoutExtension(path),ext=Path.GetExtension(path);
+        for(var i=2;i<1000;i++){var candidate=Path.Combine(dir,$"{name} ({i}){ext}");if(!File.Exists(candidate))return candidate;}
+        return Path.Combine(dir,$"{name} {DateTime.Now:yyyyMMddHHmmssfff}{ext}");
     }
 
     private void SaveRememberedLogin(DesktopMessage msg)
@@ -354,7 +422,8 @@ public sealed class MainForm : Form
         }catch{}
     }
 
-    private sealed record DesktopMessage(string? Type, bool? Enabled = null, string? UserName = null, string? Password = null, string? Target = null, string? Path = null, string? Html = null, string? Mode = null, string? FileName = null);
+    private sealed record DesktopPrintItem(string? Html=null,string? FileName=null);
+    private sealed record DesktopMessage(string? Type, bool? Enabled = null, string? UserName = null, string? Password = null, string? Target = null, string? Path = null, string? Html = null, string? Mode = null, string? FileName = null, string? Content = null, string? FolderName = null, List<DesktopPrintItem>? Items = null);
     private sealed class RememberedLogin { public string UserName { get; set; } = ""; public string EncryptedPassword { get; set; } = ""; }
 }
 
