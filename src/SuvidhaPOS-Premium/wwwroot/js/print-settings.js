@@ -32,6 +32,7 @@
  const num=n=>Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:3});
  const pct=n=>Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2});
  const currency=mode=>String(mode||state.currency).toUpperCase()==='RS'?'Rs. ':'₹';
+ const jewellery=()=>document.body.classList.contains('jewel-suite-mode')||String((window.suvidhaOutlet||{}).StoreType||'').toLowerCase()==='jewellery shop';
  async function setting(key,fallback){try{const x=await api('/api/app-settings/'+encodeURIComponent(key));return x.Value??x.value??fallback}catch{return fallback}}
  async function loadState(){
    state.mode=await setting(K.mode,'Thermal');
@@ -39,6 +40,7 @@
    state.template=await setting(K.template,state.mode==='A4'?'A01':'T01');
    state.currency=String(await setting(K.currency,'SYMBOL')).toUpperCase()==='RS'?'RS':'SYMBOL';
    if(state.mode==='Thermal'&&!/^T\d\d$/.test(state.template))state.template='T01';
+   if(jewellery()&&state.template==='T11')state.template='T01';
    if(state.mode==='A4'&&!/^A\d\d$/.test(state.template))state.template='A01';
  }
  function sample(){
@@ -122,7 +124,7 @@ ${styleCss(template,thermal)}
      <div class="footer">Thank You! Visit Again<br><span class="muted">Suvidha POS · ${esc(template)}</span></div>
    </div>${autoPrint?'<script>window.onload=function(){setTimeout(function(){window.print()},100)}<\/script>':''}</body></html>`;
  }
- function stylesFor(mode){return mode==='A4'?A4:THERMAL}
+ function stylesFor(mode){return mode==='A4'?A4:(jewellery()?THERMAL.filter(x=>x[0]!=='T11'):THERMAL)}
  function cards(){
    const list=stylesFor(state.mode),box=document.querySelector('#pmStyles');if(!box)return;
    box.innerHTML=list.map(x=>`<button class="pm-style ${state.template===x[0]?'selected':''}" onclick="selectPrintTemplate('${x[0]}')"><span>${x[0]}</span><b>${esc(x[1])}</b><small>${esc(x[2])}</small></button>`).join('');
@@ -165,11 +167,11 @@ ${styleCss(template,thermal)}
    if(!w)return toast('Popup blocked');w.document.write(html);w.document.close();w.print()
  };
  window.loadPrintSettings=async function(){
-   setPage('settings');title.textContent='Print Master';document.querySelector('header p').textContent='11 Thermal + 10 A4 bill styles with live preview';
+   setPage('settings');title.textContent='Print Master';document.querySelector('header p').textContent=(jewellery()?'10':'11')+' Thermal + 10 A4 bill styles with live preview';
    await loadState();
    app.innerHTML=`<div class="content print-master"><div class="panel pm-head"><div><h2>🖨 BILL PRINT MASTER</h2><p class="muted">Choose a default bill layout. New bills remember the selected paper and style for reprint.</p></div><div id="pmStatus" class="tag">21 Styles Available</div></div>
     <div class="pm-layout"><div class="panel pm-controls">
-      <div class="pm-tabs"><button class="pm-tab ${state.mode==='Thermal'?'active':''}" data-mode="Thermal" onclick="setPrintMode('Thermal')">Thermal Printer · 11</button><button class="pm-tab ${state.mode==='A4'?'active':''}" data-mode="A4" onclick="setPrintMode('A4')">A4 Printer · 10</button></div>
+      <div class="pm-tabs"><button class="pm-tab ${state.mode==='Thermal'?'active':''}" data-mode="Thermal" onclick="setPrintMode('Thermal')">${jewellery()?'Thermal Printer · 10':'Thermal Printer · 11'}</button><button class="pm-tab ${state.mode==='A4'?'active':''}" data-mode="A4" onclick="setPrintMode('A4')">A4 Printer · 10</button></div>
       <div id="pmWidthWrap" class="pm-width" style="display:${state.mode==='Thermal'?'grid':'none'}"><label>Thermal Paper Width<select class="select" onchange="setThermalWidth(this.value)"><option ${state.width==='80MM'?'selected':''}>80MM</option><option ${state.width==='58MM'?'selected':''}>58MM</option></select></label><label>Currency Print<select class="select" onchange="setPrintCurrency(this.value)"><option value="SYMBOL" ${state.currency==='SYMBOL'?'selected':''}>₹ Symbol</option><option value="RS" ${state.currency==='RS'?'selected':''}>Rs. fallback</option></select></label></div>
       <div id="pmStyles" class="pm-styles"></div>
       <div class="toolbar"><button class="btn" onclick="savePrintMaster()">Save as Default</button><button class="btn secondary" onclick="printMasterTest()">Print Test</button></div>
