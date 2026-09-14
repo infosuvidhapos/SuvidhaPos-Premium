@@ -9,7 +9,8 @@ const files={
  import:'src/SuvidhaPOS-Premium/wwwroot/js/purchase-import-ui.js',
  feature:'src/SuvidhaPOS-Premium/wwwroot/js/sidebar-feature-control.js',
  inventory:'src/SuvidhaPOS-Premium/wwwroot/js/inventory-master.js',
- reports:'src/SuvidhaPOS-Premium/wwwroot/js/reports-suite.js'
+ reports:'src/SuvidhaPOS-Premium/wwwroot/js/reports-suite.js',
+ desktop:'src/SuvidhaPOS-Premium/wwwroot/js/desktop-bridge.js'
 };
 for(const [name,file] of Object.entries(files)){const s=read(file);assert.doesNotThrow(()=>new Function(s),name+' JS must parse')}
 
@@ -53,6 +54,15 @@ for(const token of ['StockDamageEntries','StockReceipts','StockTransfers','Stock
 assert.ok(inv.includes("if(jewel())return loadDashboard()"),'Inventory Master must be normal-only');
 
 const reports=read(files.reports);
+for(const token of ['Bill No. ','Bill Detail Report From ','desktopSaveTextFile','desktopPrintHtmlBatch','previewBillDetailOriginal','getInvoicePrintArtifact'])
+ assert.ok(reports.includes(token)||read(files.print).includes(token)||read(files.desktop).includes(token),'Historical report export missing '+token);
+const printSchema=read('src/SuvidhaPOS-Premium/Database/print-schema.sql');
+for(const token of ['PrintSnapshotHtml','PrintSnapshotAt'])assert.ok(printSchema.includes(token),'Print snapshot schema missing '+token);
+const program=read('src/SuvidhaPOS-Premium/Program.cs');
+assert.ok(program.includes('/api/sales/{id:int}/print-snapshot'),'Immutable bill snapshot endpoint missing');
+const desktopHost=read('src/SuvidhaPOS.Desktop/MainForm.cs');
+for(const token of ['REPORT_PDF','saveTextFile','printHtmlBatch','DesktopDirectory','HandlePrintHtmlBatchAsync'])
+ assert.ok(desktopHost.includes(token),'Desktop report save support missing '+token);
 for(const token of ["['stock-date-wise-report','Stock Report Date Wise']","['stock-transfer-report','Stock Transfer Report']","21 premium business reports","<b>21</b>"])
  assert.ok(reports.includes(token),'Report Master missing '+token);
 
@@ -65,4 +75,4 @@ const manual=read('src/SuvidhaPOS-Premium/ManualPurchaseService.cs');
 assert.ok(manual.includes('Bill No is required'),'Backend Bill No guard missing');
 assert.ok(!manual.includes('?"PUR-"+Guid.NewGuid()'),'Manual purchase must not auto-generate Bill No');
 
-console.log('PASS: hold modal, print action, A4 A11, purchase validation/import delete, Inventory Master and reports');
+console.log('PASS: hold modal, print action, A4 A11, purchase validation/import delete, Inventory Master, historical bill detail and Desktop exports');
