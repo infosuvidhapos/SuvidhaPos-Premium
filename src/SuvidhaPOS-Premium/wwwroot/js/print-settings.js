@@ -140,7 +140,7 @@ ${styleCss(template,thermal)}
    const f=document.querySelector('#pmPreview');if(!f)return;
    f.className='pm-preview '+(state.mode==='A4'?('a4 '+(jewellery()?'portrait':a4Orientation(state.template))):'thermal');
    f.srcdoc=buildHtml(sample(),state.mode,state.template,state.width,false,state.currency);
-   const label=document.querySelector('#pmSelected');if(label)label.textContent=state.template+' · '+(stylesFor(state.mode).find(x=>x[0]===state.template)?.[1]||'')+' · '+(state.mode==='Thermal'?state.width:'A4');
+   const label=document.querySelector('#pmSelected');if(label)label.textContent=state.template+' · '+(stylesFor(state.mode).find(x=>x[0]===state.template)?.[1]||'')+' · '+(state.mode==='Thermal'?state.width:('A4 '+(jewellery()?'PORTRAIT':a4Orientation(state.template).toUpperCase())));
  }
  window.selectPrintTemplate=function(id){state.template=id;if(id==='T11'){state.mode='Thermal';state.width='80MM';const x=document.querySelector('#pmWidthWrap select');if(x)x.value='80MM'}cards();preview()};
  window.setPrintMode=function(mode){
@@ -166,7 +166,7 @@ ${styleCss(template,thermal)}
       api('/api/app-settings/'+encodeURIComponent(K.currency),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:state.currency})}),
       ...(!jewellery()?[api('/api/app-settings/'+encodeURIComponent(K.normalAction),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:state.action})})]:[])
     ]);
-    document.querySelector('#pmStatus').textContent='Saved default: '+state.template+' · '+format;
+    document.querySelector('#pmStatus').textContent='Saved: '+state.template+' · '+format+(jewellery()?'':' · '+(state.action==='DIRECT'?'Direct Print':state.action==='PDF'?'Save As PDF':'Print & Preview'));
     toast('Print Master saved');
    }catch(e){alert(e.message)}
  };
