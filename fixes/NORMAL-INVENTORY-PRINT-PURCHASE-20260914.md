@@ -17,3 +17,9 @@ Scope: normal Retail / Canteen only. Jewellery navigation, billing, item master,
 - N-25 Inventory ledger: Damage, Receive and Transfer are SQL transactions with document rows + StockLedger movement. Transfer is IN_TRANSIT and deducts source stock batch-wise.
 - N-26 Stock reports: add Stock Report Date Wise and Stock Transfer Report to normal Report Master.
 - N-27 SQL validation: existing isolated retail transaction test now maps InventoryMasterModules and verifies damage, receive, transfer and date-wise stock behavior.
+
+- N-28 Bill Detail historical fidelity: every new normal sale stores an immutable rendered bill snapshot on first print. Bill Detail uses stored PrintFormat / PrintTemplate for legacy reconstruction and the saved snapshot thereafter.
+- N-29 Bill Detail export naming: Bill No search saves as `Bill No. <InvoiceNo>`; date-range export uses `Bill Detail Report From <YYYY-MM-DD> To <YYYY-MM-DD>`.
+- N-30 Mixed Thermal/A4 range PDFs: Windows desktop export creates a range-named Desktop folder and saves each bill as its own exact-size PDF, avoiding forced A4 conversion of thermal receipts.
+- N-31 Report export naming: every normal report Excel/PDF uses report name plus selected From/To date; Current Stock uses `As On <date>`.
+- N-32 Desktop direct save: normal report Excel/PDF export is saved directly to the Windows Desktop with duplicate-safe file names.
