@@ -19,7 +19,10 @@ async function saveMode(mode,show){
  try{await api('/api/app-settings/'+encodeURIComponent(actionKey()),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:mode})});if(show)notice('Bill print mode: '+(mode==='DIRECT'?'Direct Print':mode==='PDF'?'Save As PDF':'Print & Preview'))}catch(e){if(show)notice('Print mode selected for this bill')}
  return mode;
 }
-w.billingSetPrintMode=function(mode){return saveMode(mode,true)};
+w.billingSetPrintMode=function(mode){
+ mode=String(mode||'DIRECT').toUpperCase();if(allowed.indexOf(mode)<0)mode='DIRECT';
+ currentMode=mode;modeLoaded=true;syncRadios();notice('This bill: '+(mode==='DIRECT'?'Direct Print':mode==='PDF'?'Save As PDF':'Print & Preview'));return mode
+};
 w.billingGetPrintMode=async function(){return modeLoaded?currentMode:await readMode()};
 function checked(mode){return currentMode===mode?' checked':''}
 function printBox(){return '<div class="billing-print-actions" id="billingPrintActions"><b>Bill Print</b><label><input type="radio" name="billingPrintAction" value="DIRECT"'+checked('DIRECT')+' onchange="billingSetPrintMode(this.value)"> Direct Print</label><label><input type="radio" name="billingPrintAction" value="PDF"'+checked('PDF')+' onchange="billingSetPrintMode(this.value)"> Save As PDF</label><label><input type="radio" name="billingPrintAction" value="PREVIEW"'+checked('PREVIEW')+' onchange="billingSetPrintMode(this.value)"> Print &amp; Preview</label></div>'}
@@ -65,7 +68,7 @@ function patch(){if(injectBusy)return;injectBusy=true;requestAnimationFrame(func
 new MutationObserver(patch).observe(q('#app')||d.body,{childList:true,subtree:true});
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',function(){readMode();patch()});else{readMode();patch()}
 
-/* Global bill printing: exactly DIRECT / PDF / PREVIEW. DIRECT is the default for every new bill. */
+/* Global bill printing: exactly DIRECT / PDF / PREVIEW. Normal default comes from Print Master; bill radios override only the current bill. */
 w.premiumPrintHtml=async function(html,name,modeOverride){
  var mode=String(modeOverride||'').toUpperCase();
  if(allowed.indexOf(mode)<0)mode=modeLoaded?currentMode:await readMode();
