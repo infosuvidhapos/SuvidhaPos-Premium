@@ -327,7 +327,9 @@ public sealed class MainForm : Form
     private static string UniquePath(string path)
     {
         if(!File.Exists(path))return path;
-        var dir=Path.GetDirectoryName(path)??"",name=Path.GetFileNameWithoutExtension(path),ext=Path.GetExtension(path);
+        var dir=Path.GetDirectoryName(path)??"";
+        var name=Path.GetFileNameWithoutExtension(path);
+        var ext=Path.GetExtension(path);
         for(var i=2;i<1000;i++){var candidate=Path.Combine(dir,$"{name} ({i}){ext}");if(!File.Exists(candidate))return candidate;}
         return Path.Combine(dir,$"{name} {DateTime.Now:yyyyMMddHHmmssfff}{ext}");
     }
