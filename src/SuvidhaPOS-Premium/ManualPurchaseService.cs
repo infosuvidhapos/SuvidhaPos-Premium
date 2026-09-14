@@ -10,6 +10,7 @@ internal static class ManualPurchaseService
     internal static async Task<IResult> Commit(Db db,global::PurchaseRequest x,string user)
     {
         if(x.Lines is null||x.Lines.Count==0)return Results.BadRequest(new{message="Add purchase items"});
+        if(string.IsNullOrWhiteSpace(x.InvoiceNo))return Results.BadRequest(new{message="Bill No is required"});
         if(x.Discount<0||x.PaidAmount<0||(x.RequestId?.Length??0)>100)return Results.BadRequest(new{message="Invalid bill discount, paid amount or request ID"});
         var requestId=string.IsNullOrWhiteSpace(x.RequestId)?Guid.NewGuid().ToString("N"):x.RequestId.Trim();var digest=PurchaseImportRules.Hash(x);
         using var c=db.CreateConnection();await c.OpenAsync();using var tx=c.BeginTransaction(IsolationLevel.Serializable);
@@ -36,7 +37,7 @@ internal static class ManualPurchaseService
                 prepared.Add((l,unit,mode,pq,pr,l.DiscountPer.HasValue?PurchaseImportRules.Sale(purchasedMrp,l.DiscountPer.Value)/factor:l.SalePrice,lineTax));
             }
             var total=sub+tax-x.Discount;if(total<0||x.PaidAmount>total)throw new InvalidOperationException("Discount or paid amount exceeds bill total");
-            var invoice=string.IsNullOrWhiteSpace(x.InvoiceNo)?"PUR-"+Guid.NewGuid().ToString("N")[..16]:PurchaseImportRules.Name(x.InvoiceNo);var date=(x.PurchaseDate??DateTime.Today).Date;var supplier=PurchaseImportRules.Name(x.SupplierName??"Walk-in Supplier");
+            var invoice=PurchaseImportRules.Name(x.InvoiceNo);var date=(x.PurchaseDate??DateTime.Today).Date;var supplier=PurchaseImportRules.Name(x.SupplierName??"Walk-in Supplier");
             if(date.Year<1900)throw new InvalidOperationException("Invalid purchase date");
             if(x.SupplierId.HasValue){using var supplierCmd=Command(c,tx,"SELECT Name FROM Suppliers WHERE Id=@id AND IsActive=1",PurchasePostingService.P("@id",x.SupplierId));var found=(await supplierCmd.ExecuteScalarAsync())?.ToString()??throw new InvalidOperationException("Supplier is inactive or missing");if(!string.IsNullOrWhiteSpace(x.SupplierName)&&PurchaseImportRules.Key(x.SupplierName)!=PurchaseImportRules.Key(found))throw new InvalidOperationException("Selected supplier does not match supplier name");supplier=found;}
             var invoiceKey=PurchaseImportRules.Hash(new{Supplier=PurchaseImportRules.Key(supplier),Invoice=PurchaseImportRules.Key(invoice),Date=date});await CheckInvoice(c,tx,invoiceKey,supplier,invoice,date);await SaveRequest(c,tx,requestId,digest,"{}");

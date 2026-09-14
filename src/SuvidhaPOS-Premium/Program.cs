@@ -236,6 +236,16 @@ app.MapPut("/api/settings",async(Db db,SettingsRequest x)=>{await db.ScalarAsync
 
 app.MapGet("/api/sales/{id:int}",async(Db db,int id)=>Results.Ok(await db.QuerySingleAsync("SELECT s.*,CAST(s.GrandTotal-s.Tax-s.TotalCost AS decimal(18,2)) Profit FROM Sales s WHERE s.Id=@id",P("@id",id))));
 app.MapGet("/api/sales/{id:int}/lines",async(Db db,int id)=>Results.Ok(await db.QueryAsync("SELECT sl.*,p.Name,p.Barcode,b.BatchNo,b.ExpiryDate FROM SaleLines sl JOIN Products p ON p.Id=sl.ProductId JOIN ProductBatches b ON b.Id=sl.BatchId WHERE sl.SaleId=@id",P("@id",id))));
+app.MapPut("/api/sales/{id:int}/print-snapshot",async(Db db,int id,PrintSnapshotRequest x)=>{
+ if(string.IsNullOrWhiteSpace(x.Html))return Results.BadRequest(new{message="Bill snapshot HTML is required"});
+ if(x.Html.Length>3000000)return Results.BadRequest(new{message="Bill snapshot is too large"});
+ using var c=db.CreateConnection();await c.OpenAsync();
+ using var cmd=new SqlCommand(@"UPDATE Sales SET PrintSnapshotHtml=CASE WHEN NULLIF(PrintSnapshotHtml,'') IS NULL THEN @h ELSE PrintSnapshotHtml END,
+ PrintSnapshotAt=CASE WHEN NULLIF(PrintSnapshotHtml,'') IS NULL THEN SYSDATETIME() ELSE PrintSnapshotAt END
+ WHERE Id=@id",c);
+ cmd.Parameters.AddRange(new[]{P("@h",x.Html),P("@id",id)});
+ var n=await cmd.ExecuteNonQueryAsync();return n==0?Results.NotFound():Results.Ok(new{saved=true});
+});
 app.MapPost("/api/sales/{id:int}/void",async(Db db,HttpContext ctx,int id,VoidRequest x)=>{var u=(SessionUser)ctx.Items["User"]!;using var c=db.CreateConnection();await c.OpenAsync();using var tx=c.BeginTransaction();try{var cmd=new SqlCommand("SELECT Status FROM Sales WITH(UPDLOCK) WHERE Id=@id",c,tx);cmd.Parameters.Add(P("@id",id));var status=(await cmd.ExecuteScalarAsync())?.ToString();if(status!="Completed")return Results.BadRequest(new{message="Only completed bills can be cancelled"});cmd=new SqlCommand("SELECT ProductId,BatchId,Quantity FROM SaleLines WHERE SaleId=@id",c,tx);cmd.Parameters.Add(P("@id",id));using var r=await cmd.ExecuteReaderAsync();var lines=new List<(int p,int b,decimal q)>();while(await r.ReadAsync())lines.Add((r.GetInt32(0),r.GetInt32(1),r.GetDecimal(2)));await r.CloseAsync();foreach(var l in lines){cmd=new SqlCommand("UPDATE ProductBatches SET Quantity=Quantity+@q WHERE Id=@b;INSERT StockLedger(ProductId,BatchId,MovementType,Quantity,ReferenceType,ReferenceId,Notes) VALUES(@p,@b,'VOID_SALE',@q,'SALE',@id,@n)",c,tx);cmd.Parameters.AddRange(new[]{P("@q",l.q),P("@b",l.b),P("@p",l.p),P("@id",id),P("@n",x.Reason)});await cmd.ExecuteNonQueryAsync();}cmd=new SqlCommand("UPDATE Sales SET Status='Cancelled',CancelledAt=SYSDATETIME(),CancelledBy=@u WHERE Id=@id",c,tx);cmd.Parameters.AddRange(new[]{P("@u",u.UserName),P("@id",id)});await cmd.ExecuteNonQueryAsync();cmd=new SqlCommand("INSERT AuditLogs(UserName,Action,Entity,EntityId,Details) VALUES(@u,'BILL_CANCELLED','Sale',@id,@d)",c,tx);cmd.Parameters.AddRange(new[]{P("@u",u.UserName),P("@id",id),P("@d",x.Reason??"Bill cancelled; stock restored batch-wise")});await cmd.ExecuteNonQueryAsync();await tx.CommitAsync();return Results.Ok(new{cancelled=true,stockRestored=true});}catch{await tx.RollbackAsync();throw;}});
 app.MapGet("/api/customers/{id:int}/ledger",async(Db db,int id)=>Results.Ok(await db.QueryAsync(@"SELECT 'SALE' Type,InvoiceNo RefNo,BillDate TxnDate,GrandTotal Debit,CAST(0 AS decimal(18,2)) Credit FROM Sales WHERE CustomerId=@id AND Status='Completed' UNION ALL SELECT 'RECEIPT',CONCAT('REC-',Id),PaymentDate,CAST(0 AS decimal(18,2)),Amount FROM CustomerPayments WHERE CustomerId=@id ORDER BY TxnDate DESC",P("@id",id))));
 app.MapPost("/api/customers/{id:int}/payments",async(Db db,int id,PartyPaymentRequest x)=>Results.Ok(new{id=await db.ScalarAsync("INSERT CustomerPayments(CustomerId,Amount,PaymentMode,ReferenceNo,Notes) VALUES(@id,@a,@m,@r,@n);SELECT CAST(SCOPE_IDENTITY() AS int)",P("@id",id),P("@a",x.Amount),P("@m",x.PaymentMode),P("@r",x.ReferenceNo),P("@n",x.Notes))}));
@@ -418,6 +428,7 @@ SuvidhaPOS.Premium.BillManagementModules.Map(app);
 SuvidhaPOS.Premium.PremiumFeatureModules.Map(app);
 SuvidhaPOS.Premium.PremiumCompletionModules.Map(app);
 SuvidhaPOS.Premium.RetailExpansionModules.Map(app);
+SuvidhaPOS.Premium.InventoryMasterModules.Map(app);
 SuvidhaPOS.Premium.PurchaseImportModules.Map(app);
 SuvidhaPOS.Premium.DayCloseAutomationModules.Map(app);
 SuvidhaPOS.Premium.JewelleryRegisterModules.Map(app);
@@ -481,6 +492,7 @@ record AiCommitRequest(List<AiImportRow> Rows);
 record AiPurchaseCommitRequest(string? InvoiceNo,int? SupplierId,string? SupplierName,string? PaymentMode,decimal PaidAmount,decimal Discount,List<AiImportRow> Rows,DateTime? PurchaseDate=null,string? RequestId=null,string? PreviewToken=null);
 record NameRequest(string Name); record PartyRequest(string Name,string? Phone,string? Address,string? GstIn,decimal OpeningBalance);
 record PurchaseRequest(string? InvoiceNo,int? SupplierId,string? SupplierName,string? PaymentMode,decimal PaidAmount,decimal Discount,string? Notes,List<PurchaseLine> Lines,DateTime? PurchaseDate=null,string? RequestId=null);
+record PrintSnapshotRequest(string Html);
 record PurchaseLine(int ProductId,string? BatchNo,decimal Qty,decimal FreeQuantity,decimal Cost,decimal SalePrice,decimal Mrp,decimal TaxRate,DateTime? ManufactureDate,DateTime? ExpiryDate=null,string? UnitPurchased=null,decimal PurchasedQty=0m,decimal TotalBaseQty=0m,decimal RatePerPurchasedUnit=0m,decimal? DiscountPer=null,string? TaxMode="INCLUSIVE",decimal? MrpPerPurchasedUnit=null);
 record SaleRequest(int? CustomerId,string? CustomerName,string? PaymentMode,decimal PaidAmount,decimal Discount,string? Notes,List<SaleLine> Lines);
 record SaleLine(int ProductId,decimal Qty,decimal SalePrice,decimal TaxRate,decimal Discount,string? UnitSold=null,decimal SoldQty=0m,decimal BaseQty=0m,decimal RatePerSoldUnit=0m);

@@ -38,6 +38,8 @@
   window.desktopBackupStartup=(enabled)=>send('backupStartup',{enabled:!!enabled});
   window.desktopOpenPath=(path)=>send('openPath',{path});
   window.desktopPrintHtml=(html,mode='PREVIEW',fileName='SuvidhaPOS-Bill')=>send('printHtml',{html,mode,fileName});
+  window.desktopSaveTextFile=(fileName,content)=>send('saveTextFile',{fileName,content});
+  window.desktopPrintHtmlBatch=(items,folderName)=>send('printHtmlBatch',{items,folderName});
 
 
   // Authentication is owned exclusively by login-authfix7.js.
