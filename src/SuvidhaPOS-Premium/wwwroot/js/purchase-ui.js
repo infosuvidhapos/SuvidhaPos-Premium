@@ -37,7 +37,7 @@ function hidePurchaseSuggestions(){const box=d.getElementById('bpSuggest');if(bo
 function renderPurchaseSuggestions(list=purchaseMatches(read('bpScan'))){
  const box=d.getElementById('bpSuggest');if(!box)return;if(purchaseSuggestIndex>=list.length)purchaseSuggestIndex=Math.max(0,list.length-1);
  box.innerHTML=list.map((x,i)=>`<button type="button" class="rp-purchase-suggestion ${i===purchaseSuggestIndex?'active':''}" onmousedown="event.preventDefault()" onclick="bpPickPurchaseItem(${x.Id})"><span><b>${esc(x.Name)}</b><small>${esc(x.Barcode||'No barcode')}${x.Sku?' · '+esc(x.Sku):''}</small></span><em>₹${money(x.PurchasePrice||0)}</em></button>`).join('');
- box.style.display=list.length?'grid':'none';box.querySelector('.active')?.scrollIntoView({block:'nearest'})
+ box.style.display=list.length?'grid':'none';box.querySelector('.active')?.scrollIntoView?.({block:'nearest'})
 }
 w.bpSearchChanged=function(){purchaseSuggestIndex=0;renderPurchaseSuggestions()};
 w.bpSearchKey=function(e){
