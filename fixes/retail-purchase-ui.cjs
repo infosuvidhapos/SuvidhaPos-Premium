@@ -69,7 +69,7 @@ test('existing pack/inner configuration reopens enabled and keeps conversion',as
  }finally{await new Promise(r=>setTimeout(r,0));h.close()}
 });
 test('purchase allows batch discount and inclusive cost without product master writes',async()=>{
- const h=harness();try{await h.w.loadPurchase();await h.w.openBarcodePurchase();h.input('bpScan','QA-001');await h.w.barcodePurchaseScan();
+ const h=harness();try{await h.w.loadPurchase();await h.w.openBarcodePurchase();h.input('bpi','QA-PUR-001');h.input('bpScan','QA-001');await h.w.barcodePurchaseScan();
  assert.equal(h.w.S.barPurLines[0].TaxMode,'INCLUSIVE');
  h.w.barcodePurchaseSet(0,'Mrp','100');h.w.barcodePurchaseSet(0,'DiscountPer','10');
  assert.equal(h.w.S.barPurLines[0].SalePrice,90);
@@ -81,7 +81,7 @@ test('purchase allows batch discount and inclusive cost without product master w
  }finally{await new Promise(r=>setTimeout(r,0));h.close()}
 });
 test('uncertain purchase save retries same payload and cannot double-submit',async()=>{
- const h=harness();try{await h.w.loadPurchase();await h.w.openBarcodePurchase();h.input('bpScan','QA-001');await h.w.barcodePurchaseScan();
+ const h=harness();try{await h.w.loadPurchase();await h.w.openBarcodePurchase();h.input('bpi','QA-PUR-RETRY');h.input('bpScan','QA-001');await h.w.barcodePurchaseScan();
  let attempts=0;h.routes.set('/api/purchases',async()=>{attempts++;if(attempts===1)throw Error('Connection lost');return {id:3,total:70,alreadyImported:true}});
  await h.w.saveBarcodePurchase();assert.equal(h.w.document.querySelector('#bpi').disabled,true,'Unknown outcome freezes edits');
  await Promise.all([h.w.saveBarcodePurchase(),h.w.saveBarcodePurchase()]);
