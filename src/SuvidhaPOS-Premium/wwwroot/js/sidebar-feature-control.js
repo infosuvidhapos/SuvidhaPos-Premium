@@ -4,6 +4,7 @@ const PREFIX='Sidebar.Feature.';
 const catalog=[
  ['BILLING','New Billing',['[data-page="billing"]'],['New Billing']],
  ['ITEM_MASTER','Item Master',['[data-page="products"]'],['Item Master','Items & Inventory']],
+ ['INVENTORY_MASTER','Inventory Master',['[data-page="inventorymaster"]'],['Inventory Master']],
  ['CATEGORY_MASTER','Category Master',[],['Category Entry','Category Master']],
  ['AI_IMPORT','AI Import',[],['AI Import']],
  ['ITEM_IMPORT','Item Import Master',[],['Item Import','Item Import Master']],
@@ -64,7 +65,7 @@ w.loadRetailFeatureControl=async function(){
  if(typeof setPage==='function')setPage('featurecontrol');if(typeof title!=='undefined')title.textContent='Feature Control';const hp=d.querySelector('header p');if(hp)hp.textContent='Normal billing masters and module switches';
  if(!admin()){app.innerHTML='<div class="content"><div class="alert">Admin / Manager permission required.</div></div>';return}
  if(!loaded)await load();
- app.innerHTML='<div class="content completion-page feature-access-page"><div class="panel completion-hero"><div><span class="completion-kicker">NORMAL BILLING ACCESS</span><h2>Feature Control</h2><p>Enable or disable normal Retail / Canteen masters and modules here. Jewellery controls stay separate.</p></div><span class="tag">'+catalog.length+' OPTIONS</span></div><div class="panel"><div class="feature-grid">'+catalog.map(([key,name])=>'<label class="feature-flag"><span><b>'+esc(name)+'</b></span><input type="checkbox" '+(state[key]!==false?'checked':'')+' onchange="sidebarFeatureToggle(\''+key+'\',this.checked)"></label>').join('')+'</div></div></div>'
+ app.innerHTML='<div class="content completion-page feature-access-page"><div class="panel completion-hero"><div><span class="completion-kicker">NORMAL BILLING ACCESS</span><h2>Feature Control</h2><p>To disable any option, simply untick it. Tick it again whenever you want to enable it.</p></div><div class="toolbar"><span class="tag">'+catalog.length+' OPTIONS</span><button class="btn secondary" onclick="loadDashboard()">← Back</button></div></div><div class="panel"><div class="feature-grid">'+catalog.map(([key,name])=>'<label class="feature-flag"><span><b>'+esc(name)+'</b></span><input type="checkbox" '+(state[key]!==false?'checked':'')+' onchange="sidebarFeatureToggle(\''+key+'\',this.checked)"></label>').join('')+'</div></div></div>'
 };
 w.loadPremiumFeatureControl=w.loadRetailFeatureControl;
 w.sidebarFeatureToggle=async function(key,on){try{await api('/api/app-settings/'+encodeURIComponent(PREFIX+key),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:on?'true':'false'})});state[key]=!!on;apply();toast((on?'Enabled: ':'Disabled: ')+(catalog.find(x=>x[0]===key)?.[1]||key))}catch(e){alert(e.message||e)}};
@@ -76,6 +77,7 @@ function gates(){
  if(!loaded||d.body.classList.contains('jewel-suite-mode'))return;
  gate('BILLING',['loadBilling']);
  gate('ITEM_MASTER',['loadProducts']);
+ gate('INVENTORY_MASTER',['loadInventoryMaster']);
  gate('CATEGORY_MASTER',['loadCategoryMaster']);
  gate('AI_IMPORT',['loadAIImport']);
  gate('ITEM_IMPORT',['loadNormalItemImportMaster']);
