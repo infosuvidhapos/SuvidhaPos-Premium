@@ -285,8 +285,15 @@ FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId JOIN Products p ON p.Id=sl.Prod
                     sql=@"SELECT p.PurchaseDate,p.InvoiceNo,p.SupplierName,p.PaymentMode,p.SubTotal,p.Discount,p.Tax,p.GrandTotal,p.PaidAmount,CAST(p.GrandTotal-p.PaidAmount AS decimal(18,2)) Balance
 FROM Purchases p WHERE p.PurchaseDate>=@f AND p.PurchaseDate<@e AND (@q='' OR p.InvoiceNo LIKE @like OR p.SupplierName LIKE @like) ORDER BY p.PurchaseDate DESC"; break;
                 case "bill-detail":
-                    sql=@"SELECT s.BillDate,s.InvoiceNo,s.CustomerName,p.Name ItemName,p.Barcode,p.Hsn,p.Category,sl.Quantity,sl.SalePrice,sl.Discount LineDiscount,sl.TaxRate,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*100/(100+sl.TaxRate)-sl.Discount ELSE sl.Quantity*sl.SalePrice-sl.Discount END AS decimal(18,2)) TaxableValue,CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*sl.TaxRate/(100+sl.TaxRate) ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100 END AS decimal(18,2)) TaxAmount
-FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId JOIN Products p ON p.Id=sl.ProductId WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e AND (@q='' OR s.InvoiceNo LIKE @like OR s.CustomerName LIKE @like OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like) ORDER BY s.BillDate DESC,s.InvoiceNo,p.Name"; break;
+                    sql=@"SELECT s.Id SaleId,s.BillDate,s.InvoiceNo,s.CustomerName,s.PaymentMode,s.SubTotal BillSubTotal,s.Discount BillDiscount,s.Tax BillTax,s.GrandTotal BillTotal,s.PaidAmount,
+ s.PrintFormat,s.PrintTemplate,CAST(CASE WHEN NULLIF(s.PrintSnapshotHtml,'') IS NULL THEN 0 ELSE 1 END AS bit) PrintSnapshotSaved,
+ p.Name ItemName,p.Barcode,p.Hsn,p.Category,sl.Quantity,sl.SalePrice,sl.Discount LineDiscount,sl.TaxRate,CAST(sl.Quantity*sl.SalePrice AS decimal(18,2)) LineGross,
+ CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*100/(100+sl.TaxRate)-sl.Discount ELSE sl.Quantity*sl.SalePrice-sl.Discount END AS decimal(18,2)) TaxableValue,
+ CAST(CASE WHEN sl.TaxMode='INCLUSIVE' THEN sl.Quantity*sl.SalePrice*sl.TaxRate/(100+sl.TaxRate) ELSE (sl.Quantity*sl.SalePrice-sl.Discount)*sl.TaxRate/100 END AS decimal(18,2)) TaxAmount
+ FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId JOIN Products p ON p.Id=sl.ProductId
+ WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e
+ AND (@q='' OR s.InvoiceNo LIKE @like OR s.CustomerName LIKE @like OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like)
+ ORDER BY s.BillDate DESC,s.InvoiceNo,sl.Id"; break;
                 case "qty-wise-report":
                     sql=@"SELECT p.Name,p.Barcode,p.Category,CAST(ISNULL(SUM(CASE WHEN s.BillDate>=@f AND s.BillDate<@e AND s.Status='Completed' THEN sl.Quantity ELSE 0 END),0) AS decimal(18,3)) SoldQty,CAST(ISNULL((SELECT SUM(b.Quantity) FROM ProductBatches b WHERE b.ProductId=p.Id),0) AS decimal(18,3)) CurrentStock,p.Unit
 FROM Products p LEFT JOIN SaleLines sl ON sl.ProductId=p.Id LEFT JOIN Sales s ON s.Id=sl.SaleId WHERE p.IsActive=1 AND (@q='' OR p.Name LIKE @like OR ISNULL(p.Barcode,'') LIKE @like) GROUP BY p.Id,p.Name,p.Barcode,p.Category,p.Unit ORDER BY SoldQty DESC,p.Name"; break;
