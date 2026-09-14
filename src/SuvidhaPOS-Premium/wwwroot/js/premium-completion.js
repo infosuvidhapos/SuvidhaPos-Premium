@@ -19,15 +19,17 @@ function ensureNav(){
   ['[data-page="reports"]','P-15'],['[data-page="billmaster"]','P-16'],
   ['#barcodeMasterNav','P-03']
  ];
- visibility.forEach(function(v){side.querySelectorAll(v[0]).forEach(function(x){x.style.display=enabled(v[1])?'':'none'})});
- side.querySelectorAll('.sidebottom .plain').forEach(function(x){if(x.textContent.indexOf('Print Master')>=0)x.style.display=enabled('P-17')?'':'none'});
+ if(jewel()){
+  visibility.forEach(function(v){side.querySelectorAll(v[0]).forEach(function(x){x.style.display=enabled(v[1])?'':'none'})});
+  side.querySelectorAll('.sidebottom .plain').forEach(function(x){if(x.textContent.indexOf('Print Master')>=0)x.style.display=enabled('P-17')?'':'none'});
+ }
  if(!jewel()){
    side.querySelectorAll('[data-page="aiimport"],[data-page="itemimport"],[data-page="openingstock"]').forEach(function(x){x.remove()});var im=side.querySelector('[data-page="itemimport"] span');if(im)im.textContent='Item Import Master';
    var bottom=side.querySelector('.sidebottom');
-   if(bottom&&enabled('P-03')&&!d.getElementById('barcodeMasterNav')){
+   if(bottom&&!d.getElementById('barcodeMasterNav')){
      var b=d.createElement('button');b.id='barcodeMasterNav';b.className='plain';b.innerHTML='▥ Barcode Print Master';b.onclick=function(){w.loadBarcodePrintMaster()};bottom.insertBefore(b,bottom.querySelector('.logoutBtn')||bottom.firstChild);
    }
-   if(bottom&&enabled('P-20')&&!d.getElementById('featureControlNav')){
+   if(bottom&&!d.getElementById('featureControlNav')){
      var f=d.createElement('button');f.id='featureControlNav';f.className='plain';f.innerHTML='⚑ Feature Control';f.onclick=function(){w.loadPremiumFeatureControl()};bottom.appendChild(f);
    }
  }else{
@@ -46,13 +48,10 @@ new MutationObserver(function(){ensureNav()}).observe(d.getElementById('sidebar'
 
 w.loadPremiumFeatureControl=async function(){
  if(jewel()&&w.loadJewelleryFeatureControl)return w.loadJewelleryFeatureControl();
-
- head('featurecontrol','Feature Control','Application module switches');
- if(!manager())return app.innerHTML='<div class="content"><div class="alert">Admin / Manager permission required.</div></div>';
- var rows=[];try{rows=await api('/api/premium/features')}catch(err){return app.innerHTML='<div class="content"><div class="alert">'+e(err.message)+'</div></div>'}
- var names={'P-01':'Jewellery Item Master','P-02':'Jewellery Billing','P-03':'Barcode Print Master','P-04':'Outlet Website Sync','P-05':'Item Import Master','P-06':'AI Import','P-08':'HUID / Hallmark','P-11':'Jewellery Menus','P-12':'Metal Rates','P-13':'Multi Payment','P-14':'Old Metal Register','P-15':'Reports','P-16':'Bill Management / Audit','P-17':'Print Master','P-20':'Feature Control'};
- var visible=rows.filter(function(x){return !!names[x.PointerCode]});
- app.innerHTML='<div class="content completion-page"><div class="panel completion-hero"><div><span class="completion-kicker">MODULE CONTROL</span><h2>Feature Control</h2><p>Enable or disable actual app modules without deleting data.</p></div><span class="tag">ADMIN</span></div><div class="panel"><div class="feature-grid">'+visible.map(function(x){return '<label class="feature-flag"><span><b>'+e(x.PointerCode)+'</b><strong>'+e(names[x.PointerCode])+'</strong></span><input type="checkbox" '+(x.IsEnabled?'checked':'')+' '+(x.PointerCode==='P-20'?'disabled':'')+' onchange="premiumToggleFeature(\''+e(x.PointerCode)+'\',this.checked)"></label>'}).join('')+'</div></div></div>';
+ if(typeof w.loadRetailFeatureControl==='function')return w.loadRetailFeatureControl();
+ head('featurecontrol','Feature Control','Loading normal billing masters and modules');
+ app.innerHTML='<div class="content"><div class="panel">Loading Feature Control…</div></div>';
+ setTimeout(function(){if(typeof w.loadRetailFeatureControl==='function')w.loadRetailFeatureControl()},120);
 };
 w.premiumToggleFeature=async function(code,on){try{await api('/api/premium/features/'+encodeURIComponent(code),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({IsEnabled:on})});C.flags[code]=on;notify(code+' '+(on?'enabled':'disabled'));setTimeout(function(){location.reload()},300)}catch(err){alert(err.message)}};
 
@@ -146,7 +145,6 @@ function importShell(titleText,sub,badge,extra){
  head('aiimport',titleText,sub);app.innerHTML='<div class="content completion-page item-import-master"><div class="panel completion-hero"><div><span class="completion-kicker">'+e(badge)+'</span><h2>'+e(titleText)+'</h2><p>'+e(sub)+'</p></div><span class="tag">EXCEL • PDF • CSV • IMAGE</span></div>'+extra+'<div class="panel"><label>Source File<input id="imFile" class="input" type="file" accept=".pdf,.xlsx,.xls,.csv,.txt,image/*"></label><label style="display:block;margin-top:10px">Notes / Pasted Messy Data<textarea id="imMessage" class="textarea" placeholder="Paste unstructured item rows, WhatsApp list, invoice text or column hints..."></textarea></label><div class="toolbar" style="margin-top:12px"><button id="imExtractBtn" class="btn"></button><button id="imSampleBtn" class="btn secondary">Download Sample Excel</button></div></div><div id="imPreview" style="margin-top:14px"></div></div>';
 }
 w.loadNormalItemImportMaster=function(){
- if(!jewel()&&!enabled('P-05'))return notify('P-05 is disabled');
  importShell('Normal Item Import Master','Normal billing fields only. Jewellery Metal/Purity/HUID/Gram fields are intentionally excluded.','P-05 NORMAL','<div class="panel import-rules"><div class="formgrid"><label>Default GST Mode<select id="nimGstMode" class="select"><option value="INCLUSIVE">Inclusive Tax</option><option value="EXCLUSIVE">Exclusive Tax</option></select></label><label>Default GST %<select id="nimGst" class="select"><option>0</option><option>3</option><option>5</option><option>12</option><option>18</option><option>28</option></select></label></div><div class="rule-grid"><div><b>Units</b><span>PCS / BOX / PACK / STRIP / KG / LTR</span></div><div><b>Tax</b><span>Inclusive / Exclusive, HSN, GST%, MRP</span></div><div><b>Inventory</b><span>Location, Rack, Shelf, Minimum Stock</span></div><div><b>Existing items</b><span>Protected · matching masters are skipped</span></div></div></div>');
  d.getElementById('imExtractBtn').textContent='Extract & Clean Normal Items';d.getElementById('imExtractBtn').onclick=w.runNormalItemImport;d.getElementById('imSampleBtn').onclick=w.downloadNormalItemSample;
 };
@@ -206,7 +204,6 @@ function labelHtml(x,scope,template){
  return '<div class="barcode-label normal-label '+template+'"><b>'+e(name)+'</b><span>'+e(x.Sku||x.Category||'')+'</span>'+barcodeSvg(code)+'<small>MRP ₹'+money(x.Mrp)+' · Sale ₹'+money(x.SalePrice)+'</small></div>';
 }
 w.loadBarcodePrintMaster=async function(){
- if(!jewel()&&!enabled('P-03'))return notify('P-03 is disabled');
  C.barcodeScope=jewel()?'JEWELLERY':'NORMAL';head('settings','Barcode Print Master',(C.barcodeScope==='JEWELLERY'?'10 Jewellery':'20 Normal')+' barcode label formats');
  try{C.barcodeItems=C.barcodeScope==='JEWELLERY'?await api('/api/jewellery/item-master'):await api('/api/products?size=1000')}catch(err){return app.innerHTML='<div class="content"><div class="alert">'+e(err.message)+'</div></div>'}
  var templates=C.barcodeScope==='JEWELLERY'?jewelTemplates:normalTemplates;C.barcodeTemplate=templates[0][0];
@@ -276,11 +273,10 @@ w.saveOutlet=async function(){
  try{var saved=await api('/api/outlet',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});notify('Outlet saved locally · website sync queued');if(w.refreshLoginOutlet)w.refreshLoginOutlet(true);w.dispatchEvent(new CustomEvent('suvidha:outlet-saved',{detail:saved||o}));w.backgroundOutletSync('PUSH','save',false)}catch(err){alert(err.message)}
 };
 
-function startupSync(){if(!enabled('P-04'))return;w.backgroundOutletSync('PULL','startup',false)}
+function startupSync(){w.backgroundOutletSync('PULL','startup',false)}
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',function(){setTimeout(startupSync,500)});else setTimeout(startupSync,500);
 var authSeen=false,lastOwnershipCheck=0;
 function ownershipPulse(reason){
- if(!enabled('P-04'))return;
  var now=Date.now();if(now-lastOwnershipCheck<60000)return;lastOwnershipCheck=now;
  w.backgroundOutletSync('PULL',reason||'periodic',false);
 }
