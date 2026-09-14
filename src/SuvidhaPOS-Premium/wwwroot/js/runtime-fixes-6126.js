@@ -104,11 +104,15 @@ function renderImport(scope){var j=scope==='JEWELLERY',rows=j?C.jewelRows:C.norm
 w.directItemCommit=async function(scope){var rows=scope==='JEWELLERY'?C.jewelRows:C.normalRows,file=byId('diFile')&&byId('diFile').files[0];if(!rows||!rows.length)return alert('Upload & Preview first.');for(var i=0;i<rows.length;i++){if(required(scope,rows[i]).length&&rows[i].Resolution!=='SKIP')return alert('Row '+(i+1)+': mandatory fields missing. Correct or Skip.')}try{var r=await api(scope==='JEWELLERY'?'/api/import/jewellery/commit':'/api/import/normal/commit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({SourceFileName:file?file.name:null,Rows:rows})});notify((scope==='JEWELLERY'?'Jewellery':'Normal')+' import: '+r.added+' added, '+r.updated+' updated, '+r.skipped+' skipped');scope==='JEWELLERY'?w.loadJewelleryItemImportMaster():w.loadNormalItemImportMaster()}catch(err){alert(err.message)}};
 
 /* ===== Feature Control scope + Jewellery menu entry. ===== */
-var JEWELLERY_ONLY={'P-01':1,'P-02':1,'P-08':1,'P-09':1,'P-11':1,'P-12':1,'P-13':1,'P-14':1};
-// The jewellery shell owns its single Feature Control navigation entry.
+// The jewellery shell owns its Feature Control. Normal Retail / Canteen uses the
+// real master/module controller from sidebar-feature-control.js (no P-xx flags).
 w.loadPremiumFeatureControl=async function(){
  if(isJewel()&&w.loadJewelleryFeatureControl)return w.loadJewelleryFeatureControl();
-setHead('settings','Premium Feature Control',isJewel()?'Jewellery + common controls':'Normal billing + common controls');if(!manager())return appBox().innerHTML='<div class="content"><div class="alert">Admin / Manager permission required.</div></div>';var rows=[];try{rows=await api('/api/premium/features')}catch(err){return appBox().innerHTML='<div class="content"><div class="alert">'+esc(err.message)+'</div></div>'}var show=rows.filter(function(x){return isJewel()||!JEWELLERY_ONLY[x.PointerCode]});appBox().innerHTML='<div class="content completion-page"><div class="panel completion-hero"><div><span class="completion-kicker">SCOPED FEATURE CONTROL</span><h2>'+(isJewel()?'Jewellery Shop':'Normal Billing')+' Features</h2><p>Jewellery-only controls Normal billing me hidden hain. Common controls dono workspaces me available hain.</p></div><span class="tag">'+show.length+' OPTIONS</span></div><div class="panel"><div class="feature-grid">'+show.map(function(x){var j=!!JEWELLERY_ONLY[x.PointerCode];return'<label class="feature-flag"><span><b>'+esc(x.PointerCode)+'</b><strong>'+esc(x.FeatureName)+'</strong><em class="feature-scope-badge '+(j?'jewel':'')+'">'+(j?'JEWELLERY':'COMMON')+'</em></span><input type="checkbox" '+(x.IsEnabled?'checked':'')+' onchange="premiumToggleFeature(\''+esc(x.PointerCode)+'\',this.checked)"></label>'}).join('')+'</div></div></div>'};
+ if(typeof w.loadRetailFeatureControl==='function')return w.loadRetailFeatureControl();
+ setHead('featurecontrol','Feature Control','Loading normal billing masters and module switches');
+ appBox().innerHTML='<div class="content"><div class="panel">Loading Feature Control…</div></div>';
+ setTimeout(function(){if(typeof w.loadRetailFeatureControl==='function')w.loadRetailFeatureControl()},120);
+};
 
 
 })(window,document);
