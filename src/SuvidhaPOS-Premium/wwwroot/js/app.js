@@ -200,6 +200,7 @@ const sidebarRoutes={
   dashboard:['loadDashboard'],
   billing:['loadBilling'],
   products:['loadProducts'],
+  inventorymaster:['loadInventoryMaster'],
   openingstock:['loadOpeningStockMaster','loadOpeningStock'],
   purchase:['loadPurchase'],
   sales:['loadSales'],
