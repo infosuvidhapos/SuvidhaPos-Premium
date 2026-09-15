@@ -58,6 +58,8 @@ jobs:
         run: node fixes/test-retail-thermal-account-reports.cjs
       - name: Validate Print Master backup and thermal runtime fixes
         run: node fixes/test-print-settings-backup-thermal.cjs
+      - name: Validate final login and live outlet sync
+        run: node fixes/test-login-sync-final.cjs
       - name: Validate BTC day-close fixes
         shell: powershell
         run: |
