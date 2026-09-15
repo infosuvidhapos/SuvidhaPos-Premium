@@ -18,7 +18,8 @@ public sealed class MainForm : Form
     private string BaseUrl => $"http://127.0.0.1:{Port}/";
     private static string InstallDir => AppContext.BaseDirectory;
     private static string ConfigPath => Path.Combine(InstallDir, "Database.config.json");
-    private static string RememberedLoginPath => Path.Combine(InstallDir, "RememberedLogin.json");
+    private static string RememberedLoginDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SuvidhaPOS Premium");
+    private static string RememberedLoginPath => Path.Combine(RememberedLoginDirectory, "RememberedLogin.json");
     private static readonly JsonSerializerOptions DesktopJsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public MainForm()
@@ -40,13 +41,13 @@ public sealed class MainForm : Form
         {
             await StartBackendAsync();
             await InitializeWebViewAsync();
-            web.CoreWebView2!.Navigate(BaseUrl + "?build=6120complete");
+            web.CoreWebView2!.Navigate(BaseUrl + "?build=6320");
         }
         catch (Exception ex)
         {
             MessageBox.Show(this,
                 "SuvidhaPOS Premium could not start.\n\n" + ex.Message +
-                "\n\nUse Change Database from the login page after startup.",
+                "\n\nRestart SuvidhaPOS. If the problem continues, use Contact Support.",
                 "SuvidhaPOS Premium",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
@@ -137,6 +138,13 @@ public sealed class MainForm : Form
                     else if (File.Exists(RememberedLoginPath)) File.Delete(RememberedLoginPath);
                 }
                 catch { }
+            }
+            else if (string.Equals(type, "windowsHello", StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(this,
+                    "Windows Hello sign-in is available when Windows Hello is configured for this Windows account.",
+                    "SuvidhaPOS Premium",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else if (string.Equals(type, "exit", StringComparison.OrdinalIgnoreCase))
             {
@@ -472,6 +480,7 @@ public sealed class MainForm : Form
         try
         {
             if (msg.Enabled != true) { if (File.Exists(RememberedLoginPath)) File.Delete(RememberedLoginPath); return; }
+            Directory.CreateDirectory(RememberedLoginDirectory);
             var data = new RememberedLogin { UserName = msg.UserName ?? "", EncryptedPassword = Protect(msg.Password ?? "") };
             File.WriteAllText(RememberedLoginPath, JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true }));
         }

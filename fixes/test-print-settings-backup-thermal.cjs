@@ -31,7 +31,7 @@ for(const [name,src] of [['app',app],['outlet-master-fix',outletFix]]){
  assert.ok(!src.includes('LOCAL DATABASE'),name+' must not render LOCAL DATABASE backup card');
  assert.ok(!src.includes('Create Backup Now'),name+' must not render Create Backup Now button');
 }
-for(const token of ['/js/outlet-master-fix.js?v=6310','/js/print-settings.js?v=6310','/js/premium-completion.js?v=6310','/js/billing-actions-6128.js?v=6310','/js/retail-thermal-reports.js?v=6310'])assert.ok(html.includes(token),'Fresh cache version missing '+token);
+for(const token of ['/js/outlet-master-fix.js?v=6310','/js/print-settings.js?v=6310','/js/premium-completion.js?v=6320','/js/billing-actions-6128.js?v=6310','/js/retail-thermal-reports.js?v=6310'])assert.ok(html.includes(token),'Fresh cache version missing '+token);
 assert.ok(jewel.includes('loadBackupMaster()'),'Jewellery must expose working Database Backup route');
 assert.ok(jewel.includes('loadPrintSettings()'),'Jewellery must expose Print Master route');
 

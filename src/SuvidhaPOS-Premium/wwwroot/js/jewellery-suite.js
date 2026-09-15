@@ -1,6 +1,7 @@
 (function(){
   'use strict';
   const JS={enabled:false,mode:'retail',items:[],rates:[],cart:[],oldMetal:[],payments:[{mode:'Cash',amount:0,reference:''}],liveRateMeta:null,lastLiveSync:0};window.__jewelSuiteState=JS;
+  const NORMAL_MODE={captured:false,sidebarHtml:'',functions:{}};
   const money=n=>Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const appBox=()=>document.getElementById('app');
@@ -10,6 +11,24 @@
     return Number(r?.RatePerGram||0);
   };
   const icon=(x)=>'<span class="js-icon">'+x+'</span>';
+
+  function rememberNormalMode(){
+    if(NORMAL_MODE.captured)return;
+    const side=document.getElementById('sidebar');
+    NORMAL_MODE.sidebarHtml=side?side.innerHTML:'';
+    ['loadDashboard','loadBilling','loadPurchase','loadReports'].forEach(name=>{if(typeof window[name]==='function')NORMAL_MODE.functions[name]=window[name]});
+    NORMAL_MODE.captured=true;
+  }
+  function restoreNormalMode(type){
+    JS.enabled=false;window.__jewelSuiteEnabled=false;
+    document.body.classList.remove('jewel-suite-mode');
+    document.body.dataset.storeType=String(type||'Retail Shop').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
+    const side=document.getElementById('sidebar');
+    if(side&&NORMAL_MODE.sidebarHtml)side.innerHTML=NORMAL_MODE.sidebarHtml;
+    Object.keys(NORMAL_MODE.functions).forEach(name=>{window[name]=NORMAL_MODE.functions[name]});
+    if(document.body.getAttribute('data-authenticated')==='true'&&typeof window.loadDashboard==='function')setTimeout(()=>window.loadDashboard(),0);
+    return false;
+  }
 
   function shell(){
     const side=document.getElementById('sidebar'); if(!side)return;
@@ -261,21 +280,14 @@
     }
     if(!isJewelleryProfile(s)){
       const explicitType=String(prop(s,'StoreType','storeType')||'').trim();
-      // A Central website StoreType change must be authoritative even after Jewellery mode is active.
-      // Reload only for an explicit non-jewellery profile so stale/null refreshes never disrupt billing.
-      if(explicitType&&(JS.enabled||document.body.classList.contains('jewel-suite-mode'))){
-        JS.enabled=false;window.__jewelSuiteEnabled=false;
-        document.body.classList.remove('jewel-suite-mode');
-        document.body.dataset.storeType=explicitType.replace(/[^a-z0-9]+/gi,'-').toLowerCase();
-        try{sessionStorage.setItem('suvidha_storetype_switch',explicitType)}catch{}
-        setTimeout(()=>location.reload(),80);
-        return false;
-      }
+      if(explicitType&&(JS.enabled||document.body.classList.contains('jewel-suite-mode')))return restoreNormalMode(explicitType);
       document.body.classList.remove('jewel-suite-mode');
       window.__jewelSuiteEnabled=false;JS.enabled=false;
+      if(explicitType)document.body.dataset.storeType=explicitType.replace(/[^a-z0-9]+/gi,'-').toLowerCase();
       return false;
     }
     if(JS.enabled&&document.body.classList.contains('jewel-suite-mode'))return true;
+    rememberNormalMode();
     JS.enabled=true;window.__jewelSuiteEnabled=true;
     document.body.classList.add('jewel-suite-mode');
     document.body.dataset.storeType='jewellery-shop';
