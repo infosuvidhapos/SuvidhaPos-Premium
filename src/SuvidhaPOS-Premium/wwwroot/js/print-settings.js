@@ -214,10 +214,10 @@ ${styleCss(template,thermal)}
    return {id:Number(id),invoiceNo:x.d.h?.InvoiceNo||('Bill-'+id),billDate:x.d.h?.BillDate||null,html,
     mode:x.cfg.mode,width:x.cfg.width,template:x.cfg.template,format:x.d.h?.PrintFormat||(x.cfg.mode==='A4'?'A4 Printer':'Thermal Printer '+x.cfg.width),snapshot:!!saved};
  };
- window.printInvoice=async function(id){
+ window.printInvoice=async function(id,modeOverride){
    try{
     const a=await window.getInvoicePrintArtifact(id);
-    if(window.premiumPrintHtml)return window.premiumPrintHtml(a.html,a.invoiceNo);
+    if(window.premiumPrintHtml)return window.premiumPrintHtml(a.html,a.invoiceNo,modeOverride);
     const w=window.open('','_blank',a.mode==='Thermal'?'width=460,height=760':'width=1000,height=800');
     if(!w)return toast('Popup blocked');w.document.write(a.html);w.document.close();w.print()
    }catch(e){alert('Print failed: '+e.message)}
