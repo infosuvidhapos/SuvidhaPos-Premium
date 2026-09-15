@@ -178,7 +178,7 @@ ${styleCss(template,thermal)}
    if(!w)return toast('Popup blocked');w.document.write(html);w.document.close();w.print()
  };
  window.loadPrintSettings=async function(){
-   setPage('settings');title.textContent='Print Master';document.querySelector('header p').textContent=(jewellery()?'10 Thermal + 10 A4':'11 Thermal + 11 A4')+' bill styles with live preview';
+   setPage(jewellery()?'jPrintMaster':'settings');title.textContent='Print Master';document.querySelector('header p').textContent=(jewellery()?'10 Thermal + 10 A4':'11 Thermal + 11 A4')+' bill styles with live preview';
    await loadState();
    app.innerHTML=`<div class="content print-master"><div class="panel pm-head"><div><h2>🖨 BILL PRINT MASTER</h2><p class="muted">Choose a default bill layout. New bills remember the selected paper and style for reprint.</p></div><div id="pmStatus" class="tag">${jewellery()?'20':'22'} Styles Available</div></div>
     <div class="pm-layout"><div class="panel pm-controls">
