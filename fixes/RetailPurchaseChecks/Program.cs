@@ -90,7 +90,7 @@ try{
   foreach(var batch in System.Text.RegularExpressions.Regex.Split(File.ReadAllText(path),@"^\s*GO\s*$",System.Text.RegularExpressions.RegexOptions.Multiline|System.Text.RegularExpressions.RegexOptions.IgnoreCase))if(!string.IsNullOrWhiteSpace(batch)&&!batch.Contains("CREATE DATABASE [SuvidhaPOS]")&&!batch.TrimStart().StartsWith("USE [SuvidhaPOS]",StringComparison.OrdinalIgnoreCase))await new SqlCommand(batch,connection).ExecuteNonQueryAsync();
  }
  await new SqlCommand("IF NOT EXISTS(SELECT 1 FROM UnitMaster WHERE UnitName='PCS') INSERT UnitMaster(UnitName,UnitCode,IsActive) VALUES('PCS','PCS',1)",connection).ExecuteNonQueryAsync();
- var builder=WebApplication.CreateBuilder();builder.Configuration["ConnectionStrings:DefaultConnection"]=cs.ConnectionString;builder.Services.AddSingleton<Db>();server=builder.Build();server.Urls.Add("http://127.0.0.1:0");PurchaseImportModules.Map(server);RetailExpansionModules.Map(server);InventoryMasterModules.Map(server);
+ var builder=WebApplication.CreateBuilder();builder.Configuration["ConnectionStrings:DefaultConnection"]=cs.ConnectionString;builder.Services.AddSingleton<Db>();server=builder.Build();server.Urls.Add("http://127.0.0.1:0");PurchaseImportModules.Map(server);RetailExpansionModules.Map(server);InventoryMasterModules.Map(server);RetailThermalReportModules.Map(server);
  var productType=typeof(RetailItemRules).Assembly.GetType("ProductRequest")!;
  var purchaseType=typeof(RetailItemRules).Assembly.GetType("PurchaseRequest")!;
  var jsonOptions=new JsonSerializerOptions{PropertyNameCaseInsensitive=true};
@@ -179,6 +179,12 @@ try{
   Check(Convert.ToInt32(await new SqlCommand("SELECT COUNT(*) FROM StockLedger WHERE ProductId="+inventoryId+" AND MovementType='STOCK_TRANSFER_OUT' AND Quantity<0",connection).ExecuteScalarAsync())>=1,"Transfer ledger movement exists");
   var dateWise=await http.GetAsync("/api/inventory/stock-date-wise?from=2020-01-01&to=2035-12-31&q=Inventory");Check(dateWise.IsSuccessStatusCode,"Date-wise stock endpoint reads ledger movements");
   Console.WriteLine("PASS: Inventory damage, receive, transfer and date-wise stock SQL transactions");
+  foreach(var type in new[]{"account-report","cashier-report","payment-mode-report","expense-report","day-close-report","audit-trail-report"})
+  {
+   var report=await http.GetAsync("/api/reports/thermal/"+type+"?from=2020-01-01&to=2035-12-31&cashier=&q=");
+   Check(report.IsSuccessStatusCode,"80mm thermal report endpoint executes on SQL Server: "+type+" :: "+await report.Content.ReadAsStringAsync());
+  }
+  Console.WriteLine("PASS: six 80mm account/closing report endpoints execute on isolated SQL Server");
  var rateZero=await http.PostAsJsonAsync("/api/retail/item-rates/apply",new{rows=new[]{new{productId=protectedId,discountPer=0}}});Check(rateZero.IsSuccessStatusCode,"Explicit zero discount is a valid rate update");
  Check(Convert.ToDecimal(await new SqlCommand("SELECT SalePrice FROM Products WHERE Id="+protectedId,connection).ExecuteScalarAsync())==150,"Explicit zero discount resets selling price to current purchase-updated MRP");
  var invalidRate=await http.PostAsJsonAsync("/api/retail/item-rates/apply",new{rows=new[]{new{productId=protectedId,discountPer=101}}});Check(invalidRate.StatusCode==HttpStatusCode.BadRequest,"Invalid discount rejects rate update");

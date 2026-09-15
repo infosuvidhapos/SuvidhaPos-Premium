@@ -63,7 +63,7 @@ assert.ok(program.includes('/api/sales/{id:int}/print-snapshot'),'Immutable bill
 const desktopHost=read('src/SuvidhaPOS.Desktop/MainForm.cs');
 for(const token of ['REPORT_PDF','saveTextFile','printHtmlBatch','DesktopDirectory','HandlePrintHtmlBatchAsync'])
  assert.ok(desktopHost.includes(token),'Desktop report save support missing '+token);
-for(const token of ["['stock-date-wise-report','Stock Report Date Wise']","['stock-transfer-report','Stock Transfer Report']","21 premium business reports","<b>21</b>"])
+for(const token of ["['stock-date-wise-report','Stock Report Date Wise']","['stock-transfer-report','Stock Transfer Report']","25 premium business reports","<b>25</b>"])
  assert.ok(reports.includes(token),'Report Master missing '+token);
 
 const html=read('src/SuvidhaPOS-Premium/wwwroot/index.html');
