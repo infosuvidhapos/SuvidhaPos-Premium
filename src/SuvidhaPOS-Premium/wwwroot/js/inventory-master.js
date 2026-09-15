@@ -12,6 +12,7 @@ function productOptions(){return '<option value="">-- Select Item --</option>'+p
 const items=[
  ['Opening Stock','Set opening quantity before day-to-day movement begins','opening','loadOpeningStockMaster()'],
  ['Purchase','Supplier bill entry and stock inward','purchase','loadPurchase()'],
+ ['Suppliers','Supplier master, payments and ledger','suppliers','loadSuppliers()'],
  ['Purchase Detail','Bill/item-wise purchase drilldown','detail','inventoryPurchaseDetail()'],
  ['Sale Return','Return sold stock into inventory','sale-return','inventoryOpenReturn(false)'],
  ['Purchase Return','Return stock to supplier','purchase-return','inventoryOpenReturn(true)'],
