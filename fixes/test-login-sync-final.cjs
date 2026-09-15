@@ -14,8 +14,8 @@ const desktop=read('src/SuvidhaPOS.Desktop/MainForm.cs');
 
 assert.strictEqual((html.match(/class="login-feature"/g)||[]).length,6,'login must show exactly six feature cards');
 for(const t of [
-  'POS Billing','Fast & Easy','Inventory','Complete Control','Purchase','Smart Procurement',
-  'Reports','Insightful Reports','Multi Store','Manage All Outlets','Secure & Fast','Your Data is Safe'
+  'POS Billing','Fast &amp; Easy','Inventory','Complete Control','Purchase','Smart Procurement',
+  'Reports','Insightful Reports','Multi Store','Manage All Outlets','Secure &amp; Fast','Your Data is Safe'
 ]) assert.ok(html.includes(t),'missing login feature text: '+t);
 
 assert.ok(!html.includes('Change Database'),'Change Database must not be visible on login');
