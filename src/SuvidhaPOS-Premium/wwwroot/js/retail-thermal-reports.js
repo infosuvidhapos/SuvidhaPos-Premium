@@ -80,27 +80,29 @@ function thermalCss(){return '@page{size:80mm auto;margin:2mm}*{box-sizing:borde
 }
 function stem(){
  const x=currentData||{},z=x.meta||{},name=titles[currentType]||'Report';
- return name+' Form '+(z.from||'')+' To '+(z.to||z.from||'')
+ return name+' From '+(z.from||'')+' To '+(z.to||z.from||'')
 }
 function controls(){
  const now=iso(new Date()),hasUser=!['expense-report','day-close-report'].includes(currentType);
- return '<div class="panel rtr-controls"><label>From<input id="rtrFrom" class="input" type="date" value="'+now+'"></label><label>To<input id="rtrTo" class="input" type="date" value="'+now+'"></label>'+
- (hasUser?'<label>User<select id="rtrCashier" class="select"><option value="">All</option></select></label>':'<input id="rtrCashier" type="hidden" value="">')+
- ((currentType==='expense-report'||currentType==='audit-trail-report')?'<label class="rtr-search">Search<input id="rtrQ" class="input" placeholder="Search report..."></label>':'<input id="rtrQ" type="hidden" value="">')+
- '<button class="btn" onclick="runRetailThermalReport()">Generate Report</button><button class="btn green" onclick="printRetailThermalReport(\'DIRECT\')">🖨 Thermal Print 80mm</button><button class="btn secondary" onclick="printRetailThermalReport(\'PREVIEW\')">Preview / Print</button><span id="rtrExportActions" class="report-export-actions" hidden><button class="btn secondary" onclick="saveRetailThermalPdf()">Export PDF</button><button class="btn secondary" onclick="exportRetailThermalExcel()">Export Excel</button></span></div>'
+ return '<div class="panel rtr-controls"><label>From Date<input id="rtrFrom" class="input" type="date" value="'+now+'"></label><label>To Date<input id="rtrTo" class="input" type="date" value="'+now+'"></label>'+
+ (hasUser?'<label>Cashier (optional)<select id="rtrCashier" class="select"><option value="">All cashiers</option></select></label>':'<input id="rtrCashier" type="hidden" value="">')+
+ ((currentType==='expense-report'||currentType==='audit-trail-report')?'<label class="rtr-search">Search (optional)<input id="rtrQ" class="input" placeholder="Search report..."></label>':'<input id="rtrQ" type="hidden" value="">')+
+ '<button class="btn" onclick="runRetailThermalReport()">Generate</button><button class="btn green" onclick="printRetailThermalReport(\'DIRECT\')">🖨 Thermal Print 80mm</button><button class="btn secondary" onclick="printRetailThermalReport(\'PREVIEW\')">Preview / Print</button></div>'
 }
 w.openRetailThermalReport=async function(type){
  if(!TYPES.has(type))return false;currentType=type;currentData=null;
- const host=typeof w.openNormalReportPopup==='function'?w.openNormalReportPopup():(d.querySelector('#normalReportWorkspace')||app);
- host.innerHTML='<div class="rtr-workspace normal-report-popup-content"><div class="rtr-top"><div><span>80MM THERMAL REPORT</span><h2>'+esc(titles[type])+'</h2><p>Choose current/default date filters, then Generate Report. Export actions appear after results load.</p></div><button class="btn secondary" onclick="closeNormalReport()">✕ Close</button></div>'+controls()+'<div class="rtr-preview-shell"><div id="rtrPreview" class="rtr-paper"><div class="empty">Report has not been generated yet.</div></div></div></div>';
+ if(typeof setPage==='function')setPage('reports');if(typeof title!=='undefined')title.textContent=titles[type];
+ const hp=d.querySelector('header p');if(hp)hp.textContent='80mm thermal '+String(titles[type]||'report').toLowerCase();
+ app.innerHTML='<div class="content rtr-workspace audit-report-page"><div class="rtr-top audit-report-top"><div><span>REPORT / 80MM THERMAL</span><h2>'+esc(titles[type])+'</h2><p>Current date preview opens automatically in 80mm thermal format.</p></div><button class="btn secondary" onclick="loadReports()">← Reports</button></div>'+controls()+'<div class="rtr-preview-shell audit-report-preview-shell"><div id="rtrPreview" class="rtr-paper audit-report-paper"><div class="empty">Generating '+esc(titles[type])+'...</div></div></div></div>';
+ await w.runRetailThermalReport();
  setTimeout(()=>d.querySelector('#rtrFrom')?.focus(),20);return true
 };
 w.runRetailThermalReport=async function(){
- const from=d.querySelector('#rtrFrom')?.value||iso(new Date()),to=d.querySelector('#rtrTo')?.value||from,cash=d.querySelector('#rtrCashier')?.value||'',q=d.querySelector('#rtrQ')?.value||'',actions=d.querySelector('#rtrExportActions');if(actions)actions.hidden=true;
+ const from=d.querySelector('#rtrFrom')?.value||iso(new Date()),to=d.querySelector('#rtrTo')?.value||from,cash=d.querySelector('#rtrCashier')?.value||'',q=d.querySelector('#rtrQ')?.value||'';
  try{
   const x=await api('/api/reports/thermal/'+encodeURIComponent(currentType)+'?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to)+'&cashier='+encodeURIComponent(cash)+'&q='+encodeURIComponent(q));
   currentData=x;const sel=d.querySelector('#rtrCashier'),keep=cash;if(sel&&sel.options.length<=1){(x.availableCashiers||[]).forEach(r=>{const name=text(r,'Cashier','cashier');if(!name)return;const o=d.createElement('option');o.value=name;o.textContent=name;sel.appendChild(o)});sel.value=keep}
-  const box=d.querySelector('#rtrPreview');if(box)box.innerHTML=receiptHtml(x);if(actions)actions.hidden=false
+  const box=d.querySelector('#rtrPreview');if(box)box.innerHTML=receiptHtml(x)
  }catch(e){currentData=null;const box=d.querySelector('#rtrPreview');if(box)box.innerHTML='<div class="alert">'+esc(e.message||e)+'</div>'}
 };
 w.printRetailThermalReport=async function(mode){if(!currentData)await w.runRetailThermalReport();if(!currentData)return;const html=printDoc(currentData),name=stem();if(w.premiumPrintHtml)return w.premiumPrintHtml(html,name,mode);const p=w.open('','_blank','width=480,height=820');if(!p)return alert('Popup blocked');p.document.write(html.replace('</body>','<script>window.onload=function(){window.print()}<\/script></body>'));p.document.close()};

@@ -41,7 +41,6 @@
           </div>
         </div>
         <div class="panel" style="margin-top:14px"><h3>AI CONFIGURATION</h3><p class="muted">AI import supports scanned PDF, Excel, images/handwritten notes and pasted messages.</p><div class="formgrid"><label>OpenAI API Key<input id="oaikey" class="input" type="password" placeholder="Leave blank to keep existing key"></label><label>Model<input id="oaimodel" class="input" value="gpt-5.6-luna"></label></div><button class="btn" style="margin-top:12px" onclick="saveAISettings()">Save AI Settings</button></div>
-        <div class="panel" style="margin-top:14px"><h3>LOCAL DATABASE</h3><p class="muted">Database: <b>SuvidhaPOS</b> • SQL Server local</p><button class="btn" onclick="backup()">💾 Create Backup Now</button></div>
       </div>`;
       applyOutletTypePreview();
       if(window.suvidhaBindIndiaLocation) window.suvidhaBindIndiaLocation(document.querySelector('#ostate'),document.querySelector('#ocity'));

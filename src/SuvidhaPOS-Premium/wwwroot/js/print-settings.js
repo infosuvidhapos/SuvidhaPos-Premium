@@ -136,7 +136,7 @@ ${styleCss(template,thermal)}
    const list=stylesFor(state.mode),box=document.querySelector('#pmStyles');if(!box)return;
    box.innerHTML=list.map(x=>`<button class="pm-style ${state.template===x[0]?'selected':''}" onclick="selectPrintTemplate('${x[0]}')"><span>${x[0]}</span><b>${esc(x[1])}</b><small>${esc(x[2])}</small></button>`).join('');
  }
- function purgePrintActionPanels(){document.querySelectorAll('#billingPrintActions,.billing-print-actions,#printMasterBillPrintAction').forEach(x=>x.remove())}
+ function purgePrintActionPanels(){document.querySelectorAll('#billingPrintActions,.billing-print-actions,#printMasterBillPrintAction,#premiumPrintActions,.premium-print-actions').forEach(x=>x.remove())}
  function preview(){
    const f=document.querySelector('#pmPreview');if(!f)return;
    f.className='pm-preview '+(state.mode==='A4'?('a4 '+(jewellery()?'portrait':a4Orientation(state.template))):'thermal');
