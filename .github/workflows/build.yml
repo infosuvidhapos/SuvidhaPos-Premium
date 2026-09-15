@@ -167,7 +167,8 @@ jobs:
           foreach($token in @('Print.ActionMode','Direct Print','Save As PDF','Print & Preview')){ if(-not ($ui+$print).Contains($token)){ throw "Three bill print actions missing: $token" } }
           foreach($token in @('desktopPrintHtml','printHtml')){ if(-not ($bridge+$desktop).Contains($token)){ throw "Desktop print bridge missing: $token" } }
           foreach($token in @('PrintAsync(null)','PrintToPdfAsync','ShowPrintUI')){ if(-not $desktop.Contains($token)){ throw "Native print action missing: $token" } }
-          foreach($token in @('premium-completion.js','premium-completion.css','Version 6.12.0-complete')){ if(-not $html.Contains($token)){ throw "Completion runtime asset missing: $token" } }
+          foreach($token in @('premium-completion.js','premium-completion.css','loginFooterVersion')){ if(-not $html.Contains($token)){ throw "Completion runtime asset missing: $token" } }
+          if(-not $program.Contains('app.MapGet("/public/app-info"')){ throw 'Dynamic app version endpoint missing' }
           if(-not $program.Contains('PremiumCompletionModules.Map(app)')){ throw 'PremiumCompletionModules is not mapped' }
           if(-not $program.Contains('mode=="jewellery-items"')){ throw 'Jewellery import extraction mode missing' }
           if(-not $program.Contains('p.TaxMode')){ throw 'Normal product TaxMode is not exposed' }
@@ -322,7 +323,7 @@ jobs:
         shell: powershell
         run: |
           $html=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/index.html' -Raw -Encoding UTF8
-          foreach($token in @('data-theme-toggle','theme-ui.js','Version 6.12.0-complete')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
+          foreach($token in @('data-theme-toggle','theme-ui.js','loginFooterVersion')){if(-not $html.Contains($token)){throw "Premium shell missing: $token"}}
           $app=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/app.js' -Raw -Encoding UTF8
           foreach($token in @('Business Command Center',"Today's completed billing",'window.scrollTo')){if(-not $app.Contains($token)){throw "Dashboard premium behavior missing: $token"}}
           if($app.Contains("'Live from SQL'")){throw 'Dashboard still shows Live from SQL'}
@@ -448,7 +449,7 @@ jobs:
           if(-not $sync.Contains("read(x,'StoreType','storeType')")){ throw 'Login store type sync is not camelCase tolerant' }
           $jewel = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js' -Raw -Encoding UTF8
           if($jewel.Contains('Settings & AMC')){ throw 'Jewellery menu must show Settings only' }
-          foreach($token in @('explicitType','location.reload()')){ if(-not $jewel.Contains($token)){ throw "Jewellery live StoreType exit missing: $token" } }
+          foreach($token in @('explicitType','restoreNormalMode')){ if(-not $jewel.Contains($token)){ throw "Jewellery live StoreType exit missing: $token" } }
           $jcss = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/jewellery-suite.css' -Raw -Encoding UTF8
           foreach($token in @('main>header{display:flex!important','license-pill{display:inline-flex!important')){ if(-not $jcss.Contains($token)){ throw "Jewellery validity header missing: $token" } }
           $completion = Get-Content 'src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js' -Raw -Encoding UTF8
