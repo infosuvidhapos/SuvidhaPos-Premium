@@ -57,7 +57,7 @@ ORDER BY Cashier",P("@f",f),P("@e",e));
 
     static async Task<object> Account(Db db,object meta,IReadOnlyList<Dictionary<string,object?>> cashiers,DateTime f,DateTime e,string cashier)
     {
-        var args=new[]{P("@f",f),P("@e",e),P("@cash",cashier)};
+        SqlParameter[] A()=>new[]{P("@f",f),P("@e",e),P("@cash",cashier)};
         var s=await db.QuerySingleAsync(@"SELECT
 COUNT(*) Bills,
 CAST(ISNULL(SUM(GrandTotal),0) AS decimal(18,2)) CompletedTotal,
@@ -65,13 +65,13 @@ CAST(ISNULL(SUM(Discount),0) AS decimal(18,2)) BillDiscount,
 CAST(ISNULL(SUM(Tax),0) AS decimal(18,2)) Tax,
 CAST(ISNULL(SUM(CASE WHEN PaidAmount<GrandTotal THEN GrandTotal-PaidAmount ELSE 0 END),0) AS decimal(18,2)) CreditBalance
 FROM Sales WHERE Status='Completed' AND BillDate>=@f AND BillDate<@e
-AND (@cash='' OR ISNULL(NULLIF(CashierName,''),'Unknown')=@cash)",args);
+AND (@cash='' OR ISNULL(NULLIF(CashierName,''),'Unknown')=@cash)",A());
         var itemDiscount=D(await db.ScalarAsync(@"SELECT ISNULL(SUM(sl.Discount),0) FROM SaleLines sl JOIN Sales s ON s.Id=sl.SaleId
-WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e AND (@cash='' OR ISNULL(NULLIF(s.CashierName,''),'Unknown')=@cash)",args));
+WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e AND (@cash='' OR ISNULL(NULLIF(s.CashierName,''),'Unknown')=@cash)",A()));
         var returns=D(await db.ScalarAsync("SELECT ISNULL(SUM(GrandTotal),0) FROM SalesReturns WHERE ReturnDate>=@f AND ReturnDate<@e",P("@f",f),P("@e",e)));
         var returnBills=I(await db.ScalarAsync("SELECT COUNT(*) FROM SalesReturns WHERE ReturnDate>=@f AND ReturnDate<@e",P("@f",f),P("@e",e)));
         var cancelled=I(await db.ScalarAsync(@"SELECT COUNT(*) FROM Sales WHERE BillDate>=@f AND BillDate<@e AND
-(Status<>'Completed' OR CancelledAt IS NOT NULL) AND (@cash='' OR ISNULL(NULLIF(CashierName,''),'Unknown')=@cash)",args));
+(Status<>'Completed' OR CancelledAt IS NOT NULL) AND (@cash='' OR ISNULL(NULLIF(CashierName,''),'Unknown')=@cash)",A()));
         var holdBills=I(await db.ScalarAsync("SELECT COUNT(*) FROM HeldBills WHERE HeldAt>=@f AND HeldAt<@e",P("@f",f),P("@e",e)));
         var completed=D(s.GetValueOrDefault("CompletedTotal"));
         var billDiscount=D(s.GetValueOrDefault("BillDiscount"));
