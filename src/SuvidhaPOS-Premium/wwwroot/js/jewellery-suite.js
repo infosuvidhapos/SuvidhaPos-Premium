@@ -58,6 +58,8 @@
         <div class="js-section">SYSTEM</div>
         <button id="jFeatureControlNav" class="nav js-nav" data-page="featurecontrol" onclick="loadJewelleryFeatureControl()">${icon('⚑')}<span>Feature Control</span></button>
         <button class="nav js-nav" onclick="loadSettings()">${icon('⚙')}<span>Settings</span></button>
+        <button class="nav js-nav" data-page="jPrintMaster" onclick="loadPrintSettings()">${icon('▣')}<span>Print Master</span></button>
+        <button class="nav js-nav" data-page="jBackupMaster" onclick="loadBackupMaster()">${icon('💾')}<span>Database Backup</span></button>
         <button class="nav js-nav" onclick="loadDayClosing()">${icon('▣')}<span>Day Closing</span></button>
       </div>
       <div class="js-side-user"><b>${esc(window.currentUser?.DisplayName||'Super Admin')}</b><small>${esc(window.currentUser?.Role||'Super Admin')}</small><button onclick="logout()">↪ &nbsp; Sign Out</button></div>`;
