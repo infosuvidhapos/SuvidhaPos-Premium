@@ -83,11 +83,11 @@ function stem(){
  return currentType==='account-report'&&z.from===z.to?name+' '+z.from:(name+' From '+z.from+' To '+z.to)
 }
 function controls(daily){
- const now=iso(new Date()),month=iso(new Date(new Date().getFullYear(),new Date().getMonth(),1));
+ const now=iso(new Date()),month=iso(new Date(new Date().getFullYear(),new Date().getMonth(),1)),hasUser=!['expense-report','day-close-report'].includes(currentType);
  return '<div class="panel rtr-controls">'+(daily?
  '<label>Date<input id="rtrFrom" class="input" type="date" value="'+now+'"></label><input id="rtrTo" type="hidden" value="'+now+'">':
  '<label>From<input id="rtrFrom" class="input" type="date" value="'+month+'"></label><label>To<input id="rtrTo" class="input" type="date" value="'+now+'"></label>')+
- '<label>User<select id="rtrCashier" class="select"><option value="">All</option></select></label>'+
+ (hasUser?'<label>User<select id="rtrCashier" class="select"><option value="">All</option></select></label>':'<input id="rtrCashier" type="hidden" value="">')+
  ((currentType==='expense-report'||currentType==='audit-trail-report')?'<label class="rtr-search">Search<input id="rtrQ" class="input" placeholder="Search report..."></label>':'<input id="rtrQ" type="hidden" value="">')+
  '<button class="btn" onclick="runRetailThermalReport()">Generate</button><button class="btn green" onclick="printRetailThermalReport(\'DIRECT\')">🖨 Direct Print</button><button class="btn secondary" onclick="printRetailThermalReport(\'PREVIEW\')">Preview & Print</button><button class="btn secondary" onclick="saveRetailThermalPdf()">Save PDF</button><button class="btn secondary" onclick="exportRetailThermalExcel()">Excel</button></div>'
 }
