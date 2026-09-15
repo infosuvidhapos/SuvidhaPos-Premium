@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="/css/payment-keyboard.css?v=6115jewelreports">
 <link rel="stylesheet" href="/css/multi-mode-payment.css?v=6115jewelreports">
 <link rel="stylesheet" href="/css/premium-fixes.css?v=6115jewelreports">
-<link rel="stylesheet" href="/css/login-premium.css?v=6115jewelreports">
+<link rel="stylesheet" href="/css/login-premium.css?v=6320">
 <link rel="stylesheet" href="/css/backup-master.css?v=6115jewelreports">
 <link rel="stylesheet" href="/css/specialized-pos.css?v=6190">
 <link rel="stylesheet" href="/css/premium-masters.css?v=6115jewelreports">
@@ -23,31 +23,63 @@
 <body>
 <div id="loginScreen" class="login-screen">
   <div class="login-wrap">
-    <div class="login-brand">
-      <div class="login-outlet" aria-label="Current outlet">🏪 <span id="loginOutlet">Loading outlet...</span><button class="login-theme-toggle" data-theme-toggle type="button" onclick="toggleSuvidhaTheme()">☀</button></div>
+    <section class="login-brand" aria-label="SuvidhaPOS Premium">
       <img class="login-logo" src="/img/suvidha-pos-logo.svg?v=original" alt="Suvidha POS">
-      <div class="login-kicker">Premium Billing & Inventory System</div>
+      <div class="login-kicker">Premium Billing &amp; Inventory System</div>
       <h1 class="login-title">Smart Billing<span>Stronger Business</span></h1>
       <div class="login-sub">Inventory&nbsp; | &nbsp;Purchase&nbsp; | &nbsp;Sales&nbsp; | &nbsp;Reports&nbsp; | &nbsp;Anywhere</div>
       <div class="login-features">
-        <div class="login-feature"><b>🛒</b>POS Billing</div><div class="login-feature"><b>▣</b>Inventory</div><div class="login-feature"><b>🚚</b>Purchase</div><div class="login-feature"><b>↩</b>Sales Return</div><div class="login-feature"><b>▥</b>Reports</div>
-        <div class="login-feature"><b>◷</b>Expiry Alert</div><div class="login-feature"><b>⌖</b>Rack Indexing</div><div class="login-feature"><b>✦</b>AI Item Entry</div><div class="login-feature"><b>▤</b>Multi Store</div><div class="login-feature"><b>⚡</b>Secure & Fast</div>
+        <div class="login-feature"><b>🛒</b><span>POS Billing<small>Fast &amp; Easy</small></span></div>
+        <div class="login-feature"><b>◇</b><span>Inventory<small>Complete Control</small></span></div>
+        <div class="login-feature"><b>▣</b><span>Purchase<small>Smart Procurement</small></span></div>
+        <div class="login-feature"><b>▥</b><span>Reports<small>Insightful Reports</small></span></div>
+        <div class="login-feature"><b>▤</b><span>Multi Store<small>Manage All Outlets</small></span></div>
+        <div class="login-feature"><b>⬟</b><span>Secure &amp; Fast<small>Your Data is Safe</small></span></div>
       </div>
-      <div class="login-quote">“ Organize Today<br><strong>&nbsp;&nbsp;&nbsp;Grow Tomorrow</strong> ”</div>
-      <div class="login-footer">Version 6.12.0-complete </div>
-    </div>
-    <div class="login-panel">
+      <div class="login-quote">“Organize Today<br><strong>Grow Tomorrow”</strong></div>
+      <div class="login-footer">SuvidhaPOS Premium&nbsp; | &nbsp;v<span id="loginFooterVersion">...</span></div>
+    </section>
+    <section class="login-panel">
       <div class="login-card">
+        <div class="login-outletbar" aria-label="Current outlet">
+          <div class="login-outlet-main"><span aria-hidden="true">🏪</span><span id="loginOutlet">Loading outlet...</span></div>
+          <span id="loginStoreBadge" class="login-store-badge" hidden>💎 JEWELLERY</span>
+          <button id="loginOutletRefresh" class="login-sync-btn" type="button" title="Refresh latest outlet information" aria-label="Refresh outlet information">↻</button>
+        </div>
         <h2>Welcome Back!</h2><p>Login to your SuvidhaPOS account</p>
-        <div class="login-field"><label>User ID</label><input id="loginUser" class="login-input" autocomplete="username" placeholder="Enter your user ID"></div>
-        <div class="login-field"><label>Password</label><div class="login-passbox"><input id="loginPass" class="login-input" type="password" autocomplete="current-password" placeholder="Enter your password"><button id="loginEye" class="login-eye" type="button">◉</button></div></div>
+        <div class="login-field"><label for="loginUser">User ID</label><div class="login-inputbox"><span class="login-field-icon" aria-hidden="true">♙</span><input id="loginUser" class="login-input" autocomplete="username" placeholder="Enter your User ID"></div></div>
+        <div class="login-field"><label for="loginPass">Password</label><div class="login-passbox"><span class="login-field-icon" aria-hidden="true">▢</span><input id="loginPass" class="login-input" type="password" autocomplete="current-password" placeholder="Enter your password"><button id="loginEye" class="login-eye" type="button" aria-label="Show password">◉</button></div><div id="capsLockWarning" class="login-caps" hidden>⚠ Caps Lock is ON</div></div>
         <div class="login-row"><label class="login-check"><input id="rememberMe" type="checkbox" checked> Remember Me</label><button id="forgotPasswordBtn" class="login-link" type="button">Forgot Password?</button></div>
-        <button id="loginSubmitBtn" class="login-submit" type="button" onclick="if(window.suvidhaLoginNow){return window.suvidhaLoginNow(event);}document.getElementById('loginError').textContent='LOGIN MODULE NOT LOADED (AUTHFIX6)';return false;">→ &nbsp; Login &nbsp;›</button>
+        <button id="loginSubmitBtn" class="login-submit" type="button"><span class="login-submit-label">→ &nbsp; Login &nbsp;›</span></button>
         <div class="login-or">OR</div>
-        <button id="biometricBtn" class="login-secondary" type="button">◎ &nbsp; Login with Biometrics (Optional)</button>
-        <div id="loginError" class="login-error"></div>
-        <div class="login-tools"><button id="changeDatabaseBtn" class="login-tool" type="button"><b>🗄</b>Change Database</button><button id="supportBtn" class="login-tool support" type="button" aria-label="Contact Support on WhatsApp"><b class="wa-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 3.2A12.7 12.7 0 0 0 5 22.2L3.4 28.6l6.5-1.7A12.8 12.8 0 1 0 16 3.2Zm0 22.2c-2.1 0-4.1-.6-5.8-1.8l-.4-.3-3.8 1 1-3.7-.3-.4A9.9 9.9 0 1 1 16 25.4Zm5.5-7.3c-.3-.5.3-.5.8-1.7.1-.2 0-.4 0-.6s-.7-1.7-.9-2.3c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.1 1.1-1.1 2.7 0 1.6 1.2 3.2 1.4 3.4.2.2 2.4 3.7 5.8 5.1 2.2.9 3.1 1 4.2.8.7-.1 1.8-.7 2.1-1.3.3-.6.3-1.2.2-1.3-.1-.2-.3-.3-.6-.4Z"/></svg></b>Contact Support</button><button id="exitBtn" class="login-tool exit" type="button"><b>⏻</b>Exit</button></div>
+        <button id="biometricBtn" class="login-secondary" type="button"><span class="windows-mark" aria-hidden="true">⊞</span> Login with Windows Hello</button>
+        <div id="loginError" class="login-error" role="status" aria-live="polite"></div>
+        <div class="login-tools">
+          <button id="aboutBtn" class="login-tool about" type="button"><b>ⓘ</b>About</button>
+          <button id="supportBtn" class="login-tool support" type="button" aria-label="Contact Support"><b>🎧</b>Contact Support</button>
+          <button id="exitBtn" class="login-tool exit" type="button"><b>⏻</b>Exit</button>
+        </div>
       </div>
+    </section>
+  </div>
+
+  <div id="aboutModal" class="login-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+    <div class="login-modal-card about-card">
+      <button id="aboutCloseBtn" class="login-modal-close" type="button" aria-label="Close About">×</button>
+      <img src="/img/suvidha-pos-logo.svg?v=original" alt="SuvidhaPOS logo" class="about-logo">
+      <h2 id="aboutTitle">About SuvidhaPOS Premium</h2>
+      <h3>SuvidhaPOS Premium</h3>
+      <p class="about-subtitle">Premium Billing &amp; Inventory System</p>
+      <div class="about-info">
+        <div><span>Version</span><b id="aboutVersion">Loading...</b></div>
+        <div><span>Edition</span><b id="aboutEdition">Loading...</b></div>
+        <div><span>Store Type</span><b id="aboutStoreType">Loading...</b></div>
+        <div><span>Copyright</span><b id="aboutCopyright">© 2026 SuvidhaPOS</b></div>
+        <div><span>Website</span><b>www.suvidhapos.com</b></div>
+        <div><span>Support</span><b>support@suvidhapos.in</b></div>
+      </div>
+      <div class="about-tagline">Smart Billing&nbsp; | &nbsp;Stronger Business</div>
+      <button id="aboutOkBtn" class="about-ok" type="button">OK</button>
     </div>
   </div>
 </div>
@@ -87,8 +119,8 @@
 <section id="app"></section><footer><span>● SQL Server: <b id="dbstatus">Checking...</b></span><span id="clock"></span><span>SuvidhaPOS Premium • Local SQL</span></footer>
 </main></div><div id="toast"></div>
 <script src="/js/theme-ui.js?v=6115jewelreports"></script><script src="/js/app.js?v=6300"></script><script src="/js/desktop-bridge.js?v=6270"></script><script src="/js/pos-fixes.js?v=6115jewelreports"></script><script src="/js/unit-master.js?v=6115jewelreports"></script><script src="/js/specialized-pos.js?v=6210"></script><script src="/js/purchase-ui.js?v=6230"></script><script src="/js/inventory-master.js?v=6260"></script><script src="/js/purchase-import-ui.js?v=6230"></script><script src="/js/tax-master.js?v=6115jewelreports"></script><script src="/js/ai-settings-fix.js?v=6115jewelreports"></script><script src="/js/counter-billing.js?v=6260"></script><script src="/js/outlet-master-fix.js?v=6310"></script><script src="/js/print-settings.js?v=6310"></script><script src="/js/bill-master.js?v=6180"></script><script src="/js/backup-master.js?v=6300"></script><script src="/js/premium-masters.js?v=6115jewelreports"></script>
-<script src="/js/outlet-login-sync.js?v=6120complete"></script><script src="/js/license-status.js?v=6123runtimewire"></script><script src="/js/login-authfix7.js?v=central-license-20260909"></script><script src="/js/jewellery-suite.js?v=6300"></script><script src="/js/jewellery-premium-ui.js?v=6200"></script><script src="/js/reports-suite.js?v=6270"></script><script src="/js/retail-thermal-reports.js?v=6310"></script>
-<script src="/js/premium-completion.js?v=6310"></script>
+<script src="/js/outlet-login-sync.js?v=6320"></script><script src="/js/license-status.js?v=6123runtimewire"></script><script src="/js/login-authfix7.js?v=6320"></script><script src="/js/jewellery-suite.js?v=6320"></script><script src="/js/jewellery-premium-ui.js?v=6200"></script><script src="/js/reports-suite.js?v=6270"></script><script src="/js/retail-thermal-reports.js?v=6310"></script>
+<script src="/js/premium-completion.js?v=6320"></script>
 <script src="/js/runtime-fixes-6124.js?v=6210"></script>
 <script src="/js/billing-actions-6128.js?v=6310"></script>
 <script src="/js/btc-settlement.js?v=6190"></script>
