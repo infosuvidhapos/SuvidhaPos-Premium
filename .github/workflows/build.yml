@@ -523,7 +523,7 @@ jobs:
         shell: powershell
         run: |
           $iss = Get-Content 'installer/SuvidhaPOS.iss' -Raw -Encoding UTF8
-          foreach($token in @('PrivilegesRequired=admin','DefaultDirName={autopf}\SuvidhaPOS Premium','UsePreviousAppDir=no','Name: "{app}"; Permissions: users-modify','EnsureSqlExpress','IsSqlConnectionReady','WaitForSqlReady','SQLBOOTSTRAP:','MSSQL$SQLEXPRESS','SQL2019-SQLEXPR_x64_ENU.exe','OriginalWindowsUser','SQLSYSADMINACCOUNTS="BUILTIN\ADMINISTRATORS"','CanLaunchApplication','NeedRestart','runasoriginaluser')){ if(-not $iss.Contains($token)){ throw "Administrator/Program Files setup policy missing: $token" } }
+          foreach($token in @('PrivilegesRequired=admin','DefaultDirName={autopf}\SuvidhaPOS Premium','UsePreviousAppDir=no','Name: "{app}"; Permissions: users-modify','EnsureSqlExpress','IsSqlConnectionReady','WaitForSqlReady','SQLBOOTSTRAP:','MSSQL$SQLEXPRESS','SQL2019-SQLEXPR_x64_ENU.exe','OriginalWindowsUser','SQLSYSADMINACCOUNTS="BUILTIN\ADMINISTRATORS"','CanLaunchApplication','NeedRestart','runasoriginaluser','EnsureDatabaseFolder','D:\Suvidha Pos\Database','E:\Suvidha Pos\Database')){ if(-not $iss.Contains($token)){ throw "Administrator/Program Files setup policy missing: $token" } }
           if($iss.Contains('PrivilegesRequired=lowest')){ throw 'Setup must request Administrator permission so {autopf} resolves to Program Files' }
           if($iss.Contains('Check: ShouldInstallSqlExpress')){ throw 'Legacy registry-only SQL install check must not be used' }
           if($iss -match 'SQL2019-SQLEXPR_x64_ENU\.exe.*skipifsilent'){ throw 'SQL Express must not be skipped during silent installation' }
