@@ -81,7 +81,7 @@ WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e AND (@cash='' OR
         var taxable=Math.Max(0,net-tax);
         var bills=I(s.GetValueOrDefault("Bills"));
 
-        var payments=await PaymentRows(db,f,e,cash);
+        var payments=await PaymentRows(db,f,e,cashier);
         decimal rawCash=0,upi=0,card=0,credit=0,other=0;
         foreach(var r in payments)
         {
