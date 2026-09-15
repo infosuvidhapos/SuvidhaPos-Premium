@@ -32,7 +32,7 @@ async function refreshRuntime(){
  try{const s=await api('/api/backup-master/status');drives=s.drives||[];renderDriveOptions(driveRoot($('bkExternalFolder')?.value||''));if($('bkLast'))$('bkLast').textContent=fmtDate(s.lastBackup);if($('bkLastResult')&&s.lastResult)$('bkLastResult').textContent=s.lastResult;if(s.nextBackup&&$('bkNext'))$('bkNext').textContent=fmtDate(s.nextBackup);externalState()}catch{}
 }
 window.loadBackupMaster=async function(){
- if(typeof setPage==='function')setPage('settings');title.textContent='SuvidhaSqlBackup';document.querySelector('header p').textContent='SQL Backup Scheduler';
+ if(typeof setPage==='function')setPage(document.body.classList.contains('jewel-suite-mode')?'jBackupMaster':'settings');title.textContent='Database Backup';document.querySelector('header p').textContent='SQL Backup Scheduler';
  const st=await api('/api/backup-master/status').catch(()=>({server:'.\\SQLEXPRESS',database:'SuvidhaPOS',defaultFolder:'D:\\SuvidhaBackup',drives:[]}));
  drives=st.drives||[];
  const keys=['Backup.Server','Backup.Databases','Backup.Labels','Backup.Folder','Backup.Schedule','Backup.RetentionDays','Backup.LocalEnabled','Backup.ZipEnabled','Backup.AutoCleanup','Backup.StartWithWindows','Backup.ExternalFolder','Backup.ExternalEnabled','Backup.GoogleDriveJson','Backup.GoogleDriveEnabled'];
