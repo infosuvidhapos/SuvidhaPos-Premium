@@ -27,11 +27,23 @@
  ['stock-date-wise-report','Stock Report Date Wise'],
  ['stock-transfer-report','Stock Transfer Report']
  ];
- let currentRows=[],currentDef=null,stockAllRows=[];
+ let currentRows=[],currentDef=null,stockAllRows=[],reportGenerated=false,reportOutletName='Main Outlet';
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const money=x=>Number(x||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
  const iso=d=>{const x=new Date(d);return new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,10)};
  const pretty=k=>k.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/_/g,' ').toUpperCase();
+ const dateLabel=v=>{const s=String(v||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return s;const [y,m,d]=s.split('-');return d+'-'+m+'-'+y};
+ const printedLabel=()=>new Date().toLocaleString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+ async function ensureReportOutlet(){try{const o=await api('/api/outlet');reportOutletName=String(o?.OutletName||o?.Name||window.suvidhaOutlet?.OutletName||'Main Outlet')}catch{reportOutletName=String(window.suvidhaOutlet?.OutletName||'Main Outlet')}return reportOutletName}
+ function popupHost(){
+  document.querySelector('#normalReportPopupOverlay')?.remove();
+  const overlay=document.createElement('div');overlay.id='normalReportPopupOverlay';overlay.className='normal-report-popup-overlay';
+  overlay.innerHTML='<div class="normal-report-popup-window" role="dialog" aria-modal="true"><div id="normalReportPopupBody"></div></div>';
+  overlay.addEventListener('mousedown',e=>{if(e.target===overlay)closeNormalReport()});document.body.appendChild(overlay);
+  return overlay.querySelector('#normalReportPopupBody')
+ }
+ function showReportExports(show){const x=document.querySelector('#reportExportActions');if(x)x.hidden=!show}
+ window.openNormalReportPopup=popupHost;
  const safeFile=s=>String(s||'Report').replace(/[<>:"/\\|?*\x00-\x1F]/g,'_').replace(/\s+/g,' ').trim();
  const billGroups=()=>{const m=new Map();(currentRows||[]).forEach(r=>{const k=String(r.SaleId||r.InvoiceNo||'');if(!m.has(k))m.set(k,{id:Number(r.SaleId||0),invoiceNo:r.InvoiceNo||k,billDate:r.BillDate,customer:r.CustomerName||'Walk-in Customer',payment:r.PaymentMode||'',format:r.PrintFormat||'',template:r.PrintTemplate||'',subTotal:r.BillSubTotal,discount:r.BillDiscount,tax:r.BillTax,total:r.BillTotal,paid:r.PaidAmount,lines:[]});m.get(k).lines.push(r)});return [...m.values()]};
  const fileStem=()=>{const name=currentDef?.[1]||'Report',from=document.querySelector('#reportFrom')?.value||'',to=document.querySelector('#reportTo')?.value||from;
@@ -44,7 +56,7 @@
 
  window.loadReports=async function(){
   setPage('reports');title.textContent='Report Master';document.querySelector('header p').textContent='25 premium business reports with filters and export';
-  currentRows=[];currentDef=null;
+  document.querySelector('#normalReportPopupOverlay')?.remove();currentRows=[];currentDef=null;reportGenerated=false;
   const meta={
    'account-report':['▣','Accounts','80mm day-end sales, tax, cash and bill summary','blue'],
    'daily-sale-bill-wise':['▥','Sales','Daily bill-wise performance','orange'],
@@ -86,49 +98,45 @@
  window.openNormalReport=async function(type){
   if(type==='current-stock-report')return openCurrentStockReport();
   if(['account-report','cashier-report','payment-mode-report','expense-report','day-close-report','audit-trail-report'].includes(type)&&typeof window.openRetailThermalReport==='function')return window.openRetailThermalReport(type);
-  currentDef=defs.find(x=>x[0]===type)||defs[0];
+  currentDef=defs.find(x=>x[0]===type)||defs[0];currentRows=[];reportGenerated=false;
   const sel=document.querySelector('#reportType');if(sel)sel.value=currentDef[0];
-  const today=iso(new Date()),from=iso(new Date(Date.now()-29*86400000));
-  const box=document.querySelector('#normalReportWorkspace');if(!box)return;
-  box.innerHTML=`<div class="panel normal-report-workspace">
-   <div class="normal-report-workspace-head"><div><span class="normal-report-kicker">OPEN REPORT</span><h3>${esc(currentDef[1])}</h3></div><button class="btn small secondary" onclick="closeNormalReport()">✕ Close</button></div>
-   <div class="normal-report-filters"><label>From Date<input id="reportFrom" class="input" type="date" value="${from}"></label><label>To Date<input id="reportTo" class="input" type="date" value="${today}"></label><label>${currentDef[0]==='bill-detail'?'Bill No / Search':'Search'}<input id="reportQ" class="input" placeholder="${currentDef[0]==='bill-detail'?'Bill No, customer or item...':'Bill, item, customer, supplier, user...'}"></label></div>
-   <div class="toolbar"><button class="btn" onclick="runReport()">Generate Report</button><button class="btn secondary" onclick="exportReportExcel()">⬇ Export Excel</button><button class="btn secondary" onclick="exportReportPdf()">⬇ Export PDF</button></div>
-   <div id="reportMeta" class="muted normal-report-meta">Loading report…</div>
-   <div class="normal-report-table-shell"><div class="tablewrap"><table class="table" id="reportTable"><thead></thead><tbody><tr><td class="empty">Generating report…</td></tr></tbody></table></div></div>
+  const today=iso(new Date()),box=popupHost();if(!box)return;
+  box.innerHTML=`<div class="panel normal-report-workspace normal-report-popup-content">
+   <div class="normal-report-workspace-head"><div><span class="normal-report-kicker">REPORT FILTER</span><h3>${esc(currentDef[1])}</h3><p class="muted">Choose date/search filters, then Generate Report. Excel/PDF actions appear after results load.</p></div><button class="btn small secondary" onclick="closeNormalReport()">✕ Close</button></div>
+   <div class="normal-report-filters"><label>From Date<input id="reportFrom" class="input" type="date" value="${today}"></label><label>To Date<input id="reportTo" class="input" type="date" value="${today}"></label><label>${currentDef[0]==='bill-detail'?'Bill No / Search':'Search'}<input id="reportQ" class="input" placeholder="${currentDef[0]==='bill-detail'?'Bill No, customer or item...':'Bill, item, customer, supplier, user...'}"></label></div>
+   <div class="toolbar"><button class="btn" onclick="runReport()">Generate Report</button><span id="reportExportActions" class="report-export-actions" hidden><button class="btn secondary" onclick="exportReportExcel()">⬇ Export Excel</button><button class="btn secondary" onclick="exportReportPdf()">⬇ Export PDF</button></span></div>
+   <div id="reportMeta" class="muted normal-report-meta">Select filters and click Generate Report.</div>
+   <div class="normal-report-table-shell"><div class="tablewrap"><table class="table" id="reportTable"><thead></thead><tbody><tr><td class="empty">Report has not been generated yet.</td></tr></tbody></table></div></div>
   </div>`;
-  box.scrollIntoView({behavior:'smooth',block:'start'});
-  await runReport();
+  setTimeout(()=>document.querySelector('#reportFrom')?.focus(),20)
  };
- window.closeNormalReport=function(){currentRows=[];stockAllRows=[];currentDef=null;const box=document.querySelector('#normalReportWorkspace');if(box)box.innerHTML='';};
-
+ window.closeNormalReport=function(){currentRows=[];stockAllRows=[];currentDef=null;reportGenerated=false;document.querySelector('#normalReportPopupOverlay')?.remove();const box=document.querySelector('#normalReportWorkspace');if(box)box.innerHTML=''};
  async function openCurrentStockReport(){
-  currentDef=defs.find(x=>x[0]==='current-stock-report')||["current-stock-report","Current Stock Report"];
-  const today=iso(new Date()),box=document.querySelector('#normalReportWorkspace');if(!box)return;
-  box.innerHTML=`<div class="panel normal-report-workspace stock-report-workspace">
-   <div class="normal-report-workspace-head"><div><span class="normal-report-kicker">INVENTORY POSITION</span><h3>Current Stock Report</h3><p class="muted">Fast item-wise stock view with valuation, category and location filters.</p></div><button class="btn small secondary" onclick="closeNormalReport()">✕ Close</button></div>
+  currentDef=defs.find(x=>x[0]==='current-stock-report')||["current-stock-report","Current Stock Report"];currentRows=[];stockAllRows=[];reportGenerated=false;
+  const today=iso(new Date()),box=popupHost();if(!box)return;
+  box.innerHTML=`<div class="panel normal-report-workspace stock-report-workspace normal-report-popup-content">
+   <div class="normal-report-workspace-head"><div><span class="normal-report-kicker">INVENTORY POSITION</span><h3>Current Stock Report</h3><p class="muted">Choose the as-on date and filters, then Generate Report.</p></div><button class="btn small secondary" onclick="closeNormalReport()">✕ Close</button></div>
    <input id="reportFrom" type="hidden" value="${today}"><input id="reportTo" type="hidden" value="${today}">
    <div class="stock-report-filters">
-    <label>As On Date<input id="stockAsOn" class="input" type="date" value="${today}" onchange="stockReload()"></label>
+    <label>As On Date<input id="stockAsOn" class="input" type="date" value="${today}"></label>
     <label>Category<select id="stockCategory" class="select" onchange="stockApplyFilters()"><option value="">All Categories</option></select></label>
     <label>Stock Status<select id="stockStatus" class="select" onchange="stockApplyFilters()"><option value="ALL">All Stock</option><option value="POSITIVE">In Stock</option><option value="LOW">Low Stock ≤ 5</option><option value="ZERO">Zero Stock</option><option value="NEGATIVE">Negative Stock</option></select></label>
-    <label class="stock-search">Search<input id="reportQ" class="input" placeholder="Item / barcode / SKU / category / rack..." oninput="stockApplyFilters()" onkeydown="if(event.key==='Enter'){event.preventDefault();stockApplyFilters()}"></label>
+    <label class="stock-search">Search<input id="reportQ" class="input" placeholder="Item / barcode / SKU / category / rack..." onkeydown="if(event.key==='Enter'){event.preventDefault();stockReload()}"></label>
    </div>
-   <div class="toolbar stock-report-actions"><button class="btn" onclick="stockReload()">↻ Generate / Refresh</button><button class="btn secondary" onclick="exportReportExcel()">⬇ Export Excel</button><button class="btn secondary" onclick="printCurrentStockReport()">⬇ Export PDF</button></div>
+   <div class="toolbar stock-report-actions"><button class="btn" onclick="stockReload()">Generate Report</button><span id="reportExportActions" class="report-export-actions" hidden><button class="btn secondary" onclick="exportReportExcel()">⬇ Export Excel</button><button class="btn secondary" onclick="printCurrentStockReport()">⬇ Export PDF</button></span></div>
    <div id="stockSummary" class="stock-summary-grid"></div>
-   <div id="reportMeta" class="muted normal-report-meta">Loading current stock…</div>
-   <div class="normal-report-table-shell stock-report-table-shell"><div class="tablewrap"><table class="table stock-report-table" id="reportTable"><thead></thead><tbody><tr><td class="empty">Loading stock…</td></tr></tbody></table></div></div>
+   <div id="reportMeta" class="muted normal-report-meta">Select filters and click Generate Report.</div>
+   <div class="normal-report-table-shell stock-report-table-shell"><div class="tablewrap"><table class="table stock-report-table" id="reportTable"><thead></thead><tbody><tr><td class="empty">Report has not been generated yet.</td></tr></tbody></table></div></div>
   </div>`;
-  box.scrollIntoView({behavior:'smooth',block:'start'});await stockReload()
  }
  window.stockReload=async function(){
   const asOn=document.querySelector('#stockAsOn')?.value||iso(new Date());const hiddenFrom=document.querySelector('#reportFrom'),hiddenTo=document.querySelector('#reportTo');if(hiddenFrom)hiddenFrom.value=asOn;if(hiddenTo)hiddenTo.value=asOn;
   try{
-   stockAllRows=await api(`/api/premium-reports/current-stock-report?from=${asOn}&to=${asOn}&q=`);
+   stockAllRows=await api(`/api/premium-reports/current-stock-report?from=${asOn}&to=${asOn}&q=`);reportGenerated=true;await ensureReportOutlet();
    if(!Array.isArray(stockAllRows))stockAllRows=[];
    const sel=document.querySelector('#stockCategory'),before=sel?.value||'',cats=[...new Set(stockAllRows.map(x=>String(x.Category||'Uncategorised')).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
    if(sel){sel.innerHTML='<option value="">All Categories</option>'+cats.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(cats.includes(before))sel.value=before}
-   stockApplyFilters()
+   stockApplyFilters();showReportExports(stockAllRows.length>0)
   }catch(e){const table=document.querySelector('#reportTable');if(table)table.innerHTML=`<tbody><tr><td class="alert">${esc(e.message||e)}</td></tr></tbody>`}
  };
  window.stockApplyFilters=function(){
@@ -157,7 +165,7 @@
   if(window.desktopPrintHtml&&window.desktopPrintHtml(html,'REPORT_PDF',fileStem()))return;const pw=window.open('','_blank','width=1200,height=850');if(!pw)return toast('Allow popups for Print / PDF');pw.document.write(html.replace('</body>','<script>window.onload=function(){window.print()}<\/script></body>'));pw.document.close()
  };
 
- window.runReport=async function(){const type=currentDef?.[0]||document.querySelector('#reportType')?.value;if(!type)return;currentDef=defs.find(x=>x[0]===type)||defs[0];const from=document.querySelector('#reportFrom')?.value||iso(new Date(Date.now()-29*86400000)),to=document.querySelector('#reportTo')?.value||iso(new Date()),q=encodeURIComponent(document.querySelector('#reportQ')?.value||'');try{currentRows=await api(`/api/premium-reports/${type}?from=${from}&to=${to}&q=${q}`);render()}catch(e){const table=document.querySelector('#reportTable');if(table)table.innerHTML=`<tbody><tr><td class="alert">${esc(e.message)}</td></tr></tbody>`}};
+ window.runReport=async function(){const type=currentDef?.[0]||document.querySelector('#reportType')?.value;if(!type)return;currentDef=defs.find(x=>x[0]===type)||defs[0];const today=iso(new Date()),from=document.querySelector('#reportFrom')?.value||today,to=document.querySelector('#reportTo')?.value||today,q=encodeURIComponent(document.querySelector('#reportQ')?.value||'');showReportExports(false);try{await ensureReportOutlet();currentRows=await api(`/api/premium-reports/${type}?from=${from}&to=${to}&q=${q}`);reportGenerated=true;render();showReportExports(currentRows.length>0)}catch(e){reportGenerated=false;const table=document.querySelector('#reportTable');if(table)table.innerHTML=`<tbody><tr><td class="alert">${esc(e.message)}</td></tr></tbody>`}};
 
  function render(){
   const table=document.querySelector('#reportTable'),rows=currentRows||[];if(!table)return;
