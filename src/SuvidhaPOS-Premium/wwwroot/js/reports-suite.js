@@ -1,9 +1,13 @@
 (function(){
  window.__suvidhaPremiumReportMaster='6.4.6';
  const defs=[
- ['account-report','Account Report'],
+ ['account-report','Daily Account Summary'],
  ['daily-sale-bill-wise','Daily Sale Report Bill Wise'],
- ['cashier-report','Cashier Report'],
+ ['cashier-report','Cashier Closing Report'],
+ ['payment-mode-report','Payment Mode Report'],
+ ['expense-report','Expense Report'],
+ ['day-close-report','Day Close Report'],
+ ['audit-trail-report','Audit Trail Report'],
  ['date-wise-summary','Date Wise Summary'],
  ['bill-modification','Bill Modification Report'],
  ['utility-report','Utility Report'],
@@ -39,12 +43,16 @@
  const format=(k,v)=>{if(v===null||v===undefined)return '-';if(/percent|rate|gst/i.test(k)&&typeof v==='number')return esc(v)+'%';if(typeof v==='number'){if(/amount|value|price|total|tax|paid|cost|sales|expense|profit|credit|debit|discount|mrp|balance|collected/i.test(k))return '₹'+money(v);return money(v)}if(/date|time|created/i.test(k)){const d=new Date(v);if(!isNaN(d))return esc(d.toLocaleString('en-IN'))}return esc(v)};
 
  window.loadReports=async function(){
-  setPage('reports');title.textContent='Report Master';document.querySelector('header p').textContent='21 premium business reports with filters and export';
+  setPage('reports');title.textContent='Report Master';document.querySelector('header p').textContent='25 premium business reports with filters and export';
   currentRows=[];currentDef=null;
   const meta={
-   'account-report':['▣','Accounts','Ledger / account view','blue'],
+   'account-report':['▣','Accounts','80mm day-end sales, tax, cash and bill summary','blue'],
    'daily-sale-bill-wise':['▥','Sales','Daily bill-wise performance','orange'],
-   'cashier-report':['♙','Sales','Cashier collection summary','cyan'],
+   'cashier-report':['♙','Accounts','80mm cashier closing and collection summary','cyan'],
+   'payment-mode-report':['₹','Accounts','80mm Cash / UPI / Card / Credit collection','green'],
+   'expense-report':['−','Accounts','80mm expense summary and detail','orange'],
+   'day-close-report':['✓','Accounts','80mm opening / expected / actual cash close','purple'],
+   'audit-trail-report':['⌕','Audit','80mm user and transaction audit trail','red'],
    'date-wise-summary':['▤','Sales','Date-wise business summary','purple'],
    'bill-modification':['✎','Audit','Bill edit / modification audit','red'],
    'utility-report':['⚙','Utility','Operational utility report','teal'],
@@ -67,7 +75,7 @@
   app.innerHTML=`<div class="content normal-report-master">
    <div class="normal-report-intro">
     <div><span class="normal-report-kicker">ANALYTICS & REPORTING</span><h2>Business Reports</h2><p>Choose a report tile to open filters, live data, Excel export and PDF print.</p></div>
-    <div class="normal-report-count"><b>21</b><span>Reports Ready</span></div>
+    <div class="normal-report-count"><b>25</b><span>Reports Ready</span></div>
    </div>
    <select id="reportType" data-no-tax-enhance="1" data-report-master="1" hidden>${defs.map(x=>`<option value="${x[0]}">${esc(x[1])}</option>`).join('')}</select>
    <div class="normal-report-grid">${defs.map(x=>{const m=meta[x[0]]||['▤','Report','Open business report','blue'];return `<button class="normal-report-tile tone-${m[3]}" onclick="openNormalReport('${x[0]}')"><div class="normal-report-tile-top"><span class="normal-report-icon">${m[0]}</span><span class="normal-report-arrow">↗</span></div><span class="normal-report-category">${esc(m[1])}</span><b>${esc(x[1])}</b><small>${esc(m[2])}</small></button>`}).join('')}</div>
@@ -77,6 +85,7 @@
 
  window.openNormalReport=async function(type){
   if(type==='current-stock-report')return openCurrentStockReport();
+  if(['account-report','cashier-report','payment-mode-report','expense-report','day-close-report','audit-trail-report'].includes(type)&&typeof window.openRetailThermalReport==='function')return window.openRetailThermalReport(type);
   currentDef=defs.find(x=>x[0]===type)||defs[0];
   const sel=document.querySelector('#reportType');if(sel)sel.value=currentDef[0];
   const today=iso(new Date()),from=iso(new Date(Date.now()-29*86400000));
