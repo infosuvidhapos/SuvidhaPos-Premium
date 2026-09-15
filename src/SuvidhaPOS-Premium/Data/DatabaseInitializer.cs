@@ -7,7 +7,20 @@ public sealed class DatabaseInitializer
  private readonly Db _db; private readonly IConfiguration _cfg; public DatabaseInitializer(Db db,IConfiguration cfg){_db=db;_cfg=cfg;}
  public async Task InitializeAsync(){
   var cs=_cfg.GetConnectionString("DefaultConnection")!; var b=new SqlConnectionStringBuilder(cs); var dbName=b.InitialCatalog; b.InitialCatalog="master";
-  var safeDb=dbName.Replace("]","]]" ); var safeName=dbName.Replace("'","''"); using(var c=new SqlConnection(b.ConnectionString)){await c.OpenAsync(); using var cmd=new SqlCommand($"IF DB_ID(N'{safeName}') IS NULL CREATE DATABASE [{safeDb}]",c); await cmd.ExecuteNonQueryAsync();}
+  var safeDb=dbName.Replace("]","]]" ); var safeName=dbName.Replace("'","''");
+  using(var c=new SqlConnection(b.ConnectionString)){
+   await c.OpenAsync();
+   using var exists=new SqlCommand($"SELECT DB_ID(N'{safeName}')",c);
+   var dbId=await exists.ExecuteScalarAsync();
+   if(dbId is null || dbId is DBNull){
+    var folder=PreferredDatabaseFolder();Directory.CreateDirectory(folder);
+    var mdf=Path.Combine(folder,dbName+".mdf").Replace("'","''");
+    var ldf=Path.Combine(folder,dbName+"_log.ldf").Replace("'","''");
+    var logicalData=(dbName+"_Data").Replace("'","''");var logicalLog=(dbName+"_Log").Replace("'","''");
+    using var cmd=new SqlCommand($"CREATE DATABASE [{safeDb}] ON PRIMARY (NAME=N'{logicalData}',FILENAME=N'{mdf}') LOG ON (NAME=N'{logicalLog}',FILENAME=N'{ldf}')",c);
+    await cmd.ExecuteNonQueryAsync();
+   }
+  }
   await RunScriptAsync(Path.Combine(AppContext.BaseDirectory,"Database","schema.sql"));
   await RunScriptAsync(Path.Combine(AppContext.BaseDirectory,"Database","specialized-schema.sql"));
   var printSchema=Path.Combine(AppContext.BaseDirectory,"Database","print-schema.sql");
@@ -24,6 +37,10 @@ public sealed class DatabaseInitializer
   await RunScriptAsync(Path.Combine(AppContext.BaseDirectory,"Database","jewellery-registers-schema.sql"));
   await RunScriptAsync(Path.Combine(AppContext.BaseDirectory,"Database","seed.sql"));
   await EnsureDefaultAdminAsync();
+ }
+ private static string PreferredDatabaseFolder(){
+  foreach(var root in new[]{@"D:\",@"E:\"}){try{var d=new DriveInfo(root);if(d.IsReady)return Path.Combine(root,@"Suvidha Pos\Database");}catch{}}
+  throw new InvalidOperationException(@"SuvidhaPOS requires D:\Suvidha Pos\Database, or E:\Suvidha Pos\Database when D: is unavailable.");
  }
  private async Task EnsureDefaultAdminAsync(){
   const string history="SELECT (SELECT COUNT(*) FROM dbo.Sales)+(SELECT COUNT(*) FROM dbo.Purchases)+(SELECT COUNT(*) FROM dbo.CustomerPayments)+(SELECT COUNT(*) FROM dbo.SupplierPayments)";
