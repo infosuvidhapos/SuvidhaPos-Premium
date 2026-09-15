@@ -136,6 +136,7 @@ ${styleCss(template,thermal)}
    const list=stylesFor(state.mode),box=document.querySelector('#pmStyles');if(!box)return;
    box.innerHTML=list.map(x=>`<button class="pm-style ${state.template===x[0]?'selected':''}" onclick="selectPrintTemplate('${x[0]}')"><span>${x[0]}</span><b>${esc(x[1])}</b><small>${esc(x[2])}</small></button>`).join('');
  }
+ function purgePrintActionPanels(){document.querySelectorAll('#billingPrintActions,.billing-print-actions,#printMasterBillPrintAction').forEach(x=>x.remove())}
  function preview(){
    const f=document.querySelector('#pmPreview');if(!f)return;
    f.className='pm-preview '+(state.mode==='A4'?('a4 '+(jewellery()?'portrait':a4Orientation(state.template))):'thermal');
@@ -150,8 +151,7 @@ ${styleCss(template,thermal)}
    if(jewellery()&&state.template==='A11')state.template='A01';
    document.querySelectorAll('.pm-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
    const width=document.querySelector('#pmWidthWrap');if(width)width.style.display=mode==='Thermal'?'grid':'none';
-   const purgePrintActionPanels=()=>document.querySelectorAll('#billingPrintActions,.billing-print-actions,#printMasterBillPrintAction').forEach(x=>x.remove());
-   purgePrintActionPanels();[0,50,200,600].forEach(ms=>setTimeout(purgePrintActionPanels,ms));cards();preview()
+   purgePrintActionPanels();[0,50,200,600,1200].forEach(ms=>setTimeout(purgePrintActionPanels,ms));cards();preview()
  };
  window.setThermalWidth=function(v){state.width=v;preview()};
  window.setPrintCurrency=function(v){state.currency=String(v||'SYMBOL').toUpperCase()==='RS'?'RS':'SYMBOL';preview()};
@@ -188,7 +188,7 @@ ${styleCss(template,thermal)}
       <div id="pmStyles" class="pm-styles"></div>
       <div class="toolbar"><button class="btn" onclick="savePrintMaster()">Save as Default</button><button class="btn secondary" onclick="printMasterTest()">Print Test</button></div>
     </div><div class="panel pm-preview-panel"><div class="panelhead"><div><h3>LIVE PREVIEW</h3><p id="pmSelected" class="muted"></p></div><span class="tag">Actual print proportions</span></div><div class="pm-preview-stage"><iframe id="pmPreview" title="Bill print preview"></iframe></div></div></div></div>`;
-   cards();preview()
+   purgePrintActionPanels();[0,50,200,600,1200].forEach(ms=>setTimeout(purgePrintActionPanels,ms));cards();preview()
  };
  async function currentPrintConfig(){
    await loadState();let action=state.action;
