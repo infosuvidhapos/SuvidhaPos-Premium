@@ -20,8 +20,10 @@ public static class RetailThermalReportModules
             var cash=(cashier??"").Trim();
             var term=(q??"").Trim();
             var outlet=await db.QuerySingleAsync("SELECT TOP 1 OutletName,StoreType,Address,Phone,Gstin FROM OutletMaster ORDER BY Id");
+            var outletName=S(outlet.GetValueOrDefault("OutletName"));
+            if(string.IsNullOrWhiteSpace(outletName))outletName="Main Outlet";
             var meta=new {
-                outlet=S(outlet.GetValueOrDefault("OutletName")) is {Length:>0} n?n:"Main Outlet",
+                outlet=outletName,
                 storeType=S(outlet.GetValueOrDefault("StoreType")),
                 address=S(outlet.GetValueOrDefault("Address")),
                 phone=S(outlet.GetValueOrDefault("Phone")),
@@ -29,8 +31,9 @@ public static class RetailThermalReportModules
                 from=f.ToString("yyyy-MM-dd"),to=e.AddDays(-1).ToString("yyyy-MM-dd"),
                 cashier=string.IsNullOrWhiteSpace(cash)?"All":cash,shift="All",printedBy=Actor(ctx),printedAt=DateTime.Now
             };
-            var availableCashiers=await db.QueryAsync(@"SELECT DISTINCT ISNULL(NULLIF(CashierName,''),'Unknown') Cashier FROM Sales
-WHERE BillDate>=@f AND BillDate<@e ORDER BY Cashier",P("@f",f),P("@e",e));
+            var availableCashiers=await db.QueryAsync(@"SELECT UserName Cashier FROM Users WHERE IsActive=1
+UNION SELECT DISTINCT ISNULL(NULLIF(CashierName,''),'Unknown') FROM Sales WHERE BillDate>=@f AND BillDate<@e
+ORDER BY Cashier",P("@f",f),P("@e",e));
 
             switch(type.ToLowerInvariant())
             {
