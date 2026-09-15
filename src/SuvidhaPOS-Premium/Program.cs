@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.IO.Compression;
 using System.Xml.Linq;
+using System.Reflection;
 
 var builder=WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<Db>(); builder.Services.AddSingleton<DatabaseInitializer>();
@@ -29,6 +30,20 @@ app.Use(async (ctx,next) => {
     }
 });
 app.UseDefaultFiles(); app.UseStaticFiles();
+app.MapGet("/public/app-info", (IConfiguration cfg) => {
+    var v=Assembly.GetExecutingAssembly().GetName().Version;
+    var version=v is null ? "Unknown" : string.Join(".",new[]{v.Major,v.Minor,Math.Max(0,v.Build)});
+    var edition=(cfg["Product:Edition"]??"Premium").Trim();
+    if(string.IsNullOrWhiteSpace(edition))edition="Premium";
+    return Results.Ok(new {
+        ProductName="SuvidhaPOS Premium",
+        Version=version,
+        Edition=edition,
+        Website="www.suvidhapos.com",
+        SupportEmail="support@suvidhapos.in",
+        CopyrightYear=DateTime.Now.Year
+    });
+});
 var sessions = new ConcurrentDictionary<string, SessionUser>();
 app.Use(async (ctx,next) => {
     var path = ctx.Request.Path;
@@ -79,7 +94,10 @@ app.Use(async (ctx,next) => {
 
 app.MapPost("/api/login", async(HttpContext ctx,Db db, LoginRequest x) => {
     var row=await db.QuerySingleAsync("SELECT TOP 1 Id,UserName,DisplayName,PasswordHash,Role,MustChangePassword FROM Users WHERE UserName=@u AND IsActive=1",P("@u",x.UserName?.Trim()));
-    if(row.Count==0 || !VerifyPassword(x.Password??"", row["PasswordHash"]?.ToString()??"")) return Results.Unauthorized();
+    if(row.Count==0)
+        return Results.Json(new{code="USER_NOT_FOUND",message="User ID not found."},statusCode:401);
+    if(!VerifyPassword(x.Password??"", row["PasswordHash"]?.ToString()??""))
+        return Results.Json(new{code="WRONG_PASSWORD",message="Incorrect password."},statusCode:401);
 
     var license=SuvidhaPOS.Premium.LicenseGuardModules.GetStatus();
     if(!license.LoginAllowed)
