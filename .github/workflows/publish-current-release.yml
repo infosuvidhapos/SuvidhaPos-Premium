@@ -1,0 +1,31 @@
+name: Publish current latest-build release
+on:
+  push:
+    branches:
+      - fix/publish-latest-build-release-20260915
+    paths:
+      - .github/workflows/publish-current-release.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish existing latest-build draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          tag="latest-build"
+          gh release edit "$tag" --repo "$repo" --draft=false --prerelease
+          draft="$(gh api "repos/$repo/releases/tags/$tag" --jq '.draft')"
+          name="$(gh api "repos/$repo/releases/tags/$tag" --jq '.name')"
+          assets="$(gh api "repos/$repo/releases/tags/$tag" --jq '[.assets[].name] | join(",")')"
+          test "$draft" = "false"
+          echo "Published: $name"
+          echo "Assets: $assets"
+          echo "$assets" | grep -q "SuvidhaPOS-Premium-Windows-Setup.exe"
+          echo "$assets" | grep -q "SuvidhaPos.bak"
