@@ -136,13 +136,17 @@ OUTER APPLY(SELECT SUM(sl.Discount) ItemDiscount FROM SaleLines sl WHERE sl.Sale
 WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e
 AND (@cash='' OR ISNULL(NULLIF(s.CashierName,''),'Unknown')=@cash)
 GROUP BY ISNULL(NULLIF(s.CashierName,''),'Unknown') ORDER BY Cashier",P("@f",f),P("@e",e),P("@cash",cashier));
-        var payments=await db.QueryAsync(@"SELECT ISNULL(NULLIF(s.CashierName,''),'Unknown') Cashier,
-COALESCE(NULLIF(sp.PaymentType,''),NULLIF(sp.PaymentMode,''),'Other') Mode,COUNT(*) Txns,CAST(SUM(sp.Amount) AS decimal(18,2)) Amount
+        var payments=await db.QueryAsync(@"SELECT Cashier,Mode,COUNT(*) Txns,CAST(SUM(Amount) AS decimal(18,2)) Amount FROM(
+SELECT ISNULL(NULLIF(s.CashierName,''),'Unknown') Cashier,COALESCE(NULLIF(sp.PaymentType,''),NULLIF(sp.PaymentMode,''),'Other') Mode,sp.Amount
 FROM SalePayments sp JOIN Sales s ON s.Id=sp.SaleId
 WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e
 AND (@cash='' OR ISNULL(NULLIF(s.CashierName,''),'Unknown')=@cash)
-GROUP BY ISNULL(NULLIF(s.CashierName,''),'Unknown'),COALESCE(NULLIF(sp.PaymentType,''),NULLIF(sp.PaymentMode,''),'Other')
-ORDER BY Cashier,Mode",P("@f",f),P("@e",e),P("@cash",cashier));
+UNION ALL
+SELECT ISNULL(NULLIF(s.CashierName,''),'Unknown'),ISNULL(NULLIF(s.PaymentMode,''),'Other'),s.GrandTotal
+FROM Sales s WHERE s.Status='Completed' AND s.BillDate>=@f AND s.BillDate<@e
+AND (@cash='' OR ISNULL(NULLIF(s.CashierName,''),'Unknown')=@cash)
+AND NOT EXISTS(SELECT 1 FROM SalePayments sp WHERE sp.SaleId=s.Id)
+)x GROUP BY Cashier,Mode ORDER BY Cashier,Mode",P("@f",f),P("@e",e),P("@cash",cashier));
         return new{type="cashier-report",title="CASHIER CLOSING REPORT",meta,availableCashiers=cashiers,cashiers=rows,payments};
     }
 
