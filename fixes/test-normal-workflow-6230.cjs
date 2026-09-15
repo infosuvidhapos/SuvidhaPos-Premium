@@ -64,14 +64,17 @@ assert.ok(inv.includes("if(jewel())return loadDashboard()"),'Inventory Master mu
 const reports=read(files.reports);
 for(const token of ['normalReportPopupOverlay','reportExportActions','Report has not been generated yet.','Reporting For :','Printed On :',"orientation=keys.length>8?'landscape':'portrait'"])
  assert.ok(reports.includes(token),'Generate-first popup/export format missing '+token);
-for(const token of ['Bill No. ','Bill Detail Report From ','desktopSaveTextFile','desktopPrintHtmlBatch','previewBillDetailOriginal','getInvoicePrintArtifact'])
+for(const token of ['Bill No. ','Bill Detail Report Form ','desktopSaveTextFile','desktopSaveReportXlsx','.xlsx','ItemWise Report',' Form ','desktopPrintHtmlBatch','previewBillDetailOriginal','getInvoicePrintArtifact'])
  assert.ok(reports.includes(token)||read(files.print).includes(token)||read(files.desktop).includes(token),'Historical report export missing '+token);
 const printSchema=read('src/SuvidhaPOS-Premium/Database/print-schema.sql');
 for(const token of ['PrintSnapshotHtml','PrintSnapshotAt'])assert.ok(printSchema.includes(token),'Print snapshot schema missing '+token);
 const program=read('src/SuvidhaPOS-Premium/Program.cs');
 assert.ok(program.includes('/api/sales/{id:int}/print-snapshot'),'Immutable bill snapshot endpoint missing');
 const desktopHost=read('src/SuvidhaPOS.Desktop/MainForm.cs');
-for(const token of ['REPORT_PDF','saveTextFile','printHtmlBatch','DesktopDirectory','HandlePrintHtmlBatchAsync'])
+const desktopProject=read('src/SuvidhaPOS.Desktop/SuvidhaPOS.Desktop.csproj');
+assert.ok(desktopProject.includes('ClosedXML'),'Desktop XLSX writer dependency missing');
+
+for(const token of ['REPORT_PDF','saveTextFile','saveReportXlsx','printHtmlBatch','DesktopDirectory','HandlePrintHtmlBatchAsync','DesktopJsonOptions','PropertyNameCaseInsensitive = true','SaveReportWorkbook','Reporting For :','Printed On :'])
  assert.ok(desktopHost.includes(token),'Desktop report save support missing '+token);
 for(const token of ["['stock-date-wise-report','Stock Report Date Wise']","['stock-transfer-report','Stock Transfer Report']","25 premium business reports","<b>25</b>"])
  assert.ok(reports.includes(token),'Report Master missing '+token);
