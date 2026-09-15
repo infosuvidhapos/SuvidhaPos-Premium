@@ -1,3 +1,4 @@
+using ClosedXML.Excel;
 using Microsoft.Data.SqlClient;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -18,6 +19,7 @@ public sealed class MainForm : Form
     private static string InstallDir => AppContext.BaseDirectory;
     private static string ConfigPath => Path.Combine(InstallDir, "Database.config.json");
     private static string RememberedLoginPath => Path.Combine(InstallDir, "RememberedLogin.json");
+    private static readonly JsonSerializerOptions DesktopJsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public MainForm()
     {
@@ -130,7 +132,7 @@ public sealed class MainForm : Form
             {
                 try
                 {
-                    var msg = JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson);
+                    var msg = JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson,DesktopJsonOptions);
                     if (string.Equals(type, "remember", StringComparison.OrdinalIgnoreCase)) SaveRememberedLogin(msg ?? new DesktopMessage(type));
                     else if (File.Exists(RememberedLoginPath)) File.Delete(RememberedLoginPath);
                 }
@@ -150,27 +152,27 @@ public sealed class MainForm : Form
             }
             else if (string.Equals(type, "browseFolder", StringComparison.OrdinalIgnoreCase))
             {
-                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson,DesktopJsonOptions)??new DesktopMessage(type);
                 using var dlg=new FolderBrowserDialog{Description="Select SuvidhaPOS backup folder",ShowNewFolderButton=true};
                 if(!string.IsNullOrWhiteSpace(msg.Path)&&Directory.Exists(msg.Path))dlg.SelectedPath=msg.Path;
                 if(dlg.ShowDialog(this)==DialogResult.OK)await SendDesktopResultAsync("browseFolder",msg.Target,dlg.SelectedPath);
             }
             else if (string.Equals(type, "browseJson", StringComparison.OrdinalIgnoreCase))
             {
-                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson,DesktopJsonOptions)??new DesktopMessage(type);
                 using var dlg=new OpenFileDialog{Title="Select Google Drive credentials JSON",Filter="JSON files (*.json)|*.json|All files (*.*)|*.*",CheckFileExists=true,Multiselect=false};
                 if(!string.IsNullOrWhiteSpace(msg.Path)&&File.Exists(msg.Path))dlg.FileName=msg.Path;
                 if(dlg.ShowDialog(this)==DialogResult.OK)await SendDesktopResultAsync("browseJson",msg.Target,dlg.FileName);
             }
             else if (string.Equals(type, "backupStartup", StringComparison.OrdinalIgnoreCase))
             {
-                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson,DesktopJsonOptions)??new DesktopMessage(type);
                 SetBackupStartup(msg.Enabled==true);
                 await SendDesktopResultAsync("backupStartup",null,msg.Enabled==true?"enabled":"disabled");
             }
             else if (string.Equals(type, "openPath", StringComparison.OrdinalIgnoreCase))
             {
-                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson,DesktopJsonOptions)??new DesktopMessage(type);
                 if(!string.IsNullOrWhiteSpace(msg.Path))
                 {
                     var p=msg.Path!;
@@ -180,21 +182,28 @@ public sealed class MainForm : Form
             }
             else if (string.Equals(type, "printHtml", StringComparison.OrdinalIgnoreCase))
             {
-                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson,DesktopJsonOptions)??new DesktopMessage(type);
                 await HandlePrintHtmlAsync(msg);
             }
             else if (string.Equals(type, "saveTextFile", StringComparison.OrdinalIgnoreCase))
             {
-                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson,DesktopJsonOptions)??new DesktopMessage(type);
                 var file=SafeFileName(string.IsNullOrWhiteSpace(msg.FileName)?"SuvidhaPOS Report.xls":msg.FileName!);
                 var path=UniquePath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),file));
                 File.WriteAllText(path,msg.Content??string.Empty,new UTF8Encoding(true));
                 await SendDesktopResultAsync("saveTextFile",null,path);
                 MessageBox.Show(this,"Report saved on Desktop:\n"+path,"SuvidhaPOS Report",MessageBoxButtons.OK,MessageBoxIcon.Information);
             }
+            else if (string.Equals(type, "saveReportXlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson,DesktopJsonOptions)??new DesktopMessage(type);
+                var path=SaveReportWorkbook(msg);
+                await SendDesktopResultAsync("saveReportXlsx",null,path);
+                MessageBox.Show(this,"Excel report saved on Desktop:\n"+path,"SuvidhaPOS Excel Export",MessageBoxButtons.OK,MessageBoxIcon.Information);
+            }
             else if (string.Equals(type, "printHtmlBatch", StringComparison.OrdinalIgnoreCase))
             {
-                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson)??new DesktopMessage(type);
+                var msg=JsonSerializer.Deserialize<DesktopMessage>(e.WebMessageAsJson,DesktopJsonOptions)??new DesktopMessage(type);
                 await HandlePrintHtmlBatchAsync(msg);
             }
         }
@@ -287,6 +296,130 @@ public sealed class MainForm : Form
         var closed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         host.FormClosed += (_, _) => closed.TrySetResult(true);
         await closed.Task;
+    }
+
+    private string SaveReportWorkbook(DesktopMessage msg)
+    {
+        var columns=msg.Columns??new List<string>();
+        var rows=msg.Rows??new List<List<JsonElement>>();
+        if(columns.Count==0)throw new InvalidOperationException("Excel export has no columns.");
+        var requested=string.IsNullOrWhiteSpace(msg.FileName)?"SuvidhaPOS Report.xlsx":msg.FileName!;
+        var safe=SafeFileName(requested);
+        if(!safe.EndsWith(".xlsx",StringComparison.OrdinalIgnoreCase))safe=Path.GetFileNameWithoutExtension(safe)+".xlsx";
+        var desktop=Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+        var path=UniquePath(Path.Combine(desktop,safe));
+        var sheetName=SafeSheetName(string.IsNullOrWhiteSpace(msg.SheetName)?msg.ReportTitle:msg.SheetName);
+        using var book=new XLWorkbook();
+        var ws=book.Worksheets.Add(sheetName);
+        var colCount=Math.Max(1,columns.Count);
+        var outlet=string.IsNullOrWhiteSpace(msg.Outlet)?"Main Outlet":msg.Outlet!;
+        var title=string.IsNullOrWhiteSpace(msg.ReportTitle)?"Report":msg.ReportTitle!;
+        var from=msg.From??string.Empty;
+        var to=msg.To??from;
+        var printed=msg.PrintedOn??DateTime.Now.ToString("dd-MM-yyyy   HH:mm:ss");
+
+        ws.Cell(1,1).Value=outlet;
+        ws.Range(1,1,1,colCount).Merge();
+        ws.Cell(2,1).Value=title;
+        ws.Range(2,1,2,colCount).Merge();
+        ws.Cell(3,1).Value=$"Reporting For :{from}  To  {to}";
+        ws.Range(3,1,3,colCount).Merge();
+        ws.Cell(4,1).Value=$"Printed On :{printed}";
+        ws.Range(4,1,4,colCount).Merge();
+
+        foreach(var row in new[]{1,2,3,4})
+        {
+            var range=ws.Range(row,1,row,colCount);
+            range.Style.Alignment.Horizontal=XLAlignmentHorizontalValues.Center;
+            range.Style.Alignment.Vertical=XLAlignmentVerticalValues.Center;
+            range.Style.Font.FontName="Calibri";
+            range.Style.Font.Italic=true;
+            range.Style.Font.Bold=true;
+        }
+        ws.Row(1).Height=23;ws.Row(2).Height=21;ws.Row(3).Height=19;ws.Row(4).Height=19;ws.Row(5).Height=8;
+        ws.Cell(1,1).Style.Font.FontSize=14;
+        ws.Cell(2,1).Style.Font.FontSize=12;
+        ws.Cell(3,1).Style.Font.FontSize=11;
+        ws.Cell(4,1).Style.Font.FontSize=11;
+
+        for(var i=0;i<columns.Count;i++)ws.Cell(6,i+1).Value=columns[i]??string.Empty;
+        var header=ws.Range(6,1,6,colCount);
+        header.Style.Font.Bold=true;
+        header.Style.Font.FontColor=XLColor.Black;
+        header.Style.Fill.BackgroundColor=XLColor.FromHtml("#D9E5F1");
+        header.Style.Alignment.Horizontal=XLAlignmentHorizontalValues.Center;
+        header.Style.Alignment.Vertical=XLAlignmentVerticalValues.Center;
+        header.Style.Border.TopBorder=XLBorderStyleValues.Thin;
+        header.Style.Border.BottomBorder=XLBorderStyleValues.Thin;
+        header.Style.Border.LeftBorder=XLBorderStyleValues.Thin;
+        header.Style.Border.RightBorder=XLBorderStyleValues.Thin;
+        ws.Row(6).Height=21;
+
+        for(var r=0;r<rows.Count;r++)
+        {
+            var src=rows[r];
+            for(var col=0;col<columns.Count;col++)
+            {
+                var cell=ws.Cell(r+7,col+1);
+                if(col<src.Count)SetCellValue(cell,src[col],columns[col]);
+                cell.Style.Border.TopBorder=XLBorderStyleValues.Thin;
+                cell.Style.Border.BottomBorder=XLBorderStyleValues.Thin;
+                cell.Style.Border.LeftBorder=XLBorderStyleValues.Thin;
+                cell.Style.Border.RightBorder=XLBorderStyleValues.Thin;
+                cell.Style.Alignment.Vertical=XLAlignmentVerticalValues.Top;
+                cell.Style.Alignment.WrapText=true;
+                if((r&1)==1)cell.Style.Fill.BackgroundColor=XLColor.FromHtml("#F8FBFD");
+            }
+        }
+
+        ws.SheetView.FreezeRows(6);
+        ws.Columns(1,colCount).AdjustToContents(1,Math.Min(rows.Count+6,250));
+        for(var i=1;i<=colCount;i++)
+        {
+            var col=ws.Column(i);
+            if(col.Width<10)col.Width=10;
+            if(col.Width>38)col.Width=38;
+        }
+        ws.PageSetup.PageOrientation=colCount>8?XLPageOrientation.Landscape:XLPageOrientation.Portrait;
+        ws.PageSetup.PaperSize=XLPaperSize.A4Paper;
+        ws.PageSetup.PagesWide=1;
+        ws.PageSetup.PagesTall=0;
+        ws.PageSetup.Margins.Top=0.35;ws.PageSetup.Margins.Bottom=0.35;ws.PageSetup.Margins.Left=0.25;ws.PageSetup.Margins.Right=0.25;
+        ws.PageSetup.CenterHorizontally=true;
+        book.SaveAs(path);
+        return path;
+    }
+
+    private static void SetCellValue(IXLCell cell,JsonElement value,string column)
+    {
+        switch(value.ValueKind)
+        {
+            case JsonValueKind.Number:
+                if(value.TryGetDecimal(out var dec))
+                {
+                    cell.Value=dec;
+                    if(System.Text.RegularExpressions.Regex.IsMatch(column??string.Empty,"amount|value|price|rate|tax|paid|cost|sale|expense|profit|credit|debit|discount|mrp|balance|collection|qty|quantity",System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                        cell.Style.NumberFormat.Format="#,##0.00";
+                    else cell.Style.NumberFormat.Format="0.###";
+                }
+                else cell.Value=value.GetRawText();
+                break;
+            case JsonValueKind.True: cell.Value=true; break;
+            case JsonValueKind.False: cell.Value=false; break;
+            case JsonValueKind.String: cell.Value=value.GetString()??string.Empty; break;
+            case JsonValueKind.Null:
+            case JsonValueKind.Undefined: cell.Value=string.Empty; break;
+            default: cell.Value=value.ToString(); break;
+        }
+    }
+
+    private static string SafeSheetName(string? name)
+    {
+        var s=string.IsNullOrWhiteSpace(name)?"Report":name!.Trim();
+        foreach(var ch in new[]{'\\','/','?','*','[',']',':'})s=s.Replace(ch,' ');
+        s=string.Join(" ",s.Split(' ',StringSplitOptions.RemoveEmptyEntries));
+        if(s.Length>31)s=s[..31];
+        return string.IsNullOrWhiteSpace(s)?"Report":s;
     }
 
     private async Task HandlePrintHtmlBatchAsync(DesktopMessage msg)
@@ -425,7 +558,7 @@ public sealed class MainForm : Form
     }
 
     private sealed record DesktopPrintItem(string? Html=null,string? FileName=null);
-    private sealed record DesktopMessage(string? Type, bool? Enabled = null, string? UserName = null, string? Password = null, string? Target = null, string? Path = null, string? Html = null, string? Mode = null, string? FileName = null, string? Content = null, string? FolderName = null, List<DesktopPrintItem>? Items = null);
+    private sealed record DesktopMessage(string? Type, bool? Enabled = null, string? UserName = null, string? Password = null, string? Target = null, string? Path = null, string? Html = null, string? Mode = null, string? FileName = null, string? Content = null, string? FolderName = null, List<DesktopPrintItem>? Items = null, string? SheetName = null, string? Outlet = null, string? ReportTitle = null, string? From = null, string? To = null, string? PrintedOn = null, List<string>? Columns = null, List<List<JsonElement>>? Rows = null);
     private sealed class RememberedLogin { public string UserName { get; set; } = ""; public string EncryptedPassword { get; set; } = ""; }
 }
 

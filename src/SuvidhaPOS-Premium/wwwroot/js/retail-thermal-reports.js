@@ -80,7 +80,7 @@ function thermalCss(){return '@page{size:80mm auto;margin:2mm}*{box-sizing:borde
 }
 function stem(){
  const x=currentData||{},z=x.meta||{},name=titles[currentType]||'Report';
- return currentType==='account-report'&&z.from===z.to?name+' '+z.from:(name+' From '+z.from+' To '+z.to)
+ return name+' Form '+(z.from||'')+' To '+(z.to||z.from||'')
 }
 function controls(){
  const now=iso(new Date()),hasUser=!['expense-report','day-close-report'].includes(currentType);
@@ -115,5 +115,13 @@ function flatRows(x){
  else if(x.type==='audit-trail-report'){(x.rows||[]).forEach(r=>push(dateText(val(r,'CreatedAt','createdAt')),text(r,'UserName','userName')+' / '+text(r,'Action','action'),text(r,'Details','details')))}
  return out
 }
-w.exportRetailThermalExcel=async function(){if(!currentData)return alert('Generate report first');const rows=flatRows(currentData),z=currentData.meta||{},title=titles[currentType]||'Report',html='<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Calibri,Arial}.r{border-collapse:collapse;width:100%}.r th,.r td{border:1px solid #9aa4ad;padding:6px}.head th{border:0;background:#fff;text-align:center}.outlet{font-size:16pt}.title{font-size:14pt}.sub{font-size:10pt}.cols th{background:#dfe9f3}.r tbody tr:nth-child(even) td{background:#f8fbfd}</style></head><body><table class="r"><thead><tr class="head"><th class="outlet" colspan="3">'+esc(z.outlet||'Main Outlet')+'</th></tr><tr class="head"><th class="title" colspan="3">'+esc(title)+'</th></tr><tr class="head"><th class="sub" colspan="3">Reporting For : '+esc(z.from||'')+' To '+esc(z.to||'')+'</th></tr><tr class="head"><th class="sub" colspan="3">Printed On : '+esc(dateText(z.printedAt||new Date()))+'</th></tr><tr><td colspan="3"></td></tr><tr class="cols"><th>Section / Date</th><th>Particular</th><th>Value</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table></body></html>',name=stem()+'.xls';if(w.desktopSaveTextFile&&w.desktopSaveTextFile(name,'\ufeff'+html))return;const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}),a=d.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;d.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};
+w.exportRetailThermalExcel=async function(){
+ if(!currentData)return alert('Generate report first');
+ const rows=flatRows(currentData),z=currentData.meta||{},title=titles[currentType]||'Report';
+ const payload={fileName:stem()+'.xlsx',sheetName:title,outlet:z.outlet||'Main Outlet',reportTitle:title,from:z.from||'',to:z.to||z.from||'',printedOn:dateText(z.printedAt||new Date()),columns:['Section / Date','Particular','Value'],rows};
+ if(w.desktopSaveReportXlsx&&w.desktopSaveReportXlsx(payload))return;
+ const html='<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Calibri,Arial}.r{border-collapse:collapse;width:100%}.r th,.r td{border:1px solid #9aa4ad;padding:6px}.head th{border:0;background:#fff;text-align:center}.outlet{font-size:16pt}.title{font-size:14pt}.sub{font-size:10pt}.cols th{background:#dfe9f3}.r tbody tr:nth-child(even) td{background:#f8fbfd}</style></head><body><table class="r"><thead><tr class="head"><th class="outlet" colspan="3">'+esc(z.outlet||'Main Outlet')+'</th></tr><tr class="head"><th class="title" colspan="3">'+esc(title)+'</th></tr><tr class="head"><th class="sub" colspan="3">Reporting For :'+esc(z.from||'')+' To '+esc(z.to||'')+'</th></tr><tr class="head"><th class="sub" colspan="3">Printed On :'+esc(dateText(z.printedAt||new Date()))+'</th></tr><tr><td colspan="3"></td></tr><tr class="cols"><th>Section / Date</th><th>Particular</th><th>Value</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table></body></html>';
+ const name=stem()+'.xls';if(w.desktopSaveTextFile&&w.desktopSaveTextFile(name,'\ufeff'+html))return;
+ const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}),a=d.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;d.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)
+};
 })(window,document);

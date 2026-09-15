@@ -46,10 +46,14 @@
  window.openNormalReportPopup=popupHost;
  const safeFile=s=>String(s||'Report').replace(/[<>:"/\\|?*\x00-\x1F]/g,'_').replace(/\s+/g,' ').trim();
  const billGroups=()=>{const m=new Map();(currentRows||[]).forEach(r=>{const k=String(r.SaleId||r.InvoiceNo||'');if(!m.has(k))m.set(k,{id:Number(r.SaleId||0),invoiceNo:r.InvoiceNo||k,billDate:r.BillDate,customer:r.CustomerName||'Walk-in Customer',payment:r.PaymentMode||'',format:r.PrintFormat||'',template:r.PrintTemplate||'',subTotal:r.BillSubTotal,discount:r.BillDiscount,tax:r.BillTax,total:r.BillTotal,paid:r.PaidAmount,lines:[]});m.get(k).lines.push(r)});return [...m.values()]};
- const fileStem=()=>{const name=currentDef?.[1]||'Report',from=document.querySelector('#reportFrom')?.value||'',to=document.querySelector('#reportTo')?.value||from;
-  if(currentDef?.[0]==='bill-detail'){const bills=billGroups(),q=String(document.querySelector('#reportQ')?.value||'').trim().toLowerCase();if(q&&bills.length===1&&String(bills[0].invoiceNo||'').toLowerCase().includes(q))return safeFile('Bill No. '+bills[0].invoiceNo);return safeFile('Bill Detail Report From '+from+' To '+to)}
+ const exportReportName=()=>{const id=currentDef?.[0]||'',name=currentDef?.[1]||'Report';const map={
+  'item-wise-report':'ItemWise Report','date-wise-summary':'DateWise Summary','date-wise-sale-summary':'DateWise Sale Summary Report',
+  'daily-sale-bill-wise':'Daily Sale Report Bill Wise','stock-date-wise-report':'Stock Report Date Wise'
+ };return map[id]||name};
+ const fileStem=()=>{const name=exportReportName(),from=document.querySelector('#reportFrom')?.value||'',to=document.querySelector('#reportTo')?.value||from;
+  if(currentDef?.[0]==='bill-detail'){const bills=billGroups(),q=String(document.querySelector('#reportQ')?.value||'').trim().toLowerCase();if(q&&bills.length===1&&String(bills[0].invoiceNo||'').toLowerCase().includes(q))return safeFile('Bill No. '+bills[0].invoiceNo);return safeFile('Bill Detail Report Form '+from+' To '+to)}
   if(currentDef?.[0]==='current-stock-report')return safeFile('Current Stock Report As On '+(document.querySelector('#stockAsOn')?.value||to));
-  return safeFile(name+' From '+from+' To '+to)
+  return safeFile(name+' Form '+from+' To '+to)
  };
  const raw=v=>v===null||v===undefined?'':String(v);
  const format=(k,v)=>{if(v===null||v===undefined)return '-';if(/percent|rate|gst/i.test(k)&&typeof v==='number')return esc(v)+'%';if(typeof v==='number'){if(/amount|value|price|total|tax|paid|cost|sales|expense|profit|credit|debit|discount|mrp|balance|collected/i.test(k))return '₹'+money(v);return money(v)}if(/date|time|created/i.test(k)){const d=new Date(v);if(!isNaN(d))return esc(d.toLocaleString('en-IN'))}return esc(v)};
@@ -191,15 +195,22 @@
  };
  function genericExcelHtml(){
   const keys=Object.keys(currentRows[0]),name=currentDef?.[1]||'Report',from=document.querySelector('#reportFrom')?.value||'',to=document.querySelector('#reportTo')?.value||'',cols=Math.max(1,keys.length);
-  const headings=`<tr><th class="outlet" colspan="${cols}">${esc(reportOutletName)}</th></tr><tr><th class="report-title" colspan="${cols}">${esc(name)}</th></tr><tr><th class="report-range" colspan="${cols}">Reporting For : ${esc(dateLabel(from))} &nbsp; To &nbsp; ${esc(dateLabel(to))}</th></tr><tr><th class="printed" colspan="${cols}">Printed On : ${esc(printedLabel())}</th></tr><tr class="spacer"><td colspan="${cols}"></td></tr>`;
+  const headings=`<tr><th class="outlet" colspan="${cols}">${esc(reportOutletName)}</th></tr><tr><th class="report-title" colspan="${cols}">${esc(name)}</th></tr><tr><th class="report-range" colspan="${cols}">Reporting For :${esc(from)} &nbsp; To &nbsp; ${esc(to)}</th></tr><tr><th class="printed" colspan="${cols}">Printed On :${esc(printedLabel())}</th></tr><tr class="spacer"><td colspan="${cols}"></td></tr>`;
   return `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Calibri,Arial,sans-serif;color:#111}.report{border-collapse:collapse;width:100%;font-size:10pt}.report th,.report td{border:1px solid #a8b0b7;padding:6px;vertical-align:top}.report .outlet,.report .report-title,.report .report-range,.report .printed{border:0;text-align:center;background:#fff}.report .outlet{font-size:16pt;font-weight:800}.report .report-title{font-size:14pt;font-weight:800}.report .report-range{font-size:10pt}.report .printed{font-size:9pt;color:#555}.report .spacer td{height:8px;border:0}.report .columns th{background:#dfe9f3;font-weight:800;text-transform:uppercase;white-space:nowrap}.report tbody tr:nth-child(even) td{background:#f8fbfd}.report td{mso-number-format:"\\@";white-space:normal}</style></head><body><table class="report"><thead>${headings}<tr class="columns">${keys.map(k=>`<th>${esc(pretty(k))}</th>`).join('')}</tr></thead><tbody>${currentRows.map(r=>'<tr>'+keys.map(k=>`<td>${esc(raw(r[k]))}</td>`).join('')+'</tr>').join('')}</tbody></table></body></html>`
  }
  function billDetailExcelHtml(){
   const from=document.querySelector('#reportFrom')?.value||'',to=document.querySelector('#reportTo')?.value||'',bills=billGroups();
   const body=bills.map(b=>`<h3>Bill No. ${esc(b.invoiceNo)}</h3><table class="meta"><tr><th>Date</th><td>${esc(new Date(b.billDate).toLocaleString('en-IN'))}</td><th>Customer</th><td>${esc(b.customer)}</td><th>Payment</th><td>${esc(b.payment)}</td></tr><tr><th>Original Print</th><td>${esc(b.format)}</td><th>Template</th><td>${esc(b.template)}</td><th>Bill Total</th><td>₹${money(b.total)}</td></tr></table><table><thead><tr><th>Item</th><th>Barcode</th><th>Qty</th><th>Rate</th><th>Discount</th><th>GST %</th><th>Taxable</th><th>Tax</th></tr></thead><tbody>${b.lines.map(r=>`<tr><td>${esc(r.ItemName)}</td><td>${esc(r.Barcode||'')}</td><td>${raw(r.Quantity)}</td><td>${raw(r.SalePrice)}</td><td>${raw(r.LineDiscount)}</td><td>${raw(r.TaxRate)}</td><td>${raw(r.TaxableValue)}</td><td>${raw(r.TaxAmount)}</td></tr>`).join('')}</tbody><tfoot><tr><th colspan="4">Bill Total</th><td>Discount ₹${money(b.discount)}</td><td>Tax ₹${money(b.tax)}</td><td colspan="2">₹${money(b.total)}</td></tr></tfoot></table>`).join('<br>');
-  return `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Calibri,Arial;color:#111}.heading{text-align:center}.heading h1{font-size:16pt;margin:0}.heading h2{font-size:14pt;margin:4px 0}.heading p{margin:3px 0;font-size:9.5pt}table{border-collapse:collapse;width:100%;margin:6px 0 14px}th,td{border:1px solid #8d969e;padding:5px;font-size:9.5pt}th{background:#e7eef5}h3{margin:12px 0 4px}</style></head><body><div class="heading"><h1>${esc(reportOutletName)}</h1><h2>Bill Detail Report</h2><p>Reporting For : ${esc(dateLabel(from))} &nbsp; To &nbsp; ${esc(dateLabel(to))}</p><p>Printed On : ${esc(printedLabel())} · ${bills.length} bill(s)</p></div>${body}</body></html>`
+  return `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Calibri,Arial;color:#111}.heading{text-align:center}.heading h1{font-size:16pt;margin:0}.heading h2{font-size:14pt;margin:4px 0}.heading p{margin:3px 0;font-size:9.5pt}table{border-collapse:collapse;width:100%;margin:6px 0 14px}th,td{border:1px solid #8d969e;padding:5px;font-size:9.5pt}th{background:#e7eef5}h3{margin:12px 0 4px}</style></head><body><div class="heading"><h1>${esc(reportOutletName)}</h1><h2>Bill Detail Report</h2><p>Reporting For : ${esc(from)} &nbsp; To &nbsp; ${esc(to)}</p><p>Printed On : ${esc(printedLabel())} · ${bills.length} bill(s)</p></div>${body}</body></html>`
+ }
+ function excelPayload(){
+  if(!currentRows.length)return null;
+  const keys=Object.keys(currentRows[0]),from=document.querySelector('#reportFrom')?.value||'',to=document.querySelector('#reportTo')?.value||from;
+  return {fileName:fileStem()+'.xlsx',sheetName:exportReportName(),outlet:reportOutletName,reportTitle:exportReportName(),from,to,printedOn:printedLabel(),
+   columns:keys.map(pretty),rows:currentRows.map(r=>keys.map(k=>r[k]??null))}
  }
  function saveExcel(html){
+  const payload=excelPayload();if(payload&&window.desktopSaveReportXlsx&&window.desktopSaveReportXlsx(payload))return;
   const name=fileStem()+'.xls';if(window.desktopSaveTextFile&&window.desktopSaveTextFile(name,'\ufeff'+html))return;
   const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)
  }
