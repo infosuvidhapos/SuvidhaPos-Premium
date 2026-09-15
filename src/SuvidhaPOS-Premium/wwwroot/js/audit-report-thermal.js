@@ -60,9 +60,9 @@ w.printAuditThermalReport=async function(preview){
 };
 
 w.openAuditThermalReport=async function(){
- if(typeof setPage==='function')setPage('reports');if(typeof title!=='undefined')title.textContent='Audit Report';const hp=d.querySelector('header p');if(hp)hp.textContent='Account summary style audit report · 80mm thermal printer';
+ if(typeof setPage==='function')setPage('reports');if(typeof title!=='undefined')title.textContent='Audit Report';const hp=d.querySelector('header p');if(hp)hp.textContent='80mm thermal audit report';
  const now=new Date(),from=iso(now),to=from;
- app.innerHTML='<div class="content audit-report-page"><div class="audit-report-top"><div><span>REPORT / AUDIT</span><h2>Audit Report</h2><p>Thermal account summary inspired by your sample report.</p></div><button class="btn secondary" onclick="loadReports()">← Reports</button></div>'+
+ app.innerHTML='<div class="content audit-report-page"><div class="audit-report-top"><div><span>REPORT / AUDIT</span><h2>Audit Report</h2><p>Sales, payment, tax and audit activity in 80mm thermal format.</p></div><button class="btn secondary" onclick="loadReports()">← Reports</button></div>'+
  '<div class="panel audit-report-controls"><label>From Date<input id="atrFrom" class="input" type="date" value="'+from+'"></label><label>To Date<input id="atrTo" class="input" type="date" value="'+to+'"></label><label>Cashier (optional)<input id="atrCashier" class="input" placeholder="All cashiers"></label><button class="btn" onclick="runAuditThermalReport()">Generate</button><button class="btn green" onclick="printAuditThermalReport(false)">🖨 Thermal Print 80mm</button><button class="btn secondary" onclick="printAuditThermalReport(true)">Preview / Print</button></div>'+
  '<div class="audit-report-preview-shell"><div id="auditThermalPreview" class="audit-report-paper"><div class="empty">Generating Audit Report...</div></div></div></div>';
  await w.runAuditThermalReport();
