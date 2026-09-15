@@ -38,7 +38,7 @@ for(const token of [
  'grossSales','itemDiscount','billDiscount','netSales','cgst','sgst','expectedCash','actualCash','averageBillValue'
 ]) assert.ok(backend.includes(token),'Backend thermal report data missing '+token);
 assert.ok(backend.includes('cashWithdrawal=0m'),'Cash withdrawal must be explicit zero instead of guessed data');
-assert.ok(html.includes('/js/retail-thermal-reports.js?v=6280'),'Thermal report JS not loaded');
-assert.ok(html.includes('/css/retail-thermal-reports.css?v=6280'),'Thermal report CSS not loaded');
+assert.ok(html.includes('/js/retail-thermal-reports.js?v=6290'),'Thermal report JS not loaded');
+assert.ok(html.includes('/css/retail-thermal-reports.css?v=6290'),'Thermal report CSS not loaded');
 
 console.log('PASS: 25-report master and six 80mm thermal account/closing reports');
