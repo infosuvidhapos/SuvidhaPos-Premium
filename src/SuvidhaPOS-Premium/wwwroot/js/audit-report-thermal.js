@@ -20,7 +20,7 @@ function receiptHtml(x){
  const cashier=cashiers.map(r=>'<div class="atr-cashier"><b>'+esc(val(r,'Cashier','cashier')||'System')+'</b><span>₹'+money(val(r,'Amount','amount'))+'</span>'+(num(val(r,'BtcAmount','btcAmount'))>0?'<small>BTC : ₹'+money(val(r,'BtcAmount','btcAmount'))+'</small>':'')+'</div>').join('')||'<div class="atr-empty">No cashier sales</div>';
  const cancelCount=Number(val(audit,'CancelActions','cancelActions')||0),modifyCount=Number(val(audit,'ModifyActions','modifyActions')||0);
  return '<div class="audit-thermal-receipt">'+
-  '<header class="atr-head"><h2>'+esc(val(o,'OutletName','outletName')||'SuvidhaPOS Premium')+'</h2>'+(outletLine(o)?'<p>'+esc(outletLine(o))+'</p>':'')+(val(o,'Gstin','gstin')?'<p>GSTIN : '+esc(val(o,'Gstin','gstin'))+'</p>':'')+'<h3>Audit Report - Account Summary</h3></header>'+
+  '<div class="atr-head"><h2>'+esc(val(o,'OutletName','outletName')||'SuvidhaPOS Premium')+'</h2>'+(outletLine(o)?'<p>'+esc(outletLine(o))+'</p>':'')+(val(o,'Gstin','gstin')?'<p>GSTIN : '+esc(val(o,'Gstin','gstin'))+'</p>':'')+'<h3>AUDIT REPORT</h3></div>'+
   '<div class="atr-meta"><div><b>Print Date & Time:</b><span>'+esc(printed)+'</span></div><div><b>From :</b><span>'+esc(from)+'</span><b>To :</b><span>'+esc(to)+'</span></div>'+(val(x,'cashier')?'<div><b>Cashier :</b><span>'+esc(val(x,'cashier'))+'</span></div>':'')+'</div>'+
   section('Sales Details',
    row('Bill No.',(val(s,'firstBillNo')||'-')+'   To   '+(val(s,'lastBillNo')||'-'))+
