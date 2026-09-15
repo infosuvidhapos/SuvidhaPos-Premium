@@ -82,29 +82,26 @@ function stem(){
  const x=currentData||{},z=x.meta||{},name=titles[currentType]||'Report';
  return currentType==='account-report'&&z.from===z.to?name+' '+z.from:(name+' From '+z.from+' To '+z.to)
 }
-function controls(daily){
- const now=iso(new Date()),month=iso(new Date(new Date().getFullYear(),new Date().getMonth(),1)),hasUser=!['expense-report','day-close-report'].includes(currentType);
- return '<div class="panel rtr-controls">'+(daily?
- '<label>Date<input id="rtrFrom" class="input" type="date" value="'+now+'"></label><input id="rtrTo" type="hidden" value="'+now+'">':
- '<label>From<input id="rtrFrom" class="input" type="date" value="'+month+'"></label><label>To<input id="rtrTo" class="input" type="date" value="'+now+'"></label>')+
+function controls(){
+ const now=iso(new Date()),hasUser=!['expense-report','day-close-report'].includes(currentType);
+ return '<div class="panel rtr-controls"><label>From<input id="rtrFrom" class="input" type="date" value="'+now+'"></label><label>To<input id="rtrTo" class="input" type="date" value="'+now+'"></label>'+
  (hasUser?'<label>User<select id="rtrCashier" class="select"><option value="">All</option></select></label>':'<input id="rtrCashier" type="hidden" value="">')+
  ((currentType==='expense-report'||currentType==='audit-trail-report')?'<label class="rtr-search">Search<input id="rtrQ" class="input" placeholder="Search report..."></label>':'<input id="rtrQ" type="hidden" value="">')+
- '<button class="btn" onclick="runRetailThermalReport()">Generate</button><button class="btn green" onclick="printRetailThermalReport(\'DIRECT\')">🖨 Direct Print</button><button class="btn secondary" onclick="printRetailThermalReport(\'PREVIEW\')">Preview & Print</button><button class="btn secondary" onclick="saveRetailThermalPdf()">Save PDF</button><button class="btn secondary" onclick="exportRetailThermalExcel()">Excel</button></div>'
+ '<button class="btn" onclick="runRetailThermalReport()">Generate Report</button><span id="rtrExportActions" class="report-export-actions" hidden><button class="btn green" onclick="printRetailThermalReport(\'DIRECT\')">🖨 Direct Print</button><button class="btn secondary" onclick="printRetailThermalReport(\'PREVIEW\')">Preview & Print</button><button class="btn secondary" onclick="saveRetailThermalPdf()">Export PDF</button><button class="btn secondary" onclick="exportRetailThermalExcel()">Export Excel</button></span></div>'
 }
 w.openRetailThermalReport=async function(type){
  if(!TYPES.has(type))return false;currentType=type;currentData=null;
- const daily=type==='account-report'||type==='cashier-report'||type==='day-close-report';
- const host=d.querySelector('#normalReportWorkspace')||app;
- host.innerHTML='<div class="rtr-workspace"><div class="rtr-top"><div><span>80MM THERMAL REPORT</span><h2>'+esc(titles[type])+'</h2><p>Compact day-end/account report designed for 80mm thermal printers.</p></div><button class="btn secondary" onclick="loadReports()">← Reports</button></div>'+controls(daily)+'<div class="rtr-preview-shell"><div id="rtrPreview" class="rtr-paper"><div class="empty">Generating report…</div></div></div></div>';
- await w.runRetailThermalReport();return true
+ const host=typeof w.openNormalReportPopup==='function'?w.openNormalReportPopup():(d.querySelector('#normalReportWorkspace')||app);
+ host.innerHTML='<div class="rtr-workspace normal-report-popup-content"><div class="rtr-top"><div><span>80MM THERMAL REPORT</span><h2>'+esc(titles[type])+'</h2><p>Choose current/default date filters, then Generate Report. Export actions appear after results load.</p></div><button class="btn secondary" onclick="closeNormalReport()">✕ Close</button></div>'+controls()+'<div class="rtr-preview-shell"><div id="rtrPreview" class="rtr-paper"><div class="empty">Report has not been generated yet.</div></div></div></div>';
+ setTimeout(()=>d.querySelector('#rtrFrom')?.focus(),20);return true
 };
 w.runRetailThermalReport=async function(){
- const from=d.querySelector('#rtrFrom')?.value||iso(new Date()),to=d.querySelector('#rtrTo')?.value||from,cash=d.querySelector('#rtrCashier')?.value||'',q=d.querySelector('#rtrQ')?.value||'';
+ const from=d.querySelector('#rtrFrom')?.value||iso(new Date()),to=d.querySelector('#rtrTo')?.value||from,cash=d.querySelector('#rtrCashier')?.value||'',q=d.querySelector('#rtrQ')?.value||'',actions=d.querySelector('#rtrExportActions');if(actions)actions.hidden=true;
  try{
   const x=await api('/api/reports/thermal/'+encodeURIComponent(currentType)+'?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to)+'&cashier='+encodeURIComponent(cash)+'&q='+encodeURIComponent(q));
   currentData=x;const sel=d.querySelector('#rtrCashier'),keep=cash;if(sel&&sel.options.length<=1){(x.availableCashiers||[]).forEach(r=>{const name=text(r,'Cashier','cashier');if(!name)return;const o=d.createElement('option');o.value=name;o.textContent=name;sel.appendChild(o)});sel.value=keep}
-  const box=d.querySelector('#rtrPreview');if(box)box.innerHTML=receiptHtml(x)
- }catch(e){const box=d.querySelector('#rtrPreview');if(box)box.innerHTML='<div class="alert">'+esc(e.message||e)+'</div>'}
+  const box=d.querySelector('#rtrPreview');if(box)box.innerHTML=receiptHtml(x);if(actions)actions.hidden=false
+ }catch(e){currentData=null;const box=d.querySelector('#rtrPreview');if(box)box.innerHTML='<div class="alert">'+esc(e.message||e)+'</div>'}
 };
 w.printRetailThermalReport=async function(mode){if(!currentData)await w.runRetailThermalReport();if(!currentData)return;const html=printDoc(currentData),name=stem();if(w.premiumPrintHtml)return w.premiumPrintHtml(html,name,mode);const p=w.open('','_blank','width=480,height=820');if(!p)return alert('Popup blocked');p.document.write(html.replace('</body>','<script>window.onload=function(){window.print()}<\/script></body>'));p.document.close()};
 w.saveRetailThermalPdf=async function(){if(!currentData)await w.runRetailThermalReport();if(!currentData)return;const html=printDoc(currentData),name=stem();if(w.desktopPrintHtml&&w.desktopPrintHtml(html,'REPORT_PDF',name))return;return w.printRetailThermalReport('PREVIEW')};
@@ -118,5 +115,5 @@ function flatRows(x){
  else if(x.type==='audit-trail-report'){(x.rows||[]).forEach(r=>push(dateText(val(r,'CreatedAt','createdAt')),text(r,'UserName','userName')+' / '+text(r,'Action','action'),text(r,'Details','details')))}
  return out
 }
-w.exportRetailThermalExcel=async function(){if(!currentData)await w.runRetailThermalReport();if(!currentData)return;const rows=flatRows(currentData),html='<!doctype html><html><head><meta charset="utf-8"></head><body><h2>'+esc(titles[currentType])+'</h2><p>'+esc(currentData.meta?.from)+' To '+esc(currentData.meta?.to)+'</p><table border="1"><thead><tr><th>Section / Date</th><th>Particular</th><th>Value</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table></body></html>',name=stem()+'.xls';if(w.desktopSaveTextFile&&w.desktopSaveTextFile(name,'\ufeff'+html))return;const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}),a=d.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;d.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};
+w.exportRetailThermalExcel=async function(){if(!currentData)return alert('Generate report first');const rows=flatRows(currentData),z=currentData.meta||{},title=titles[currentType]||'Report',html='<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Calibri,Arial}.r{border-collapse:collapse;width:100%}.r th,.r td{border:1px solid #9aa4ad;padding:6px}.head th{border:0;background:#fff;text-align:center}.outlet{font-size:16pt}.title{font-size:14pt}.sub{font-size:10pt}.cols th{background:#dfe9f3}.r tbody tr:nth-child(even) td{background:#f8fbfd}</style></head><body><table class="r"><thead><tr class="head"><th class="outlet" colspan="3">'+esc(z.outlet||'Main Outlet')+'</th></tr><tr class="head"><th class="title" colspan="3">'+esc(title)+'</th></tr><tr class="head"><th class="sub" colspan="3">Reporting For : '+esc(z.from||'')+' To '+esc(z.to||'')+'</th></tr><tr class="head"><th class="sub" colspan="3">Printed On : '+esc(dateText(z.printedAt||new Date()))+'</th></tr><tr><td colspan="3"></td></tr><tr class="cols"><th>Section / Date</th><th>Particular</th><th>Value</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table></body></html>',name=stem()+'.xls';if(w.desktopSaveTextFile&&w.desktopSaveTextFile(name,'\ufeff'+html))return;const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}),a=d.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;d.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};
 })(window,document);
