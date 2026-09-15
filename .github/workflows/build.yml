@@ -569,9 +569,21 @@ jobs:
           gh release upload $tag $installer.FullName $backup.FullName --repo "${{ github.repository }}" --clobber
           if($LASTEXITCODE -ne 0){ throw 'Unable to upload installer/database backup to latest-build release' }
 
+          gh release edit $tag --repo "${{ github.repository }}" --draft=false --prerelease
+          if($LASTEXITCODE -ne 0){ throw 'Unable to publish latest-build release after asset upload' }
+
+          $verify = gh api "repos/${{ github.repository }}/releases/tags/$tag" | ConvertFrom-Json
+          if($LASTEXITCODE -ne 0 -or $null -eq $verify){ throw 'Unable to verify latest-build release' }
+          if($verify.draft -eq $true){ throw 'latest-build release is still draft and public downloads will fail' }
+          if($verify.tag_name -ne $tag){ throw "latest-build tag verification failed: $($verify.tag_name)" }
+          $assetNames=@($verify.assets | ForEach-Object { $_.name })
+          foreach($requiredAsset in @('SuvidhaPOS-Premium-Windows-Setup.exe','SuvidhaPos.bak')){
+            if($assetNames -notcontains $requiredAsset){ throw "latest-build release asset missing: $requiredAsset" }
+          }
+
       - name: Validate release publishing policy
         shell: powershell
         run: |
           $wf = Get-Content '.github/workflows/build.yml' -Raw -Encoding UTF8
           if($wf -match '(?m)^\s*uses:\s*actions/upload-artifact@v4\s*$'){ throw 'Actions artifact storage must not be used by this workflow' }
-          foreach($token in @('contents: write','Publish rolling GitHub Release','latest-build','gh release create','gh release upload')){ if(-not $wf.Contains($token)){ throw "Release publishing policy missing: $token" } }
+          foreach($token in @('contents: write','Publish rolling GitHub Release','latest-build','gh release create','gh release upload','gh release edit','--draft=false','releases/tags/$tag')){ if(-not $wf.Contains($token)){ throw "Release publishing policy missing: $token" } }
