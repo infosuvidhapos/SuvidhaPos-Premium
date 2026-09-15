@@ -69,7 +69,7 @@ function auditBody(x){
 function bodyFor(x){switch(x.type){case'account-report':return accountBody(x);case'cashier-report':return cashierBody(x);case'payment-mode-report':return paymentBody(x);case'expense-report':return expenseBody(x);case'day-close-report':return dayCloseBody(x);case'audit-trail-report':return auditBody(x);default:return''}}
 function receiptHtml(x){
  const z=x.meta||{},single=z.from===z.to;
- return '<div class="rtr-receipt"><header class="rtr-head"><h2>SUVIDHA POS</h2><h3>'+esc(x.title||titles[x.type]||'REPORT')+'</h3></header>'+
+ return '<div class="rtr-receipt"><div class="rtr-head"><h2>'+esc(text(z,'outlet')||'SUVIDHA POS')+'</h2>'+(text(z,'address')?'<p>'+esc(text(z,'address'))+'</p>':'')+(text(z,'gstin')?'<p>GSTIN : '+esc(text(z,'gstin'))+'</p>':'')+'<h3>'+esc(x.title||titles[x.type]||'REPORT')+'</h3></div>'+
  '<div class="rtr-meta">'+row('Outlet',text(z,'outlet'))+(single?row('Date',text(z,'from')):row('From / To',text(z,'from')+' / '+text(z,'to')))+row('Shift',text(z,'shift')||'All')+row('User',text(z,'cashier')||'All')+'</div>'+
  bodyFor(x)+'<footer class="rtr-foot"><div>Printed: '+esc(dateText(val(z,'printedAt')))+'</div><div>Cashier: '+esc(text(z,'printedBy')||'SYSTEM')+'</div>'+
  ((x.type==='account-report'||x.type==='cashier-report'||x.type==='day-close-report')?'<div class="rtr-sign"><span>Cashier Sign: ______________</span><span>Manager Sign: ______________</span></div>':'')+
@@ -87,7 +87,7 @@ function controls(){
  return '<div class="panel rtr-controls"><label>From<input id="rtrFrom" class="input" type="date" value="'+now+'"></label><label>To<input id="rtrTo" class="input" type="date" value="'+now+'"></label>'+
  (hasUser?'<label>User<select id="rtrCashier" class="select"><option value="">All</option></select></label>':'<input id="rtrCashier" type="hidden" value="">')+
  ((currentType==='expense-report'||currentType==='audit-trail-report')?'<label class="rtr-search">Search<input id="rtrQ" class="input" placeholder="Search report..."></label>':'<input id="rtrQ" type="hidden" value="">')+
- '<button class="btn" onclick="runRetailThermalReport()">Generate Report</button><span id="rtrExportActions" class="report-export-actions" hidden><button class="btn green" onclick="printRetailThermalReport(\'DIRECT\')">🖨 Direct Print</button><button class="btn secondary" onclick="printRetailThermalReport(\'PREVIEW\')">Preview & Print</button><button class="btn secondary" onclick="saveRetailThermalPdf()">Export PDF</button><button class="btn secondary" onclick="exportRetailThermalExcel()">Export Excel</button></span></div>'
+ '<button class="btn" onclick="runRetailThermalReport()">Generate Report</button><span id="rtrExportActions" class="report-export-actions" hidden><button class="btn green" onclick="printRetailThermalReport(\'DIRECT\')">🖨 Thermal Print 80mm</button><button class="btn secondary" onclick="printRetailThermalReport(\'PREVIEW\')">Preview / Print</button><button class="btn secondary" onclick="saveRetailThermalPdf()">Export PDF</button><button class="btn secondary" onclick="exportRetailThermalExcel()">Export Excel</button></span></div>'
 }
 w.openRetailThermalReport=async function(type){
  if(!TYPES.has(type))return false;currentType=type;currentData=null;
