@@ -17,6 +17,8 @@ assert.equal((print.match(/Default Bill Print Action/g)||[]).length,1,'Print Mas
 assert.ok(!print.includes('id="billingPrintActions"'),'Print Master source must not contain billingPrintActions radio panel');
 assert.ok(print.includes('purgePrintActionPanels'),'Print Master must purge any late injected bill-action panel');
 assert.ok(billing.includes("if(q('.print-master'))"),'Billing action injector must exit on Print Master');
+assert.ok(billing.includes('/css/audit-report-thermal.css?v=6300'),'Audit thermal CSS cache must be v6300');
+assert.ok(billing.includes('/js/audit-report-thermal.js?v=6300'),'Audit thermal JS cache must be v6300');
 assert.ok(billing.includes("qa('#billingPrintActions,.billing-print-actions,#printMasterBillPrintAction')"),'Print Master duplicate purge guard missing');
 
 // 2. Settings: Local Database/Create Backup card removed, dedicated Backup Master remains.
