@@ -36,7 +36,23 @@ assert.ok(t11Rows.includes('Discount:'),'T11 must keep per-item Discount % line'
 assert.ok(!t11Rows.includes('You Save:'),'T11 must not print per-item You Save amount');
 assert.ok(print.includes('YOU SAVED'),'T11 must retain total savings at bill bottom');
 const printCss=read('src/SuvidhaPOS-Premium/wwwroot/css/print-master.css');
+const appJs=read('src/SuvidhaPOS-Premium/wwwroot/js/app.js');
+const jewellerySuite=read('src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js');
+const auditThermal=read('src/SuvidhaPOS-Premium/wwwroot/js/audit-report-thermal.js');
+const retailThermal=read('src/SuvidhaPOS-Premium/wwwroot/js/retail-thermal-reports.js');
+const dbInit=read('src/SuvidhaPOS-Premium/Data/DatabaseInitializer.cs');
+const installer=read('installer/SuvidhaPOS.iss');
 assert.ok(printCss.includes('.print-master .billing-print-actions'),'Print Master must suppress redundant Bill Print Action panel');
+assert.ok(billing.includes("if(q('.print-master'))"),'Billing action injector must stop on Print Master');
+assert.ok(print.includes('purgePrintActionPanels'),'Print Master must purge late duplicate action panels');
+assert.ok(!appJs.includes('<h3>LOCAL DATABASE</h3>'),'Settings must not contain duplicate Local Database backup card');
+assert.ok(jewellerySuite.includes('onclick="loadBackupMaster()"')&&jewellerySuite.includes('<span>Database Backup</span>'),'Jewellery sidebar must expose working Database Backup');
+assert.ok(jewellerySuite.includes('onclick="loadPrintSettings()"')&&jewellerySuite.includes('<span>Print Master</span>'),'Jewellery sidebar must expose Print Master');
+assert.ok(!auditThermal.includes('<header class="atr-head">')&&auditThermal.includes('<h3>AUDIT REPORT</h3>'),'Audit thermal header must stay isolated and clean');
+assert.ok(!retailThermal.includes('<header class="rtr-head">')&&retailThermal.includes('Thermal Print 80mm'),'All retail thermal reports must use isolated 80mm preview/print header');
+for(const token of ['D:\\','E:\\','Suvidha Pos\\Database','PreferredDatabaseFolder','FILENAME=N'])assert.ok(dbInit.includes(token),'Database MDF/LDF placement missing '+token);
+for(const token of ["DirExists('D:\\')","DirExists('E:\\')",'D:\\Suvidha Pos\\Database','E:\\Suvidha Pos\\Database','EnsureDatabaseFolder'])assert.ok(installer.includes(token),'Installer database folder policy missing '+token);
+
 
 const purchase=read(files.purchase),imp=read(files.import);
 const purchaseModeToken='purchase-mode-'+'$'+'{mode}';
