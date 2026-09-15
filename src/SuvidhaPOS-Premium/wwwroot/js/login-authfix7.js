@@ -194,19 +194,20 @@
     warning.hidden = !e.getModifierState('CapsLock');
   }
   function onReady() {
-    var pass = el('loginPass'), user = el('loginUser'), eye = el('loginEye');
+    var pass = el('loginPass'), user = el('loginUser'), eye = el('loginEye'), submit = el('loginSubmitBtn');
+    if (submit) submit.addEventListener('click', w.suvidhaLoginNow);
 
     if (pass) {
       pass.addEventListener('keydown', function (e) {
         updateCapsLock(e);
-        if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); w.suvidhaLoginNow(e); }
+        if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); e.stopPropagation(); w.suvidhaLoginNow(e); }
       });
       pass.addEventListener('keyup', updateCapsLock);
       pass.addEventListener('blur', function () { var x = el('capsLockWarning'); if (x) x.hidden = true; });
     }
     if (user) {
       user.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); if (pass) pass.focus(); }
+        if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); e.stopPropagation(); if (pass) pass.focus(); }
       });
       w.setTimeout(function () { try { user.focus(); user.select(); } catch (_) {} }, 80);
     }
