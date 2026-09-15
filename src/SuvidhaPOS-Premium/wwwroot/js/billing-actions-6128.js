@@ -44,7 +44,7 @@ w.cbRemoveBillRow=function(i){if(typeof state==='undefined'||!state.cart||!state
 function startNewBill(root,isJewel){
  if(isJewel){
   if(lastJewelRoot===root)return;lastJewelRoot=root;
-  billModeOverride=false;currentMode='DIRECT';modeLoaded=true;syncRadios();
+  billModeOverride=false;modeLoaded=false;readMode();
   return;
  }
  if(lastNormalRoot===root)return;lastNormalRoot=root;
@@ -64,7 +64,7 @@ function patchJewellery(){
  if(!root.querySelector('#billingPrintActions')){var tabs=root.querySelector('.js-bill-tabs');if(tabs)tabs.insertAdjacentHTML('afterend',printBox())}
  syncRadios();
 }
-function patch(){if(injectBusy)return;injectBusy=true;requestAnimationFrame(function(){injectBusy=false;ensureStyle();patchNormal();patchJewellery();syncRadios()})}
+function patch(){if(injectBusy)return;injectBusy=true;requestAnimationFrame(function(){injectBusy=false;if(q('.print-master')){qa('#billingPrintActions,.billing-print-actions,#printMasterBillPrintAction').forEach(function(x){x.remove()});return}ensureStyle();patchNormal();patchJewellery();syncRadios()})}
 new MutationObserver(patch).observe(q('#app')||d.body,{childList:true,subtree:true});
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',function(){readMode();patch()});else{readMode();patch()}
 
@@ -90,14 +90,14 @@ async function loadRuntime(){
  addCss('/css/billing-layout-fix.css?v=6180','billingLayoutFix6130');
  addCss('/css/btc-payment-receipt-flow.css?v=6190','btcReceiptFlowCss6130');
  addCss('/css/retail-expansion.css?v=6180','retailExpansionCss6140');
- addCss('/css/audit-report-thermal.css?v=6180','auditReportThermalCss6140');
+ addCss('/css/audit-report-thermal.css?v=6290','auditReportThermalCss6140');
  try{
   await addScript('/js/btc-payment-receipt-flow.js?v=6190','btcReceiptFlowJs6130');
   await addScript('/js/btc-payment-receipt-input-fix.js?v=6180','btcReceiptInputFixJs6130');
   await addScript('/js/billing-hold.js?v=6230','billingHoldJs6130');
   await addScript('/js/india-locations.js?v=6180','indiaLocationsJs6140');
   await addScript('/js/retail-masters-ui.js?v=6210','retailMastersUiJs6140');
-  await addScript('/js/audit-report-thermal.js?v=6180','auditReportThermalJs6140');
+  await addScript('/js/audit-report-thermal.js?v=6290','auditReportThermalJs6140');
   await addScript('/js/jewellery-nav-fix.js?v=6200','jewelleryNavFix6170');
   await addScript('/js/credit-upi-click-fix.js?v=6180','creditUpiClickFix6170');
  }catch(e){console.error('Suvidha retail/BTC runtime 6.14.0:',e)}

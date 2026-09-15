@@ -196,7 +196,7 @@ jobs:
           foreach($token in @('btcBillingAdvance','btcBillingAdvanceMode','Submit')){if(-not $btcBill.Contains($token)){throw "BTC billing company advance/submit flow missing: $token"}}
           foreach($token in @('btcRptMode','mode=','All Modes','/api/reports/btc-payments')){if(-not $ui.Contains($token)){throw "BTC Payment Report filter missing: $token"}}
           if(-not $backend.Contains('string? type, string? mode')){throw 'BTC Payment Report backend payment-mode filter missing'}
-          foreach($token in @('Thermal Print 80mm','Audit Report - Account Summary','Payment Break up','Cashier Report','* End of Reports *','data-audit-thermal-report','injectAuditTile')){if(-not $audit.Contains($token)){throw "Thermal Audit Report missing: $token"}}
+          foreach($token in @('Thermal Print 80mm','AUDIT REPORT','Payment Break up','Cashier Report','* End of Reports *','data-audit-thermal-report','injectAuditTile')){if(-not $audit.Contains($token)){throw "Thermal Audit Report missing: $token"}}
           if(-not $audit.Contains('@page{size:80mm auto')){throw '80mm thermal print page rule missing'}
           foreach($token in @('PdfPig','ContentOrderTextExtractor','ext == ".pdf"','ParsePdfTable')){if(-not ($project+$backend).Contains($token)){throw "Local PDF rate import missing: $token"}}
           foreach($token in @('CustomerPhone','CustomerGstIn','INSERT Customers')){if(-not $premium.Contains($token)){throw "Billing customer auto-save backend missing: $token"}}
@@ -523,7 +523,7 @@ jobs:
         shell: powershell
         run: |
           $iss = Get-Content 'installer/SuvidhaPOS.iss' -Raw -Encoding UTF8
-          foreach($token in @('PrivilegesRequired=admin','DefaultDirName={autopf}\SuvidhaPOS Premium','UsePreviousAppDir=no','Name: "{app}"; Permissions: users-modify','EnsureSqlExpress','IsSqlConnectionReady','WaitForSqlReady','SQLBOOTSTRAP:','MSSQL$SQLEXPRESS','SQL2019-SQLEXPR_x64_ENU.exe','OriginalWindowsUser','SQLSYSADMINACCOUNTS="BUILTIN\ADMINISTRATORS"','CanLaunchApplication','NeedRestart','runasoriginaluser')){ if(-not $iss.Contains($token)){ throw "Administrator/Program Files setup policy missing: $token" } }
+          foreach($token in @('PrivilegesRequired=admin','DefaultDirName={autopf}\SuvidhaPOS Premium','UsePreviousAppDir=no','Name: "{app}"; Permissions: users-modify','EnsureSqlExpress','IsSqlConnectionReady','WaitForSqlReady','SQLBOOTSTRAP:','MSSQL$SQLEXPRESS','SQL2019-SQLEXPR_x64_ENU.exe','OriginalWindowsUser','SQLSYSADMINACCOUNTS="BUILTIN\ADMINISTRATORS"','CanLaunchApplication','NeedRestart','runasoriginaluser','EnsureDatabaseFolder','D:\Suvidha Pos\Database','E:\Suvidha Pos\Database')){ if(-not $iss.Contains($token)){ throw "Administrator/Program Files setup policy missing: $token" } }
           if($iss.Contains('PrivilegesRequired=lowest')){ throw 'Setup must request Administrator permission so {autopf} resolves to Program Files' }
           if($iss.Contains('Check: ShouldInstallSqlExpress')){ throw 'Legacy registry-only SQL install check must not be used' }
           if($iss -match 'SQL2019-SQLEXPR_x64_ENU\.exe.*skipifsilent'){ throw 'SQL Express must not be skipped during silent installation' }

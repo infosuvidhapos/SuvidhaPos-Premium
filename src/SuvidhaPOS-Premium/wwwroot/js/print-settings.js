@@ -1,6 +1,6 @@
 (function(){
  'use strict';
- const K={mode:'Print.BillMode',width:'Print.ThermalWidth',template:'Print.BillTemplate',format:'Print.BillFormat',currency:'Print.CurrencyText',normalAction:'Print.Normal.ActionMode'};
+ const K={mode:'Print.BillMode',width:'Print.ThermalWidth',template:'Print.BillTemplate',format:'Print.BillFormat',currency:'Print.CurrencyText',normalAction:'Print.Normal.ActionMode',jewelAction:'Print.ActionMode'};
  const THERMAL=[
   ['T01','Classic Compact','Fast mono receipt'],
   ['T02','GST Compact','GST-focused compact bill'],
@@ -40,7 +40,7 @@
    state.width=await setting(K.width,'80MM');
    state.template=await setting(K.template,state.mode==='A4'?'A01':'T01');
    state.currency=String(await setting(K.currency,'SYMBOL')).toUpperCase()==='RS'?'RS':'SYMBOL';
-   if(!jewellery()){const a=String(await setting(K.normalAction,'DIRECT')).toUpperCase();state.action=['DIRECT','PDF','PREVIEW'].includes(a)?a:'DIRECT'}else state.action='DIRECT';
+   {const key=jewellery()?K.jewelAction:K.normalAction,a=String(await setting(key,'DIRECT')).toUpperCase();state.action=['DIRECT','PDF','PREVIEW'].includes(a)?a:'DIRECT'}
    if(state.mode==='Thermal'&&!/^T\d\d$/.test(state.template))state.template='T01';
    if(jewellery()&&state.template==='T11')state.template='T01';
    if(jewellery()&&state.template==='A11')state.template='A01';
@@ -150,7 +150,8 @@ ${styleCss(template,thermal)}
    if(jewellery()&&state.template==='A11')state.template='A01';
    document.querySelectorAll('.pm-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
    const width=document.querySelector('#pmWidthWrap');if(width)width.style.display=mode==='Thermal'?'grid':'none';
-   document.querySelectorAll('.print-master .billing-print-actions,.print-master #billingPrintActions,.print-master #printMasterBillPrintAction').forEach(x=>x.remove());cards();preview()
+   const purgePrintActionPanels=()=>document.querySelectorAll('#billingPrintActions,.billing-print-actions,#printMasterBillPrintAction').forEach(x=>x.remove());
+   purgePrintActionPanels();[0,50,200,600].forEach(ms=>setTimeout(purgePrintActionPanels,ms));cards();preview()
  };
  window.setThermalWidth=function(v){state.width=v;preview()};
  window.setPrintCurrency=function(v){state.currency=String(v||'SYMBOL').toUpperCase()==='RS'?'RS':'SYMBOL';preview()};
@@ -164,33 +165,33 @@ ${styleCss(template,thermal)}
      api('/api/app-settings/'+encodeURIComponent(K.template),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:state.template})}),
      api('/api/app-settings/'+encodeURIComponent(K.format),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:format})}),
       api('/api/app-settings/'+encodeURIComponent(K.currency),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:state.currency})}),
-      ...(!jewellery()?[api('/api/app-settings/'+encodeURIComponent(K.normalAction),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:state.action})})]:[])
+      api('/api/app-settings/'+encodeURIComponent(jewellery()?K.jewelAction:K.normalAction),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:state.action})})
     ]);
-    document.querySelector('#pmStatus').textContent='Saved: '+state.template+' · '+format+(jewellery()?'':' · '+(state.action==='DIRECT'?'Direct Print':state.action==='PDF'?'Save As PDF':'Print & Preview'));
+    document.querySelector('#pmStatus').textContent='Saved: '+state.template+' · '+format+' · '+(state.action==='DIRECT'?'Direct Print':state.action==='PDF'?'Save As PDF':'Print & Preview');
     toast('Print Master saved');
    }catch(e){alert(e.message)}
  };
  window.printMasterTest=async function(){
    const html=buildHtml(sample(),state.mode,state.template,state.width,false,state.currency);
-   if(window.premiumPrintHtml)return window.premiumPrintHtml(html,'SuvidhaPOS-Print-Test',jewellery()?undefined:state.action);
+   if(window.premiumPrintHtml)return window.premiumPrintHtml(html,'SuvidhaPOS-Print-Test',state.action);
    const w=window.open('','_blank',state.mode==='Thermal'?'width=460,height=760':'width=950,height=760');
    if(!w)return toast('Popup blocked');w.document.write(html);w.document.close();w.print()
  };
  window.loadPrintSettings=async function(){
-   setPage('settings');title.textContent='Print Master';document.querySelector('header p').textContent=(jewellery()?'10 Thermal + 10 A4':'11 Thermal + 11 A4')+' bill styles with live preview';
+   setPage(jewellery()?'jPrintMaster':'settings');title.textContent='Print Master';document.querySelector('header p').textContent=(jewellery()?'10 Thermal + 10 A4':'11 Thermal + 11 A4')+' bill styles with live preview';
    await loadState();
    app.innerHTML=`<div class="content print-master"><div class="panel pm-head"><div><h2>🖨 BILL PRINT MASTER</h2><p class="muted">Choose a default bill layout. New bills remember the selected paper and style for reprint.</p></div><div id="pmStatus" class="tag">${jewellery()?'20':'22'} Styles Available</div></div>
     <div class="pm-layout"><div class="panel pm-controls">
       <div class="pm-tabs"><button class="pm-tab ${state.mode==='Thermal'?'active':''}" data-mode="Thermal" onclick="setPrintMode('Thermal')">${jewellery()?'Thermal Printer · 10':'Thermal Printer · 11'}</button><button class="pm-tab ${state.mode==='A4'?'active':''}" data-mode="A4" onclick="setPrintMode('A4')">A4 Printer · ${jewellery()?'10':'11'}</button></div>
       <div id="pmWidthWrap" class="pm-width" style="display:${state.mode==='Thermal'?'grid':'none'}"><label>Thermal Paper Width<select class="select" onchange="setThermalWidth(this.value)"><option ${state.width==='80MM'?'selected':''}>80MM</option><option ${state.width==='58MM'?'selected':''}>58MM</option></select></label><label>Currency Print<select class="select" onchange="setPrintCurrency(this.value)"><option value="SYMBOL" ${state.currency==='SYMBOL'?'selected':''}>₹ Symbol</option><option value="RS" ${state.currency==='RS'?'selected':''}>Rs. fallback</option></select></label></div>
-      ${jewellery()?'':`<div class="pm-action"><label>Default Bill Print Action<select class="select" onchange="setPrintAction(this.value)"><option value="DIRECT" ${state.action==='DIRECT'?'selected':''}>Direct Print</option><option value="PDF" ${state.action==='PDF'?'selected':''}>Save As PDF</option><option value="PREVIEW" ${state.action==='PREVIEW'?'selected':''}>Print & Preview</option></select></label><small>This becomes the selected option on every new normal bill.</small></div>`}
+      <div class="pm-action"><label>Default Bill Print Action<select class="select" onchange="setPrintAction(this.value)"><option value="DIRECT" ${state.action==='DIRECT'?'selected':''}>Direct Print</option><option value="PDF" ${state.action==='PDF'?'selected':''}>Save As PDF</option><option value="PREVIEW" ${state.action==='PREVIEW'?'selected':''}>Print & Preview</option></select></label><small>This becomes the selected option on every new ${jewellery()?'jewellery':'normal'} bill.</small></div>
       <div id="pmStyles" class="pm-styles"></div>
       <div class="toolbar"><button class="btn" onclick="savePrintMaster()">Save as Default</button><button class="btn secondary" onclick="printMasterTest()">Print Test</button></div>
     </div><div class="panel pm-preview-panel"><div class="panelhead"><div><h3>LIVE PREVIEW</h3><p id="pmSelected" class="muted"></p></div><span class="tag">Actual print proportions</span></div><div class="pm-preview-stage"><iframe id="pmPreview" title="Bill print preview"></iframe></div></div></div></div>`;
    cards();preview()
  };
  async function currentPrintConfig(){
-   await loadState();let action=jewellery()?'DIRECT':state.action;
+   await loadState();let action=state.action;
    return {mode:state.mode,width:state.width,template:state.template,action,currency:state.currency}
  }
  async function saleData(id){
