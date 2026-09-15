@@ -3,13 +3,16 @@ const root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p
 const print=read('src/SuvidhaPOS-Premium/wwwroot/js/print-settings.js');
 const billing=read('src/SuvidhaPOS-Premium/wwwroot/js/billing-actions-6128.js');
 const app=read('src/SuvidhaPOS-Premium/wwwroot/js/app.js');
+const outletFix=read('src/SuvidhaPOS-Premium/wwwroot/js/outlet-master-fix.js');
+const completion=read('src/SuvidhaPOS-Premium/wwwroot/js/premium-completion.js');
+const html=read('src/SuvidhaPOS-Premium/wwwroot/index.html');
 const audit=read('src/SuvidhaPOS-Premium/wwwroot/js/audit-report-thermal.js');
 const thermal=read('src/SuvidhaPOS-Premium/wwwroot/js/retail-thermal-reports.js');
 const jewel=read('src/SuvidhaPOS-Premium/wwwroot/js/jewellery-suite.js');
 const init=read('src/SuvidhaPOS-Premium/Data/DatabaseInitializer.cs');
 const iss=read('installer/SuvidhaPOS.iss');
 
-for(const [name,src] of [['print-settings',print],['billing-actions',billing],['app',app],['audit',audit],['thermal',thermal],['jewellery-suite',jewel]])
+for(const [name,src] of [['print-settings',print],['billing-actions',billing],['app',app],['outlet-master-fix',outletFix],['premium-completion',completion],['audit',audit],['thermal',thermal],['jewellery-suite',jewel]])
  assert.doesNotThrow(()=>new Function(src),name+' must parse');
 
 // 1. Print Master: exactly one default selector, no injected Bill Print Action panel.
@@ -19,11 +22,16 @@ assert.ok(print.includes('purgePrintActionPanels'),'Print Master must purge any 
 assert.ok(billing.includes("if(q('.print-master'))"),'Billing action injector must exit on Print Master');
 assert.ok(billing.includes('/css/audit-report-thermal.css?v=6300'),'Audit thermal CSS cache must be v6300');
 assert.ok(billing.includes('/js/audit-report-thermal.js?v=6300'),'Audit thermal JS cache must be v6300');
-assert.ok(billing.includes("qa('#billingPrintActions,.billing-print-actions,#printMasterBillPrintAction')"),'Print Master duplicate purge guard missing');
+assert.ok(print.includes('#premiumPrintActions,.premium-print-actions'),'Print Master must purge legacy premium action panel');
+assert.ok(billing.includes('#premiumPrintActions,.premium-print-actions'),'Late billing observer must purge legacy premium action panel');
+assert.ok(!completion.includes('<b>BILL PRINT ACTION</b>'),'Premium completion must not inject duplicate BILL PRINT ACTION panel');
 
 // 2. Settings: Local Database/Create Backup card removed, dedicated Backup Master remains.
-assert.ok(!app.includes('LOCAL DATABASE'),'Settings must not render LOCAL DATABASE backup card');
-assert.ok(!app.includes('Create Backup Now'),'Settings must not render Create Backup Now button');
+for(const [name,src] of [['app',app],['outlet-master-fix',outletFix]]){
+ assert.ok(!src.includes('LOCAL DATABASE'),name+' must not render LOCAL DATABASE backup card');
+ assert.ok(!src.includes('Create Backup Now'),name+' must not render Create Backup Now button');
+}
+for(const token of ['/js/outlet-master-fix.js?v=6310','/js/print-settings.js?v=6310','/js/premium-completion.js?v=6310','/js/billing-actions-6128.js?v=6310','/js/retail-thermal-reports.js?v=6310'])assert.ok(html.includes(token),'Fresh cache version missing '+token);
 assert.ok(jewel.includes('loadBackupMaster()'),'Jewellery must expose working Database Backup route');
 assert.ok(jewel.includes('loadPrintSettings()'),'Jewellery must expose Print Master route');
 
