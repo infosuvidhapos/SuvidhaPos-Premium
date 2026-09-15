@@ -17,14 +17,18 @@ const print=read(jsFiles[0]),billing=read(jsFiles[1]),purchase=read(jsFiles[2]),
 const backend=read('src/SuvidhaPOS-Premium/PremiumFeatureModules.cs');
 const manualPurchase=read('src/SuvidhaPOS-Premium/ManualPurchaseService.cs');
 
-for(const token of ["['T11','Retail Savings 80mm'","You Save:","YOU SAVED","Print.CurrencyText","Thermal Printer · 11","template==='T11'?z.net:z.amount"])
+for(const token of ["['T11','Retail Savings 80mm'","Discount:","YOU SAVED","Print.CurrencyText","Thermal Printer · 11","template==='T11'?z.net:z.amount"])
  assert.ok(print.includes(token),'T11 missing '+token);
+const t11Rows=print.slice(print.indexOf('const rows=lines.map'),print.indexOf('const lineInfoRows='));
+assert.ok(!t11Rows.includes('You Save:'),'T11 per-item You Save amount must stay removed');
 assert.ok(print.includes("state.width='80MM'"),'T11 must force 80MM');
 assert.ok(print.includes("'Rs. '"),'T11 must support Rs. fallback');
 
 for(const token of ['cbApplyLineEdit','DiscountPer:cbProductDiscount','cb-line-discount','Discount:cbLineDiscount(x).discount','totalDiscount:lineDiscount+d.amount'])
  assert.ok(billing.includes(token),'Billing discount missing '+token);
 assert.ok(billing.includes("Discount: ${Number(dl.percent.toFixed(2))}%"),'Billing must show non-zero item discount below item');
+assert.ok(billing.includes('function cbQtyStep(unit)'),'Billing quantity step helper missing');
+assert.ok(billing.includes('cbFractionalUnit(unit)?0.1:1'),'KG/GM/LTR/ML/MTR style UOMs must support decimal quantity steps');
 
 for(const token of ['Bill No :','Bill Date :','Supplier Name :','Barcode / Item Name:','purchaseHeaderKey','bpSearchKey','bpPickPurchaseItem','purchaseCellKey','data-purchase-edit'])
  assert.ok(purchase.includes(token),'Purchase keyboard picker missing '+token);
