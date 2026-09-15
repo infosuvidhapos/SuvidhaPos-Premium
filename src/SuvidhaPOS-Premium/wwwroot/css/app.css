@@ -89,3 +89,13 @@ body[data-theme="light"] .stock-summary-grid>div{background:#fffdf8;border-color
 .bill-detail-original-frame.a4{width:min(920px,100%);height:980px}
 #reportTable td small{display:block;margin-top:4px;color:var(--muted);font-size:9px}
 @media(max-width:780px){.bill-detail-original-frame.a4{height:720px}.bill-detail-original-frame.thermal{height:640px}}
+
+.normal-report-popup-overlay{position:fixed;inset:0;z-index:2800;background:rgba(2,10,18,.74);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:22px}
+.normal-report-popup-window{width:min(1500px,96vw);height:min(900px,94vh);border:1px solid #29465d;border-radius:16px;background:#081724;box-shadow:0 28px 90px #000b;overflow:hidden}
+#normalReportPopupBody{height:100%;overflow:auto;padding:16px}
+.normal-report-popup-content{margin:0;min-height:100%;box-shadow:none}
+.report-export-actions{display:inline-flex;gap:8px;flex-wrap:wrap}
+.report-export-actions[hidden]{display:none!important}
+body[data-theme="light"] .normal-report-popup-overlay{background:rgba(35,40,45,.38)}
+body[data-theme="light"] .normal-report-popup-window{background:#f5f8fb;border-color:#b8cad8}
+@media(max-width:760px){.normal-report-popup-overlay{padding:6px}.normal-report-popup-window{width:100vw;height:96vh;border-radius:10px}#normalReportPopupBody{padding:8px}.report-export-actions{width:100%}.report-export-actions .btn{flex:1}}

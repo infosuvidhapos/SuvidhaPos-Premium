@@ -1,6 +1,6 @@
 (function(w,d){
 'use strict';
-var PRINT_KEY='Print.Normal.ActionMode',JEWEL_PRINT_KEY='Print.ActionMode',allowed=['DIRECT','PDF','PREVIEW'],currentMode='DIRECT',modeLoaded=true,injectBusy=false,lastNormalRoot=null,lastJewelRoot=null;
+var PRINT_KEY='Print.Normal.ActionMode',JEWEL_PRINT_KEY='Print.ActionMode',allowed=['DIRECT','PDF','PREVIEW'],currentMode='DIRECT',modeLoaded=true,billModeOverride=false,injectBusy=false,lastNormalRoot=null,lastJewelRoot=null;
 function q(s){return d.querySelector(s)}
 function qa(s){return Array.prototype.slice.call(d.querySelectorAll(s))}
 function notice(m){try{toast(m)}catch(_){}}
@@ -10,8 +10,8 @@ async function readMode(){
  try{
   const row=await api('/api/app-settings/'+encodeURIComponent(actionKey()));
   const saved=String(row?.Value??row?.value??'DIRECT').toUpperCase();
-  currentMode=allowed.includes(saved)?saved:'DIRECT';
- }catch(_){currentMode='DIRECT'}
+  if(!billModeOverride)currentMode=allowed.includes(saved)?saved:'DIRECT';
+ }catch(_){if(!billModeOverride)currentMode='DIRECT'}
  modeLoaded=true;syncRadios();return currentMode;
 }
 async function saveMode(mode,show){
@@ -21,7 +21,7 @@ async function saveMode(mode,show){
 }
 w.billingSetPrintMode=function(mode){
  mode=String(mode||'DIRECT').toUpperCase();if(allowed.indexOf(mode)<0)mode='DIRECT';
- currentMode=mode;modeLoaded=true;syncRadios();notice('This bill: '+(mode==='DIRECT'?'Direct Print':mode==='PDF'?'Save As PDF':'Print & Preview'));return mode
+ billModeOverride=true;currentMode=mode;modeLoaded=true;syncRadios();notice('This bill: '+(mode==='DIRECT'?'Direct Print':mode==='PDF'?'Save As PDF':'Print & Preview'));return mode
 };
 w.billingGetPrintMode=async function(){return modeLoaded?currentMode:await readMode()};
 function checked(mode){return currentMode===mode?' checked':''}
@@ -44,11 +44,11 @@ w.cbRemoveBillRow=function(i){if(typeof state==='undefined'||!state.cart||!state
 function startNewBill(root,isJewel){
  if(isJewel){
   if(lastJewelRoot===root)return;lastJewelRoot=root;
-  currentMode='DIRECT';modeLoaded=true;syncRadios();
+  billModeOverride=false;currentMode='DIRECT';modeLoaded=true;syncRadios();
   return;
  }
  if(lastNormalRoot===root)return;lastNormalRoot=root;
- modeLoaded=false;readMode();
+ billModeOverride=false;modeLoaded=false;readMode();
 }
 function patchNormal(){
  var root=q('.counter-billing');if(!root)return;startNewBill(root,false);

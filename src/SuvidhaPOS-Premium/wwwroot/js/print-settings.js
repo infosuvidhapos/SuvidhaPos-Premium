@@ -12,7 +12,7 @@
   ['T08','Detailed Tax','Tax details with summary'],
   ['T09','Quick Counter','Large qty/rate for counter'],
   ['T10','Premium Border','Double-border premium receipt'],
-  ['T11','Retail Savings 80mm','Per-item discount + You Save receipt']
+  ['T11','Retail Savings 80mm','Per-item Discount % + total savings at bill end']
  ];
  const A4=[
   ['A01','Classic Tax Invoice','Traditional GST invoice'],
@@ -115,7 +115,7 @@ ${styleCss(template,thermal)}
    const cancelledMark=String(h.Status||'Completed').toLowerCase()!=='completed'?'<div style="border:3px double #900;color:#900;font-weight:900;text-align:center;padding:6px;margin:6px 0">CANCELLED BILL</div>':'';
    const showCode=['T04','A02','A07'].includes(template);
    const detailed=['T06','T08','A02','A06','A07'].includes(template);
-   const rows=lines.map((x,i)=>{const z=lineInfo(x),discountPct=z.amount>0?z.discount*100/z.amount:0,hasSaving=savingsTemplate&&z.discount>0,saving=template==='T11'&&hasSaving?`<tr class="saving-row"><td colspan="4"><div class="saving-line"><span>Discount: ${pct(discountPct)}%</span><span>You Save: ${ccy}${money(z.discount)}</span></div></td></tr>`:'';if(template==='A11')return `<tr><td><b>${esc(x.Name||'Item')}</b>${showCode?'<br><span class="mono">'+esc(x.Barcode||'')+'</span>':''}</td><td>${num(z.qty)} ${esc(z.unit)}</td><td class="amt">${ccy}${money(z.rate)}</td><td class="amt">${hasSaving?pct(discountPct)+'%':'-'}</td><td class="amt">${hasSaving?ccy+money(z.discount):'-'}</td><td class="amt"><b>${ccy}${money(z.net)}</b></td></tr>`;return `<tr class="${hasSaving?'discounted':''}">
+   const rows=lines.map((x,i)=>{const z=lineInfo(x),discountPct=z.amount>0?z.discount*100/z.amount:0,hasSaving=savingsTemplate&&z.discount>0,saving=template==='T11'&&hasSaving?`<tr class="saving-row"><td colspan="4"><div class="saving-line"><span>Discount: ${pct(discountPct)}%</span></div></td></tr>`:'';if(template==='A11')return `<tr><td><b>${esc(x.Name||'Item')}</b>${showCode?'<br><span class="mono">'+esc(x.Barcode||'')+'</span>':''}</td><td>${num(z.qty)} ${esc(z.unit)}</td><td class="amt">${ccy}${money(z.rate)}</td><td class="amt">${hasSaving?pct(discountPct)+'%':'-'}</td><td class="amt">${hasSaving?ccy+money(z.discount):'-'}</td><td class="amt"><b>${ccy}${money(z.net)}</b></td></tr>`;return `<tr class="${hasSaving?'discounted':''}">
      <td>${showCode?'<span class="mono">'+esc(x.Barcode||'')+'</span><br>':''}<b>${esc(x.Name||'Item')}</b>${(detailed||isPharma)?`<div class="batch">Batch: ${esc(x.BatchNo||'-')} ${x.ExpiryDate?' · Exp: '+new Date(x.ExpiryDate).toLocaleDateString('en-IN'):''}</div>`:''}</td>
      <td>${num(z.qty)} ${esc(z.unit)}</td><td class="amt">${ccy}${money(z.rate)}</td><td class="amt">${ccy}${money(template==='T11'?z.net:z.amount)}</td></tr>${saving}`}).join('');
    const lineInfoRows=lines.map(lineInfo),itemSavings=lineInfoRows.reduce((a,z)=>a+z.discount,0),receiptGross=lineInfoRows.reduce((a,z)=>a+z.amount,0),totalSavings=itemSavings+Math.max(0,Number(h.Discount||0));
@@ -150,7 +150,7 @@ ${styleCss(template,thermal)}
    if(jewellery()&&state.template==='A11')state.template='A01';
    document.querySelectorAll('.pm-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
    const width=document.querySelector('#pmWidthWrap');if(width)width.style.display=mode==='Thermal'?'grid':'none';
-   cards();preview()
+   document.querySelectorAll('.print-master .billing-print-actions,.print-master #billingPrintActions,.print-master #printMasterBillPrintAction').forEach(x=>x.remove());cards();preview()
  };
  window.setThermalWidth=function(v){state.width=v;preview()};
  window.setPrintCurrency=function(v){state.currency=String(v||'SYMBOL').toUpperCase()==='RS'?'RS':'SYMBOL';preview()};
@@ -214,10 +214,10 @@ ${styleCss(template,thermal)}
    return {id:Number(id),invoiceNo:x.d.h?.InvoiceNo||('Bill-'+id),billDate:x.d.h?.BillDate||null,html,
     mode:x.cfg.mode,width:x.cfg.width,template:x.cfg.template,format:x.d.h?.PrintFormat||(x.cfg.mode==='A4'?'A4 Printer':'Thermal Printer '+x.cfg.width),snapshot:!!saved};
  };
- window.printInvoice=async function(id){
+ window.printInvoice=async function(id,modeOverride){
    try{
     const a=await window.getInvoicePrintArtifact(id);
-    if(window.premiumPrintHtml)return window.premiumPrintHtml(a.html,a.invoiceNo);
+    if(window.premiumPrintHtml)return window.premiumPrintHtml(a.html,a.invoiceNo,modeOverride);
     const w=window.open('','_blank',a.mode==='Thermal'?'width=460,height=760':'width=1000,height=800');
     if(!w)return toast('Popup blocked');w.document.write(a.html);w.document.close();w.print()
    }catch(e){alert('Print failed: '+e.message)}
