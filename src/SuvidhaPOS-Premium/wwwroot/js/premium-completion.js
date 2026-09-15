@@ -314,14 +314,10 @@ if(typeof baseMetalSave==='function')w.saveMetalRate=async function(){
 };
 
 var basePrintSettings=w.loadPrintSettings;
-w.premiumSetPrintAction=async function(mode){
- try{await api('/api/app-settings/'+encodeURIComponent('Print.ActionMode'),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({Value:mode})});notify('Print action saved: '+mode)}catch(err){alert(err.message)}
-};
 if(typeof basePrintSettings==='function')w.loadPrintSettings=async function(){
- await basePrintSettings.apply(this,arguments);
- var controls=d.querySelector('.pm-controls');if(!controls||d.getElementById('premiumPrintActions'))return;
- var mode=await printAction(),box=d.createElement('div');box.id='premiumPrintActions';box.className='premium-print-actions';box.innerHTML='<b>BILL PRINT ACTION</b><label><input type="radio" name="premiumPrintAction" value="DIRECT" '+(mode==='DIRECT'?'checked':'')+' onchange="premiumSetPrintAction(this.value)"> Direct Print <small>No print dialog</small></label><label><input type="radio" name="premiumPrintAction" value="PDF" '+(mode==='PDF'?'checked':'')+' onchange="premiumSetPrintAction(this.value)"> Save to PDF <small>Select PDF file</small></label><label><input type="radio" name="premiumPrintAction" value="PREVIEW" '+(mode==='PREVIEW'?'checked':'')+' onchange="premiumSetPrintAction(this.value)"> Preview & Print <small>Preview before printing</small></label>';
- controls.insertBefore(box,controls.querySelector('#pmStyles')||controls.firstChild);
+ var result=await basePrintSettings.apply(this,arguments);
+ var legacy=d.getElementById('premiumPrintActions');if(legacy)legacy.remove();
+ return result;
 };
 
 w.premiumPrintJewelleryDraft=async function(){
