@@ -150,7 +150,8 @@ ${styleCss(template,thermal)}
    if(jewellery()&&state.template==='A11')state.template='A01';
    document.querySelectorAll('.pm-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
    const width=document.querySelector('#pmWidthWrap');if(width)width.style.display=mode==='Thermal'?'grid':'none';
-   document.querySelectorAll('.print-master .billing-print-actions,.print-master #billingPrintActions,.print-master #printMasterBillPrintAction').forEach(x=>x.remove());cards();preview()
+   const purgePrintActionPanels=()=>document.querySelectorAll('.print-master .billing-print-actions,.print-master #billingPrintActions,.print-master #printMasterBillPrintAction').forEach(x=>x.remove());
+   purgePrintActionPanels();[0,50,200,600].forEach(ms=>setTimeout(purgePrintActionPanels,ms));cards();preview()
  };
  window.setThermalWidth=function(v){state.width=v;preview()};
  window.setPrintCurrency=function(v){state.currency=String(v||'SYMBOL').toUpperCase()==='RS'?'RS':'SYMBOL';preview()};
