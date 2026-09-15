@@ -23,12 +23,20 @@ assert.ok(billing.includes("Print.Normal.ActionMode"),'Normal print action setti
 assert.ok(billing.includes("JEWEL_PRINT_KEY='Print.ActionMode'"),'Jewellery legacy action key must remain isolated');
 assert.ok(!billing.includes("saveMode('DIRECT',false)"),'New normal bill must not overwrite default print action');
 assert.ok(billing.includes('modeOverride'),'Print engine must accept an explicit action override');
-assert.ok(counter.includes("await printLastBill(data.id)"),'Billing must await selected print action before opening next bill');
+assert.ok(billing.includes('billModeOverride=true'),'Current bill print selection must lock against late default loads');
+assert.ok(billing.includes('if(!billModeOverride)currentMode'),'Late Print Master default must not overwrite a current-bill choice');
+assert.ok(counter.includes("await printLastBill(data.id,selectedPrintMode)"),'Billing must capture and await the selected print action before opening next bill');
 
 const print=read(files.print);
 for(const token of ["['A11','Discount Savings A4'","Print.Normal.ActionMode","Default Bill Print Action","a4Orientation","'A02','A07'","Discount %","You Save","22"])
  assert.ok(print.includes(token),'Print Master missing '+token);
 assert.ok(print.includes("jewellery()?A4.filter(x=>x[0]!=='A11'):A4"),'A11 must stay out of Jewellery Print Master');
+const t11Rows=print.slice(print.indexOf('const rows=lines.map'),print.indexOf('const lineInfoRows='));
+assert.ok(t11Rows.includes('Discount:'),'T11 must keep per-item Discount % line');
+assert.ok(!t11Rows.includes('You Save:'),'T11 must not print per-item You Save amount');
+assert.ok(print.includes('YOU SAVED'),'T11 must retain total savings at bill bottom');
+const printCss=read('src/SuvidhaPOS-Premium/wwwroot/css/print-master.css');
+assert.ok(printCss.includes('.print-master .billing-print-actions'),'Print Master must suppress redundant Bill Print Action panel');
 
 const purchase=read(files.purchase),imp=read(files.import);
 const purchaseModeToken='purchase-mode-'+'$'+'{mode}';
@@ -45,7 +53,7 @@ assert.ok(!retailFeaturePage.includes('Jewellery controls stay separate'),'Reque
 assert.ok(retailFeaturePage.includes('← Back'),'Feature Control Back action missing');
 
 const inv=read(files.inventory),backend=read('src/SuvidhaPOS-Premium/InventoryMasterModules.cs'),schema=read('src/SuvidhaPOS-Premium/Database/schema.sql');
-const ordered=['Opening Stock','Purchase','Purchase Detail','Sale Return','Purchase Return','Damage Entry','Closing Stock','Stock Receive','Stock Transfer'];
+const ordered=['Opening Stock','Purchase','Suppliers','Purchase Detail','Sale Return','Purchase Return','Damage Entry','Closing Stock','Stock Receive','Stock Transfer'];
 let last=-1;for(const name of ordered){const at=inv.indexOf("['"+name+"'");assert.ok(at>last,'Inventory Master option missing/out of order: '+name);last=at}
 for(const token of ['/api/inventory/damage','/api/inventory/receive','/api/inventory/transfer','STOCK_TRANSFER_OUT','IN_TRANSIT','stock-date-wise'])
  assert.ok(backend.includes(token),'Inventory backend missing '+token);
@@ -54,6 +62,8 @@ for(const token of ['StockDamageEntries','StockReceipts','StockTransfers','Stock
 assert.ok(inv.includes("if(jewel())return loadDashboard()"),'Inventory Master must be normal-only');
 
 const reports=read(files.reports);
+for(const token of ['normalReportPopupOverlay','reportExportActions','Report has not been generated yet.','Reporting For :','Printed On :',"orientation=keys.length>8?'landscape':'portrait'"])
+ assert.ok(reports.includes(token),'Generate-first popup/export format missing '+token);
 for(const token of ['Bill No. ','Bill Detail Report From ','desktopSaveTextFile','desktopPrintHtmlBatch','previewBillDetailOriginal','getInvoicePrintArtifact'])
  assert.ok(reports.includes(token)||read(files.print).includes(token)||read(files.desktop).includes(token),'Historical report export missing '+token);
 const printSchema=read('src/SuvidhaPOS-Premium/Database/print-schema.sql');
@@ -70,9 +80,15 @@ const html=read('src/SuvidhaPOS-Premium/wwwroot/index.html');
 assert.ok(html.includes('data-page="inventorymaster"'),'Inventory Master sidebar entry missing');
 assert.ok(!html.includes('data-page="purchase"'),'Purchase must not remain a top-level sidebar entry');
 assert.ok(!html.includes('data-page="returns"'),'Returns must not remain a top-level sidebar entry');
+assert.ok(!html.includes('data-page="suppliers"'),'Suppliers must not remain a top-level sidebar entry');
+assert.ok(inv.includes("['Suppliers','Supplier master, payments and ledger'"),'Supplier Master tile must live inside Inventory Master');
+
+assert.ok(counter.includes('function cbQtyStep(unit)'),'Billing must choose quantity step from UOM');
+assert.ok(counter.includes('step="1" value="1"'),'New Billing count-unit quantity spinner must start at integer step 1');
+assert.ok(counter.includes("cbFractionalUnit(unit)?0.1:1"),'Measured units must allow decimal quantity stepping');
 
 const manual=read('src/SuvidhaPOS-Premium/ManualPurchaseService.cs');
 assert.ok(manual.includes('Bill No is required'),'Backend Bill No guard missing');
 assert.ok(!manual.includes('?"PUR-"+Guid.NewGuid()'),'Manual purchase must not auto-generate Bill No');
 
-console.log('PASS: hold modal, print action, A4 A11, purchase validation/import delete, Inventory Master, historical bill detail and Desktop exports');
+console.log('PASS: popup reports, supplier inventory move, quantity UOM steps, print actions, purchase/inventory and historical exports');
