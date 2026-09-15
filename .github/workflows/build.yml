@@ -162,7 +162,7 @@ jobs:
           foreach($token in @('Normal Item Import Master','Jewellery Item Import Master','downloadNormalItemSample','downloadJewelleryItemSample','916','22K','INCLUSIVE','EXCLUSIVE','SKIP','UPDATE','CREATE','ItemImportJobs','ItemImportConflicts')){ if(-not ($backend+$ui+$schema).Contains($token)){ throw "P-05/P-06/P-07/P-18/P-19 import feature missing: $token" } }
           foreach($token in @('PremiumFeatureFlags','/api/premium/features','Feature Control')){ if(-not ($backend+$ui+$schema).Contains($token)){ throw "P-20 feature control missing: $token" } }
           foreach($token in @('TaxMode','INCLUSIVE','beforeDiscount')){ if(-not ($counter+$premium+$program).Contains($token)){ throw "Inclusive/exclusive normal billing missing: $token" } }
-          foreach($token in @('Print.ActionMode','Direct Print','Save to PDF','Preview & Print')){ if(-not ($ui+$print).Contains($token)){ throw "Three bill print actions missing: $token" } }
+          foreach($token in @('Print.ActionMode','Direct Print','Save As PDF','Print & Preview')){ if(-not ($ui+$print).Contains($token)){ throw "Three bill print actions missing: $token" } }
           foreach($token in @('desktopPrintHtml','printHtml')){ if(-not ($bridge+$desktop).Contains($token)){ throw "Desktop print bridge missing: $token" } }
           foreach($token in @('PrintAsync(null)','PrintToPdfAsync','ShowPrintUI')){ if(-not $desktop.Contains($token)){ throw "Native print action missing: $token" } }
           foreach($token in @('premium-completion.js','premium-completion.css','Version 6.12.0-complete')){ if(-not $html.Contains($token)){ throw "Completion runtime asset missing: $token" } }
