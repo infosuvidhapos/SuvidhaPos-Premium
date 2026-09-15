@@ -44,7 +44,7 @@ w.cbRemoveBillRow=function(i){if(typeof state==='undefined'||!state.cart||!state
 function startNewBill(root,isJewel){
  if(isJewel){
   if(lastJewelRoot===root)return;lastJewelRoot=root;
-  billModeOverride=false;currentMode='DIRECT';modeLoaded=true;syncRadios();
+  billModeOverride=false;modeLoaded=false;readMode();
   return;
  }
  if(lastNormalRoot===root)return;lastNormalRoot=root;
@@ -64,7 +64,7 @@ function patchJewellery(){
  if(!root.querySelector('#billingPrintActions')){var tabs=root.querySelector('.js-bill-tabs');if(tabs)tabs.insertAdjacentHTML('afterend',printBox())}
  syncRadios();
 }
-function patch(){if(injectBusy)return;injectBusy=true;requestAnimationFrame(function(){injectBusy=false;if(q('.print-master')){qa('.print-master .billing-print-actions,.print-master #billingPrintActions,.print-master #printMasterBillPrintAction').forEach(function(x){x.remove()});return}ensureStyle();patchNormal();patchJewellery();syncRadios()})}
+function patch(){if(injectBusy)return;injectBusy=true;requestAnimationFrame(function(){injectBusy=false;if(q('.print-master')){qa('#billingPrintActions,.billing-print-actions,#printMasterBillPrintAction').forEach(function(x){x.remove()});return}ensureStyle();patchNormal();patchJewellery();syncRadios()})}
 new MutationObserver(patch).observe(q('#app')||d.body,{childList:true,subtree:true});
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',function(){readMode();patch()});else{readMode();patch()}
 
