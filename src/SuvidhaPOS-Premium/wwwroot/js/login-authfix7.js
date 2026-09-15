@@ -235,7 +235,7 @@
     var support = el('supportBtn'), forgot = el('forgotPasswordBtn');
     function supportFallback() {
       if (typeof w.openSuvidhaContactSupport === 'function') { w.openSuvidhaContactSupport(); return; }
-      if (!postDesktop('support', {})) { try { w.open('https://www.suvidhapos.com', '_blank'); } catch (_) {} }
+      if (!postDesktop('support', {})) { try { w.open('https://wa.me/918271718844', '_blank'); } catch (_) {} }
     }
     if (support) support.addEventListener('click', supportFallback);
     if (forgot) forgot.addEventListener('click', supportFallback);
