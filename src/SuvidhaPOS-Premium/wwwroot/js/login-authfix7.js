@@ -190,6 +190,7 @@
   function updateCapsLock(e) {
     var warning = el('capsLockWarning');
     if (!warning || !e || typeof e.getModifierState !== 'function') return;
+    warning.textContent = '⚠ Caps Lock is ON';
     warning.hidden = !e.getModifierState('CapsLock');
   }
   function onReady() {
