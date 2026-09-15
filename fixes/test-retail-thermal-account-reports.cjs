@@ -31,14 +31,18 @@ for(const token of [
  'Cashier Sign: ______________','Manager Sign: ______________'
 ]) assert.ok(thermal.includes(token),'Daily Account receipt token missing: '+token);
 assert.ok(thermal.includes('@page{size:80mm auto'),'Thermal report must be 80mm compatible');
-for(const token of ['DIRECT','PREVIEW','REPORT_PDF','desktopSaveTextFile','desktopSaveReportXlsx','.xlsx',' Form '])assert.ok(thermal.includes(token),'Print/export mode missing '+token);
+for(const token of ['DIRECT','PREVIEW','REPORT_PDF','desktopSaveTextFile','desktopSaveReportXlsx','.xlsx',' From '])assert.ok(thermal.includes(token),'Print/export mode missing '+token);
+for(const token of ['>Generate<','Thermal Print 80mm','Preview / Print','Current date preview opens automatically','await w.runRetailThermalReport()','← Reports'])assert.ok(thermal.includes(token),'Audit-style thermal report UI missing '+token);
+assert.ok(!thermal.includes('>Export PDF<'),'Six thermal pages must not show Export PDF action');
+assert.ok(!thermal.includes('>Export Excel<'),'Six thermal pages must not show Export Excel action');
+assert.ok(!thermal.includes('rtrExportActions'),'Six thermal pages must expose only three report actions');
 
 for(const token of [
  '/api/reports/thermal/{type}','SalesReturns','SalePayments','CustomerPayments','SupplierPayments','DayClosings','HeldBills','AuditLogs','Expenses',
  'grossSales','itemDiscount','billDiscount','netSales','cgst','sgst','expectedCash','actualCash','averageBillValue'
 ]) assert.ok(backend.includes(token),'Backend thermal report data missing '+token);
 assert.ok(backend.includes('cashWithdrawal=0m'),'Cash withdrawal must be explicit zero instead of guessed data');
-assert.ok(html.includes('/js/retail-thermal-reports.js?v=6300'),'Thermal report JS not loaded');
+assert.ok(html.includes('/js/retail-thermal-reports.js?v=6310'),'Thermal report JS not loaded');
 assert.ok(html.includes('/css/retail-thermal-reports.css?v=6290'),'Thermal report CSS not loaded');
 
 console.log('PASS: 25-report master and six 80mm thermal account/closing reports');
