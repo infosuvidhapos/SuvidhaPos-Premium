@@ -39,6 +39,7 @@
   window.desktopOpenPath=(path)=>send('openPath',{path});
   window.desktopPrintHtml=(html,mode='PREVIEW',fileName='SuvidhaPOS-Bill')=>send('printHtml',{html,mode,fileName});
   window.desktopSaveTextFile=(fileName,content)=>send('saveTextFile',{fileName,content});
+  window.desktopSaveReportXlsx=(payload)=>send('saveReportXlsx',payload||{});
   window.desktopPrintHtmlBatch=(items,folderName)=>send('printHtmlBatch',{items,folderName});
 
 
