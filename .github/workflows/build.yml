@@ -330,7 +330,7 @@ jobs:
           $css=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/app.css' -Raw -Encoding UTF8
           foreach($token in @('dashboard-premium','html[data-theme="light"]','@media(min-width:2400px)','.brandmark{width:48px')){if(-not $css.Contains($token)){throw "Responsive CSS missing: $token"}}
           $login=Get-Content 'src/SuvidhaPOS-Premium/wwwroot/css/login-premium.css' -Raw -Encoding UTF8
-          foreach($token in @('1366x768','font-size:42px','min-width:1900px')){if(-not $login.Contains($token)){throw "Login responsive CSS missing: $token"}}
+          foreach($token in @('@media(max-width:1366px)','@media(max-height:768px)','Windows display scaling 125%','overflow:hidden')){if(-not $login.Contains($token)){throw "Login responsive CSS missing: $token"}}
       - name: Validate compact sidebar and page subtitle reset
         shell: powershell
         run: |
