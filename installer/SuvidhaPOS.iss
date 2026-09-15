@@ -244,10 +244,38 @@ begin
   RaiseException('SQL Server 2019 Express installation failed.');
 end;
 
+function PreferredDatabaseFolder: String;
+begin
+  if DirExists('D:\') then
+    Result := 'D:\Suvidha Pos\Database'
+  else if DirExists('E:\') then
+    Result := 'E:\Suvidha Pos\Database'
+  else
+  begin
+    MsgBox('SuvidhaPOS requires D: for its SQL database, or E: when D: is unavailable.' + #13#10 +
+      'Required folder: D:\Suvidha Pos\Database or E:\Suvidha Pos\Database', mbError, MB_OK);
+    RaiseException('No D: or E: drive is available for the SuvidhaPOS database.');
+  end;
+end;
+
+procedure EnsureDatabaseFolder;
+var
+  Folder: String;
+begin
+  Folder := PreferredDatabaseFolder;
+  if not DirExists(Folder) then
+    if not ForceDirectories(Folder) then
+      RaiseException('Unable to create database folder: ' + Folder);
+  Log('SQLBOOTSTRAP: SuvidhaPOS MDF/LDF folder ready: ' + Folder);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
+  begin
+    EnsureDatabaseFolder;
     EnsureSqlExpress;
+  end;
 end;
 
 function CanLaunchApplication: Boolean;
